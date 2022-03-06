@@ -2,17 +2,21 @@
 
 An io_context library aimed at low-latency io, based on liburingcxx.
 
-**co_context** 是一个**协程**异步多线程并发框架，主要瞄准性能（低延迟优先，高并发其次）。**co_context** 也致力于减轻用户的心智负担。让 C++ 初学者也能轻松写出高并发程序。
+**co_context** 是一个**协程**异步多线程并发框架，主要瞄准性能（低延迟优先，高并发其次）。**co_context** 也致力于减轻用户的心智负担，让 C++ 初学者也能轻松写出高并发程序。
 
 目前 **co_context** 的设计仍处于极早期的混沌状态。No timeline and no roadmap yet.
 
-如果你正在寻找 C++ 异步的终极解决方案，且不在乎编程复杂度，我推荐你学习 **sender/receiver model**，而无需尝试协程。
+在我创建这个项目之前，我已经知道基于协程的异步框架很可能**不是**性能最优解，如果你正在寻找 C++ 异步的终极解决方案，且不在乎编程复杂度，我推荐你学习 **sender/receiver model**，而无需尝试协程。
+
+如果你想最佳地平衡「开发、维护成本」和「项目质量、性能」，从而最大化经济效益，我推荐你关注协程方案。
 
 ---
 
-<detail>
+<details>
 
-# draft zone
+<summary>draft zone</summary>
+
+# draft
 
 - 研究 liburingcxx 如何支持多生产者，多消费者并行（线程池中每个线程同时是 IO 生产者和消费者）
 - Coroutine 解决内联和动态内存分配问题
@@ -52,4 +56,4 @@ An io_context library aimed at low-latency io, based on liburingcxx.
 
 
 
-</detail>
+</details>
