@@ -24,12 +24,13 @@
 #include <atomic>
 #include <semaphore>
 #include <thread>
-#include <coroutine>
 #include <chrono>
 #include <cassert>
 #include <vector>
 #include <queue>
 #include "uring.hpp"
+#include <co_context/task.hpp>
+
 #include <iostream>
 #include <syncstream>
 
@@ -50,7 +51,7 @@ namespace detail {
     using liburingcxx::SQEntry;
     using liburingcxx::CQEntry;
 
-    struct task_info {
+    struct [[nodiscard]] task_info {
         union {
             SQEntry *sqe;
             CQEntry *cqe;
@@ -76,7 +77,7 @@ template<
     unsigned total_threads_number = 8,
     bool perf_mode = true,
     uint16_t swap_slots = 1024 / task_info_number_per_cache_line>
-class co_context final {
+class [[nodiscard]] co_context final {
   public:
     static constexpr uint16_t task_info_number_per_thread =
         task_info_number_per_cache_line * swap_slots;

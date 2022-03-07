@@ -67,6 +67,7 @@
         "stop_token": "cpp",
         "syncstream": "cpp",
         "thread": "cpp",
-        "coroutine": "cpp"
+        "coroutine": "cpp",
+        "variant": "cpp"
     }
 }

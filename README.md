@@ -14,6 +14,17 @@ An io_context library aimed at low-latency io, based on [liburingcxx](https://gi
 
 如果你希望异步框架能够最佳地平衡「开发、维护成本」和「项目质量、性能」，从而最大化经济效益，我推荐你关注协程方案。
 
+
+## 关于缓存友好问题
+
+**co_context** 竭尽所能避免缓存问题：
+1. **co_context** 的主线程和任意 worker 的数据交换中没有使用互斥锁或原子变量。
+2. **co_context** 的数据结构保证「可能频繁读写」的 cacheline 最多被两个线程访问，无论并发强度有多大。这个保证本身也不经过互斥锁或原子变量。（若使用原子变量，高竞争下性能损失约 33%～70%）
+3. 对于可能被多于两个线程读写的 cacheline，**co_context** 保证乒乓缓存问题最多发生常数次。
+4. 在 AMD-5800X，3200 Mhz-ddr4 环境下，若绕过 io_uring，**co_context** 的线程交互频率可达 1.25 GHz。（线程数=6，swap_slots=256，0.980 s 内完成1.25 G 次生产消费）
+5. 协程自身的缓存不友好问题（主要由 `operator new` 引起），需要借助其他工具来解决。
+
+
 ---
 
 <details>
@@ -34,15 +45,6 @@ An io_context library aimed at low-latency io, based on [liburingcxx](https://gi
 - 每个 worker 自带两条任务队列（一个sqe，一个cqe），固定长度，原子变量，cacheline友好。sqe放不下就放 std::queue，等有空位再放入共享cache。
 - 主线程cqe推送满了就切换到提交sqe
 - 主线程sqe提交满了就切换到推送cqe
-
-## 关于缓存友好问题
-
-**co_context** 竭尽所能避免缓存问题：
-1. **co_context** 的主线程和任意 worker 的数据交换中没有使用互斥锁或原子变量。
-2. **co_context** 的数据结构保证「可能频繁读写」的 cacheline 最多被两个线程访问，无论并发强度有多大。这个保证本身也不经过互斥锁或原子变量。（若使用原子变量，高竞争下性能损失约 33%～70%）
-3. 可能被多于两个线程读写的 cacheline，**co_context** 保证乒乓缓存问题最多发生常数次。
-4. 在 AMD-5800X，3200 Mhz-ddr4 环境下，若绕过 io_uring，**co_context** 的线程交互频率可达 1.25 GHz。（线程数=6，swap_slots=256，0.980 s 内完成1.25 G 次生产消费）
-5. 协程自身的缓存不友好问题（主要由 `operator new` 引起），需要借助其他工具来解决。
 
 ## 协程存在的问题
 
