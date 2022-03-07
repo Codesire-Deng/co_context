@@ -260,6 +260,10 @@ class co_context final {
         printf("co_context::run(): done\n");
     }
 
+    void run() {
+        
+    }
+
     ~co_context() noexcept {
         for (std::thread &t : worker_threads) {
             t.join();
