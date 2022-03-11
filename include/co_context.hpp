@@ -31,6 +31,7 @@
 #include "uring.hpp"
 #include "co_context/task.hpp"
 #include "co_context/config.hpp"
+#include "co_context/set_cpu_affinity.hpp"
 
 #include <iostream>
 #include <syncstream>
@@ -131,11 +132,22 @@ class [[nodiscard]] co_context final {
         } submit_cur, reap_cur;
         std::queue<task_info *> submit_overflow_buf;
 
-        inline void
-        init(const int thread_index, co_context *const context) noexcept {
+        inline void init(const int thread_index, co_context *const context) {
             assert(submit_overflow_buf.empty());
             this->ctx = context;
             this->tid = thread_index;
+#ifdef USE_CPU_AFFINITY
+            const unsigned logic_cores = std::thread::hardware_concurrency();
+            if constexpr (config::use_hyper_threading) {
+                if (this->tid * 2 < logic_cores) {
+                    detail::set_cpu_affinity(this->tid * 2);
+                } else {
+                    detail::set_cpu_affinity(this->tid * 2 % logic_cores + 1);
+                }
+            } else {
+                detail::set_cpu_affinity(this->tid);
+            }
+#endif
         }
 
         void hello_world() noexcept {
@@ -150,6 +162,11 @@ class [[nodiscard]] co_context final {
         void run(const int thread_index, co_context *const context) {
             init(thread_index, context);
             auto &submit_swap = ctx->submit_swap;
+
+            hello_world();
+            // while (true)
+            // std::this_thread::sleep_for(std::chrono::seconds(10));
+            while (true) {}
         }
 
         void run_test_swap(const int thread_index, co_context *const context) {
@@ -166,7 +183,6 @@ class [[nodiscard]] co_context final {
                 cur.next();
             }
         }
-
     } worker[worker_threads_number];
 
     union alignas(cache_line_size) {
@@ -197,21 +213,26 @@ class [[nodiscard]] co_context final {
     co_context(unsigned io_uring_entries, uring::Params &io_uring_params)
         : ring(io_uring_entries, io_uring_params)
         , ring_entries(io_uring_entries) {
-        memset(submit_swap, 0, sizeof(submit_swap));
-        memset(reap_swap, 0, sizeof(reap_swap));
+        init();
     }
 
     co_context(unsigned io_uring_entries)
         : ring(io_uring_entries), ring_entries(io_uring_entries) {
-        memset(submit_swap, 0, sizeof(submit_swap));
-        memset(reap_swap, 0, sizeof(reap_swap));
+        init();
     }
 
     co_context(unsigned io_uring_entries, uring::Params &&io_uring_params)
         : co_context(io_uring_entries, io_uring_params) {}
 
+    void init() {
+        memset(submit_swap, 0, sizeof(submit_swap));
+        memset(reap_swap, 0, sizeof(reap_swap));
+    }
+
     void probe() const {
         using namespace std;
+        cout << "number of logic cores: " << std::thread::hardware_concurrency()
+             << endl;
         cout << "size of co_context: " << sizeof(co_context) << endl;
         cout << "size of uring: " << sizeof(uring) << endl;
         cout << "size of single swap_zone: " << sizeof(swap_zone) << endl;
@@ -253,7 +274,11 @@ class [[nodiscard]] co_context final {
         printf("co_context::run(): done\n");
     }
 
-    void run() {}
+    void run() {
+#ifdef USE_CPU_AFFINITY
+        detail::set_cpu_affinity(std::thread::hardware_concurrency() - 1);
+#endif
+    }
 
     ~co_context() noexcept {
         for (std::thread &t : worker_threads) {

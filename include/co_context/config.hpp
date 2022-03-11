@@ -8,6 +8,14 @@ namespace co_context {
 
 namespace config {
 
+    inline constexpr bool use_hyper_threading = true;
+#define USE_CPU_AFFINITY
+#ifdef USE_CPU_AFFINITY
+    inline constexpr bool use_CPU_affinity = true;
+#else
+    inline constexpr bool use_CPU_affinity = false;
+#endif
+
 #if __cpp_lib_hardware_interference_size >= 201603
     inline constexpr size_t cache_line_size =
         std::hardware_destructive_interference_size;
