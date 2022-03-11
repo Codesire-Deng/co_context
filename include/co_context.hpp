@@ -29,23 +29,15 @@
 #include <vector>
 #include <queue>
 #include "uring.hpp"
-#include <co_context/task.hpp>
+#include "co_context/task.hpp"
+#include "co_context/config.hpp"
 
 #include <iostream>
 #include <syncstream>
 
 namespace co_context {
 
-#if __cpp_lib_hardware_interference_size >= 201603
-inline constexpr size_t cache_line_size =
-    std::hardware_destructive_interference_size;
-#else
-inline constexpr size_t cache_line_size = 64;
-#endif
-
-namespace test {
-    inline constexpr int64_t swap_tot = 1'250'000'000;
-} // namespace test
+using config::cache_line_size;
 
 namespace detail {
     using liburingcxx::SQEntry;
@@ -69,14 +61,15 @@ namespace detail {
     };
 } // namespace detail
 
-static constexpr uint16_t task_info_number_per_cache_line =
+inline constexpr uint16_t task_info_number_per_cache_line =
     cache_line_size / sizeof(detail::task_info *);
 
 template<
     unsigned io_uring_flags,
-    unsigned total_threads_number = 8,
-    bool perf_mode = true,
-    uint16_t swap_slots = 1024 / task_info_number_per_cache_line>
+    unsigned total_threads_number = config::total_threads_number,
+    bool low_latency_mode = config::low_latency_mode,
+    uint16_t swap_slots =
+        config::swap_capacity / task_info_number_per_cache_line>
 class [[nodiscard]] co_context final {
   public:
     static constexpr uint16_t task_info_number_per_thread =
@@ -130,9 +123,9 @@ class [[nodiscard]] co_context final {
             uint16_t slot = 0;
             uint16_t off = 0;
             inline void next() {
-                if (++off == task_info_number_per_cache_line)  {
+                if (++off == task_info_number_per_cache_line) {
                     off = 0;
-                    if (++slot == swap_slots)  { slot = 0; }
+                    if (++slot == swap_slots) { slot = 0; }
                 }
             }
         } submit_cur, reap_cur;
@@ -157,8 +150,6 @@ class [[nodiscard]] co_context final {
         void run(const int thread_index, co_context *const context) {
             init(thread_index, context);
             auto &submit_swap = ctx->submit_swap;
-
-            
         }
 
         void run_test_swap(const int thread_index, co_context *const context) {
@@ -245,7 +236,8 @@ class [[nodiscard]] co_context final {
     void make_test_thread_pool() {
         for (int i = 0; i < worker_threads_number; ++i)
             std::construct_at(
-                worker_threads + i, &worker_meta::run_test_swap, worker + i, i, this);
+                worker_threads + i, &worker_meta::run_test_swap, worker + i, i,
+                this);
     }
 
     void run_test_swap() {
@@ -261,9 +253,7 @@ class [[nodiscard]] co_context final {
         printf("co_context::run(): done\n");
     }
 
-    void run() {
-        
-    }
+    void run() {}
 
     ~co_context() noexcept {
         for (std::thread &t : worker_threads) {
