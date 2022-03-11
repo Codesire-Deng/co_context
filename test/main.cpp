@@ -13,6 +13,13 @@ int main(int argc, char *argv[]) {
 
     io_context.run();
 
+    using co_context::task;
+
+    auto t = []() -> task<int> {
+        co_return 1;
+    }();
+
+    auto aw = t.operator co_await();
 
     return 0;
 }

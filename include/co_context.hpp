@@ -166,7 +166,7 @@ class [[nodiscard]] co_context final {
             hello_world();
             // while (true)
             // std::this_thread::sleep_for(std::chrono::seconds(10));
-            while (true) {}
+            // while (true) {}
         }
 
         void run_test_swap(const int thread_index, co_context *const context) {
@@ -224,7 +224,7 @@ class [[nodiscard]] co_context final {
     co_context(unsigned io_uring_entries, uring::Params &&io_uring_params)
         : co_context(io_uring_entries, io_uring_params) {}
 
-    void init() {
+    void init() noexcept {
         memset(submit_swap, 0, sizeof(submit_swap));
         memset(reap_swap, 0, sizeof(reap_swap));
     }

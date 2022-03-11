@@ -4,17 +4,17 @@
 #include <variant>
 #include <concepts>
 #include <cassert>
+#include "co_context/static_polymorphism.hpp"
 
 namespace co_context {
 
-template<typename... F>
-struct overloaded : F... {
-    using F::operator()...;
-};
-
-template<typename... F>
-overloaded(F...) -> overloaded<F...>;
-
+/**
+ * @brief A task is a lazy synchronous coroutine that only executes at co_await
+ * <task> (or co_await <task>.when_ready()).
+ * @note As long as a task has been awaited, it will execute immediately at
+ * current thread, and will not return until it's all finished.
+ * @tparam T
+ */
 template<typename T>
 class task;
 
@@ -33,7 +33,7 @@ namespace detail {
         struct final_awaiter {
             constexpr bool await_ready() const noexcept { return false; }
 
-            template<typename Promise>
+            template<std::derived_from<task_promise_base> Promise>
             std::coroutine_handle<>
             await_suspend(std::coroutine_handle<Promise> current) noexcept {
                 return current.promise().fa_coro;
@@ -174,8 +174,8 @@ class [[nodiscard]] task {
         }
 
         std::coroutine_handle<>
-        await_suspend(std::coroutine_handle<> fa_coro) noexcept {
-            handle.promise().set_father(fa_coro);
+        await_suspend(std::coroutine_handle<> awaiting_coro) noexcept {
+            handle.promise().set_father(awaiting_coro);
             return handle;
         }
     };

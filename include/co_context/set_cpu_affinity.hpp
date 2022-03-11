@@ -8,6 +8,12 @@ namespace co_context {
 
 namespace detail {
 
+    /**
+     * @brief Set the cpu affinity for the caller thread.
+     * @param cpu
+     * @note using `sched_setaffinity` with the std::thread might be an
+     * undefined behavior according to ... according to what ??? (forgetful)
+     */
     inline void set_cpu_affinity(int cpu) {
         ::cpu_set_t cpu_set;
         CPU_SET(cpu, &cpu_set);
@@ -21,4 +27,4 @@ namespace detail {
 
 } // namespace co_context
 
-#endif USE_CPU_AFFINITY
+#endif
