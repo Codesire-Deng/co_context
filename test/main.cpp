@@ -1,7 +1,7 @@
 #include "co_context.hpp"
 
 int main(int argc, char *argv[]) {
-    co_context::co_context<0, 6, true, 256> io_context{8};
+    co_context::io_context io_context{8};
 
     io_context.probe();
 

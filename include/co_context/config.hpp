@@ -23,8 +23,9 @@ namespace config {
     inline constexpr size_t cache_line_size = 64;
 #endif
 
-    // these configurations below can be overridden as template parameters
-    inline constexpr unsigned total_threads_number = 8;
+    // About io_context
+    inline constexpr unsigned io_uring_flags = 0;
+    inline constexpr unsigned total_threads_number = 6;
     inline constexpr bool low_latency_mode = true;
     inline constexpr uint16_t swap_capacity = 1024;
 
