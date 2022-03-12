@@ -64,9 +64,6 @@ namespace detail {
         }
     };
 
-} // namespace detail
-
-namespace detail {
     struct alignas(cache_line_size) thread_meta {
         io_context *ctx;
         worker_meta *worker;
@@ -74,64 +71,66 @@ namespace detail {
     };
 
     inline static thread_local thread_meta this_thread;
-} // namespace detail
 
-struct alignas(cache_line_size) worker_meta {
-    enum class worker_state : uint8_t { running, idle, blocked };
-    /**
-     * @brief sharing zone with main thread
-     */
-    struct alignas(cache_line_size) {
-        worker_state state; // TODO atomic?
-        int temp;
-    };
-    struct swap_cur {
-        uint16_t slot = 0;
-        uint16_t off = 0;
-        inline void next() noexcept;
-    } submit_cur, reap_cur;
-    std::queue<detail::task_info *> submit_overflow_buf;
+    struct alignas(cache_line_size) worker_meta {
+        enum class worker_state : uint8_t { running, idle, blocked };
+        /**
+         * @brief sharing zone with main thread
+         */
+        struct alignas(cache_line_size) {
+            worker_state state; // TODO atomic?
+            int temp;
+        };
+        struct swap_cur {
+            uint16_t slot = 0;
+            uint16_t off = 0;
+            void next() noexcept;
+        } submit_cur, reap_cur;
+        std::queue<detail::task_info *> submit_overflow_buf;
 
-    inline void init(const int thread_index, io_context *const context) {
-        assert(submit_overflow_buf.empty());
-        detail::this_thread.ctx = context;
-        detail::this_thread.tid = thread_index;
+        inline void init(const int thread_index, io_context *const context) {
+            assert(submit_overflow_buf.empty());
+            detail::this_thread.ctx = context;
+            detail::this_thread.tid = thread_index;
 #ifdef USE_CPU_AFFINITY
-        const unsigned logic_cores = std::thread::hardware_concurrency();
-        if constexpr (config::use_hyper_threading) {
-            if (thread_index * 2 < logic_cores) {
-                detail::set_cpu_affinity(thread_index * 2);
+            const unsigned logic_cores = std::thread::hardware_concurrency();
+            if constexpr (config::use_hyper_threading) {
+                if (thread_index * 2 < logic_cores) {
+                    detail::set_cpu_affinity(thread_index * 2);
+                } else {
+                    detail::set_cpu_affinity(
+                        thread_index * 2 % logic_cores + 1);
+                }
             } else {
-                detail::set_cpu_affinity(thread_index * 2 % logic_cores + 1);
+                detail::set_cpu_affinity(thread_index);
             }
-        } else {
-            detail::set_cpu_affinity(thread_index);
-        }
 #endif
-    }
-
-    void hello_world() noexcept {
-        {
-            using namespace std;
-            osyncstream synced_out{cout};
-            synced_out << "Hello, world from " << detail::this_thread.tid
-                       << endl;
         }
-        std::this_thread::yield();
-    }
 
-    void run(const int thread_index, io_context *const context) {
-        init(thread_index, context);
+        void hello_world() noexcept {
+            {
+                using namespace std;
+                osyncstream synced_out{cout};
+                synced_out << "Hello, world from " << detail::this_thread.tid
+                           << endl;
+            }
+            std::this_thread::yield();
+        }
 
-        hello_world();
-        // while (true)
-        // std::this_thread::sleep_for(std::chrono::seconds(10));
-        // while (true) {}
-    }
+        void run(const int thread_index, io_context *const context) {
+            init(thread_index, context);
 
-    void
-    run_test_swap(const int thread_index, io_context *const context) noexcept;
-};
+            hello_world();
+            // while (true)
+            // std::this_thread::sleep_for(std::chrono::seconds(10));
+            // while (true) {}
+        }
+
+        void run_test_swap(
+            const int thread_index, io_context *const context) noexcept;
+    };
+
+} // namespace detail
 
 inline constexpr uint16_t task_info_number_per_cache_line =
     cache_line_size / sizeof(detail::task_info *);
@@ -182,7 +181,8 @@ class [[nodiscard]] io_context final {
     // std::counting_semaphore<1> idle_worker_quota{1};
 
   public:
-    friend struct worker_meta;
+    using worker_meta = detail::worker_meta;
+    friend worker_meta;
 
   private:
     alignas(cache_line_size) worker_meta worker[worker_threads_number];
@@ -299,27 +299,31 @@ class [[nodiscard]] io_context final {
     io_context &operator=(io_context &&) = delete;
 };
 
-inline void worker_meta::swap_cur::next() noexcept {
-    if (++off == task_info_number_per_cache_line) {
-        off = 0;
-        if (++slot == io_context::swap_slots) { slot = 0; }
-    }
-}
+namespace detail {
 
-inline void worker_meta::run_test_swap(
-    const int thread_index, io_context *const context) noexcept {
-    init(thread_index, context);
-    auto &submit_swap = context->submit_swap;
-    const int tid = detail::this_thread.tid;
-
-    for (int64_t send = 0;
-         send < test::swap_tot / io_context::worker_threads_number;) {
-        swap_cur &cur = submit_cur;
-        while (submit_swap[cur.slot][tid][cur.off] != nullptr) cur.next();
-        submit_swap[cur.slot][tid][cur.off] = (detail::task_info *)this;
-        ++send;
-        cur.next();
+    inline void worker_meta::swap_cur::next() noexcept {
+        if (++off == task_info_number_per_cache_line) {
+            off = 0;
+            if (++slot == io_context::swap_slots) { slot = 0; }
+        }
     }
-}
+
+    inline void worker_meta::run_test_swap(
+        const int thread_index, io_context *const context) noexcept {
+        init(thread_index, context);
+        auto &submit_swap = context->submit_swap;
+        const int tid = detail::this_thread.tid;
+
+        for (int64_t send = 0;
+             send < test::swap_tot / io_context::worker_threads_number;) {
+            swap_cur &cur = submit_cur;
+            while (submit_swap[cur.slot][tid][cur.off] != nullptr) cur.next();
+            submit_swap[cur.slot][tid][cur.off] = (detail::task_info *)this;
+            ++send;
+            cur.next();
+        }
+    }
+
+} // namespace detail
 
 } // namespace co_context
