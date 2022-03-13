@@ -10,6 +10,8 @@ add_definitions(-DDEBUG)
 
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
+find_package(mimalloc 2.0 REQUIRED)
+
 add_subdirectory(./test)
 # add_subdirectory(./example)
 # add_subdirectory(./src)

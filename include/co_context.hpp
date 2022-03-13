@@ -42,6 +42,8 @@ using config::cache_line_size;
 
 class io_context;
 class worker_meta;
+class eager_io;
+class lazy_io;
 
 namespace detail {
     using liburingcxx::SQEntry;
@@ -325,5 +327,7 @@ namespace detail {
     }
 
 } // namespace detail
+
+
 
 } // namespace co_context

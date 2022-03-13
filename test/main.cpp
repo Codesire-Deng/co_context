@@ -1,3 +1,4 @@
+#include <mimalloc-new-delete.h>
 #include "co_context.hpp"
 
 int main(int argc, char *argv[]) {
