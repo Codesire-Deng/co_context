@@ -2,7 +2,7 @@
 
 An io_context library aimed at low-latency io, based on [liburingcxx](https://github.com/Codesire-Deng/liburingcxx).
 
-**co_context** 是一个**协程**异步多线程并发框架，主要瞄准性能（低延迟优先，高并发其次）。**co_context** 也致力于减轻用户的心智负担，让 C++ 初学者也能轻松写出高并发程序。
+**co_context** 是一个**协程**异步多线程并发框架，主要瞄准性能（倾向低延迟）。**co_context** 也致力于减轻用户的心智负担，让 C++ 初学者也能轻松写出高并发程序。
 
 目前 **co_context** 的设计仍处于极早期的混沌状态。No timeline and no roadmap yet.
 
