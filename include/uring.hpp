@@ -54,6 +54,11 @@ class SQEntry : private io_uring_sqe {
     template<unsigned URingFlags>
     friend class ::liburingcxx::URing;
 
+    inline SQEntry &cloneFrom(const SQEntry &other) noexcept {
+        std::memcpy(this, &other, sizeof(*this));
+        return *this;
+    }
+
     inline SQEntry &setData(uint64_t data) noexcept {
         this->user_data = data;
         return *this;
@@ -84,7 +89,7 @@ class SQEntry : private io_uring_sqe {
         this->addr = reinterpret_cast<uint64_t>(addr);
         this->len = len;
         this->rw_flags = 0;
-        this->user_data = 0;
+        // this->user_data = 0;
         this->buf_index = 0;
         this->personality = 0;
         this->file_index = 0;
@@ -684,9 +689,10 @@ class [[nodiscard]] URing final {
             auto [cqe, availableNum] = __peekCQEntry();
             if (cqe == nullptr && data.waitNum == 0 && data.submit == 0) {
                 if (!isCQRingNeedFlush())
+                    return nullptr;
                     // TODO Reconsider whether to use exceptions
-                    throw std::system_error{
-                        EAGAIN, std::system_category(), "getCQEntry_impl.1"};
+                    // throw std::system_error{
+                    //     EAGAIN, std::system_category(), "getCQEntry_impl.1"};
                 isCQOverflowFlush = true;
             }
             if (data.waitNum > availableNum || isCQOverflowFlush) {

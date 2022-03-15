@@ -8,7 +8,7 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-project(NeedProjectName VERSION 0.1.0 LANGUAGES C CXX)
+project(NeedProjectName VERSION 0.2.0 LANGUAGES C CXX)
 
 include_directories(${PROJECT_SOURCE_DIR}/include)
 

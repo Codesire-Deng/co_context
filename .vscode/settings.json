@@ -68,6 +68,7 @@
         "syncstream": "cpp",
         "thread": "cpp",
         "coroutine": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "cassert": "cpp"
     }
 }

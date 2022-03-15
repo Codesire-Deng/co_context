@@ -32,6 +32,8 @@
 #include "co_context/task.hpp"
 #include "co_context/config.hpp"
 #include "co_context/set_cpu_affinity.hpp"
+#include "co_context/task_info.hpp"
+#include "co_context/main_task.hpp"
 
 #include <iostream>
 #include <syncstream>
@@ -41,30 +43,11 @@ namespace co_context {
 using config::cache_line_size;
 
 class io_context;
-class worker_meta;
-class eager_io;
-class lazy_io;
+// class eager_io;
+// class lazy_io;
 
 namespace detail {
-    using liburingcxx::SQEntry;
-    using liburingcxx::CQEntry;
-
-    struct [[nodiscard]] task_info {
-        union {
-            SQEntry *sqe;
-            CQEntry *cqe;
-        };
-        std::coroutine_handle<> handle;
-        int tid_hint;
-
-        static task_info nop() {
-            return task_info{
-                .sqe = nullptr,
-                .handle{nullptr},
-                .tid_hint = -1,
-            };
-        }
-    };
+    class worker_meta;
 
     struct alignas(cache_line_size) thread_meta {
         io_context *ctx;
@@ -88,11 +71,16 @@ namespace detail {
             uint16_t off = 0;
             void next() noexcept;
         } submit_cur, reap_cur;
-        std::queue<detail::task_info *> submit_overflow_buf;
+        std::queue<task_info *> submit_overflow_buf;
+
+        void submit(task_info *io_info) noexcept;
+
+        std::coroutine_handle<> schedule() noexcept;
 
         inline void init(const int thread_index, io_context *const context) {
             assert(submit_overflow_buf.empty());
             detail::this_thread.ctx = context;
+            detail::this_thread.worker = this;
             detail::this_thread.tid = thread_index;
 #ifdef USE_CPU_AFFINITY
             const unsigned logic_cores = std::thread::hardware_concurrency();
@@ -119,13 +107,12 @@ namespace detail {
             std::this_thread::yield();
         }
 
+        void co_spawn(main_task entrance) noexcept;
+
         void run(const int thread_index, io_context *const context) {
             init(thread_index, context);
 
-            hello_world();
-            // while (true)
-            // std::this_thread::sleep_for(std::chrono::seconds(10));
-            // while (true) {}
+            while (true) { this->schedule().resume(); }
         }
 
         void run_test_swap(
@@ -180,20 +167,7 @@ class [[nodiscard]] io_context final {
     alignas(cache_line_size) uring ring;
     alignas(cache_line_size) swap_zone submit_swap;
     alignas(cache_line_size) swap_zone reap_swap;
-    // std::counting_semaphore<1> idle_worker_quota{1};
 
-  public:
-    using worker_meta = detail::worker_meta;
-    friend worker_meta;
-
-  private:
-    alignas(cache_line_size) worker_meta worker[worker_threads_number];
-
-    union alignas(cache_line_size) {
-        std::thread worker_threads[worker_threads_number];
-    };
-
-  public:
     struct ctx_swap_cur {
         uint16_t slot = 0;
         unsigned tid = 0;
@@ -209,6 +183,24 @@ class [[nodiscard]] io_context final {
             }
         }
     };
+
+    ctx_swap_cur s_cur, r_cur;
+    char __padding0[cache_line_size - 2 * sizeof(ctx_swap_cur)];
+
+    // std::counting_semaphore<1> idle_worker_quota{1};
+
+  public:
+    using worker_meta = detail::worker_meta;
+    friend worker_meta;
+
+  private:
+    alignas(cache_line_size) worker_meta worker[worker_threads_number];
+
+    union alignas(cache_line_size) {
+        std::thread worker_threads[worker_threads_number];
+    };
+
+  public:
 
   private:
     const unsigned ring_entries;
@@ -232,6 +224,8 @@ class [[nodiscard]] io_context final {
     void init() noexcept {
         memset(submit_swap, 0, sizeof(submit_swap));
         memset(reap_swap, 0, sizeof(reap_swap));
+        detail::this_thread.ctx = this;
+        detail::this_thread.tid = std::thread::hardware_concurrency() - 1;
     }
 
     void probe() const {
@@ -267,23 +261,106 @@ class [[nodiscard]] io_context final {
     }
 
     void run_test_swap() {
-        ctx_swap_cur cur;
         for (int64_t recv = 0; recv < test::swap_tot / worker_threads_number
                                           * worker_threads_number;) {
-            while (submit_swap[cur.slot][cur.tid][cur.off] == nullptr)
-                cur.next();
-            submit_swap[cur.slot][cur.tid][cur.off] = nullptr;
+            while (submit_swap[s_cur.slot][s_cur.tid][s_cur.off] == nullptr)
+                s_cur.next();
+            submit_swap[s_cur.slot][s_cur.tid][s_cur.off] = nullptr;
             ++recv;
-            cur.next();
+            s_cur.next();
         }
         printf("io_context::run(): done\n");
     }
 
-    void run() {
-#ifdef USE_CPU_AFFINITY
-        detail::set_cpu_affinity(std::thread::hardware_concurrency() - 1);
-#endif
+    void co_spawn(main_task entrance) {
+        const unsigned tid = detail::this_thread.tid;
+        if (tid < worker_threads_number) return worker[tid].co_spawn(entrance);
+        while (reap_swap[r_cur.slot][r_cur.tid][r_cur.off] != nullptr)
+            r_cur.next();
+
+        reap_swap[r_cur.slot][r_cur.tid][r_cur.off] =
+            entrance.get_io_info_ptr();
+        r_cur.next();
     }
+
+    void run() {
+        detail::this_thread.worker = nullptr;
+#ifdef USE_CPU_AFFINITY
+        detail::this_thread.tid = std::thread::hardware_concurrency() - 1;
+        detail::set_cpu_affinity(detail::this_thread.tid);
+#endif
+
+        make_thread_pool();
+
+        auto forward_task = [this](task_info& task) noexcept {
+            while (reap_swap[r_cur.slot][r_cur.tid][r_cur.off] != nullptr)
+                r_cur.next();
+            reap_swap[r_cur.slot][r_cur.tid][r_cur.off] = &task;
+            r_cur.next();
+        };
+
+        constexpr int swap_size = sizeof(swap_zone) / sizeof(task_info *);
+        liburingcxx::CQEntry *cqe = nullptr;
+        while (true) {
+            do {
+                // submit round
+                int i = 0;
+                for (; i < swap_size; ++i) {
+                    if (submit_swap[s_cur.slot][s_cur.tid][s_cur.off]
+                        != nullptr)
+                        break;
+                    s_cur.next();
+                }
+                if (i == swap_size) break;
+                task_info &io_info =
+                    *submit_swap[s_cur.slot][s_cur.tid][s_cur.off];
+                submit_swap[s_cur.slot][s_cur.tid][s_cur.off] = nullptr;
+
+                if (io_info.type == task_info::task_type::co_spawn) {
+                    forward_task(io_info);
+                    break;
+                }
+
+                if (ring.SQSpaceLeft() == 0) break; // SQRing is full
+                liburingcxx::SQEntry *sqe = ring.getSQEntry();
+
+                sqe->cloneFrom(*io_info.sqe);
+                ring.submit();
+
+                s_cur.next();
+            } while (0);
+            do {
+                // reap round
+                if (cqe == nullptr) [[likely]]
+                    cqe = ring.peekCQEntry();
+                if (cqe == nullptr) break;
+                int i = 0;
+                for (; i < swap_size; ++i) {
+                    if (reap_swap[r_cur.slot][r_cur.tid][r_cur.off] == nullptr)
+                        break;
+                    r_cur.next();
+                }
+                if (i == swap_size) break;
+                task_info &io_info =
+                    *reinterpret_cast<task_info *>(cqe->getData());
+                io_info.result = cqe->getRes();
+
+                // release the io_info into the reap_swap
+                std::atomic_store_explicit(
+                    reinterpret_cast<std::atomic<task_info *> *>(
+                        &reap_swap[r_cur.slot][r_cur.tid][r_cur.off]),
+                    &io_info, std::memory_order_release);
+
+                ring.SeenCQEntry(cqe);
+                cqe = nullptr;
+
+                r_cur.next();
+            } while (0);
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+    }
+
+    inline uring &io() noexcept { return ring; }
 
     ~io_context() noexcept {
         for (std::thread &t : worker_threads) {
@@ -301,6 +378,10 @@ class [[nodiscard]] io_context final {
     io_context &operator=(io_context &&) = delete;
 };
 
+inline void co_spawn(main_task entrance) noexcept {
+    detail::this_thread.ctx->co_spawn(entrance);
+}
+
 namespace detail {
 
     inline void worker_meta::swap_cur::next() noexcept {
@@ -308,6 +389,43 @@ namespace detail {
             off = 0;
             if (++slot == io_context::swap_slots) { slot = 0; }
         }
+    }
+
+    inline void worker_meta::co_spawn(main_task entrance) noexcept {
+        this->submit(entrance.get_io_info_ptr());
+    }
+
+    inline void worker_meta::submit(task_info *io_info) noexcept {
+        const unsigned tid = this_thread.tid;
+        auto &ctx = *this_thread.ctx;
+        auto &cur = this->submit_cur;
+        // std::cerr << cur.slot << " " << tid << cur.off << std::endl;
+        while (ctx.submit_swap[cur.slot][tid][cur.off] != nullptr) cur.next();
+
+        ctx.submit_swap[cur.slot][tid][cur.off] = io_info;
+        // TODO use waiting queue when overflow
+        cur.next();
+    }
+
+    inline std::coroutine_handle<> worker_meta::schedule() noexcept {
+        const unsigned tid = this_thread.tid;
+        auto &ctx = *this_thread.ctx;
+        auto &cur = this->reap_cur;
+        int count = 0;
+        while (ctx.reap_swap[cur.slot][tid][cur.off] == nullptr) {
+            cur.next();
+            if (++count == 100) {
+                count = 0;
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+        }
+
+        const task_info &io_info = *ctx.reap_swap[cur.slot][tid][cur.off];
+        ctx.reap_swap[cur.slot][tid][cur.off] = nullptr;
+        cur.next();
+
+        // TODO consider tid_hint here
+        return io_info.handle;
     }
 
     inline void worker_meta::run_test_swap(
@@ -327,7 +445,5 @@ namespace detail {
     }
 
 } // namespace detail
-
-
 
 } // namespace co_context

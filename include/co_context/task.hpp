@@ -4,7 +4,6 @@
 #include <variant>
 #include <concepts>
 #include <cassert>
-#include "co_context/static_polymorphism.hpp"
 
 namespace co_context {
 
