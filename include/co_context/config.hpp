@@ -29,6 +29,7 @@ namespace config {
     // inline constexpr unsigned total_threads_number = 2;
     inline constexpr bool low_latency_mode = true;
     inline constexpr uint16_t swap_capacity = 1024;
+    // inline constexpr uint16_t swap_capacity = 128;
 
 } // namespace config
 

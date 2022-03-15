@@ -38,12 +38,15 @@ int main(int argc, char *argv[]) {
             for (size_t offset = 0; offset < file_size;) {
                 const size_t to_read =
                     std::min<size_t>(buf_size, file_size - offset);
+                // int res = ::read(file_fd, buf, buf_size);
                 int res = co_await lazy::read(file_fd, buf, offset);
                 offset += res;
                 for (int i=0; i<res; ++i)
                     putchar(buf[i]);
             }
         }
+        printf("ok\n");
+        std::terminate();
     }());
 
     io_context.run();

@@ -283,7 +283,7 @@ class [[nodiscard]] io_context final {
         r_cur.next();
     }
 
-    void run() {
+    [[noreturn]] void run() {
         detail::this_thread.worker = nullptr;
 #ifdef USE_CPU_AFFINITY
         detail::this_thread.tid = std::thread::hardware_concurrency() - 1;
@@ -318,6 +318,7 @@ class [[nodiscard]] io_context final {
 
                 if (io_info.type == task_info::task_type::co_spawn) {
                     forward_task(io_info);
+                    s_cur.next();
                     break;
                 }
 
@@ -356,7 +357,7 @@ class [[nodiscard]] io_context final {
 
                 r_cur.next();
             } while (0);
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            // std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     }
 
@@ -416,7 +417,7 @@ namespace detail {
             cur.next();
             if (++count == 100) {
                 count = 0;
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                // std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
         }
 
