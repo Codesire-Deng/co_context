@@ -9,14 +9,14 @@ if (NOT CMAKE_BUILD_TYPE)
     message("Setting default build type to Release")
 endif()
 
-project(NeedProjectName VERSION 0.2.0 LANGUAGES C CXX)
+project(co_context VERSION 0.2.0 LANGUAGES C CXX)
 
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
 find_package(mimalloc 2.0 REQUIRED)
 
 add_subdirectory(./test)
-# add_subdirectory(./example)
+add_subdirectory(./example)
 # add_subdirectory(./src)
 
 # include(CTest)

@@ -42,19 +42,6 @@ send_all(co_context::socket &sock, std::span<const char> buf) {
     co_return written;
 }
 
- // should somehow notify main thread instead
-    // }());
-
-    /*
-        char buf[8192];
-        int nr = 0;
-        while ((nr = ::read(STDIN_FILENO, buf, sizeof(buf))) > 0) {
-            int nw = co_await send_all(peer, {buf, (size_t)nr});
-            if (nw < nr) { break; }
-        }
-        co_await peer.shutdown_write();
-    */
-
 co_context::main_task run(co_context::socket peer) {
     using namespace co_context;
     // Caution: a bad example for closing connection
