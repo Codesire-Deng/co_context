@@ -25,11 +25,15 @@ namespace config {
 
     // About io_context
     inline constexpr unsigned io_uring_flags = 0;
-    inline constexpr unsigned total_threads_number = 6;
-    // inline constexpr unsigned total_threads_number = 2;
+    // inline constexpr unsigned total_threads_number = 6;
+    inline constexpr unsigned total_threads_number = 2;
     inline constexpr bool low_latency_mode = true;
-    inline constexpr uint16_t swap_capacity = 1024;
-    // inline constexpr uint16_t swap_capacity = 128;
+    // inline constexpr uint16_t swap_capacity = 1024;
+    inline constexpr uint16_t swap_capacity = 128;
+
+    // net configuration
+    inline constexpr bool loopback_only = false;
+
 
 } // namespace config
 

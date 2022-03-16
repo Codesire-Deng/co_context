@@ -688,11 +688,10 @@ class [[nodiscard]] URing final {
 
             auto [cqe, availableNum] = __peekCQEntry();
             if (cqe == nullptr && data.waitNum == 0 && data.submit == 0) {
-                if (!isCQRingNeedFlush())
-                    return nullptr;
-                    // TODO Reconsider whether to use exceptions
-                    // throw std::system_error{
-                    //     EAGAIN, std::system_category(), "getCQEntry_impl.1"};
+                if (!isCQRingNeedFlush()) return nullptr;
+                // TODO Reconsider whether to use exceptions
+                // throw std::system_error{
+                //     EAGAIN, std::system_category(), "getCQEntry_impl.1"};
                 isCQOverflowFlush = true;
             }
             if (data.waitNum > availableNum || isCQOverflowFlush) {

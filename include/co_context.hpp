@@ -70,42 +70,16 @@ namespace detail {
             uint16_t slot = 0;
             uint16_t off = 0;
             void next() noexcept;
-        } submit_cur, reap_cur;
+        };
+        swap_cur submit_cur;
+        swap_cur reap_cur;
         std::queue<task_info *> submit_overflow_buf;
 
         void submit(task_info *io_info) noexcept;
 
         std::coroutine_handle<> schedule() noexcept;
 
-        inline void init(const int thread_index, io_context *const context) {
-            assert(submit_overflow_buf.empty());
-            detail::this_thread.ctx = context;
-            detail::this_thread.worker = this;
-            detail::this_thread.tid = thread_index;
-#ifdef USE_CPU_AFFINITY
-            const unsigned logic_cores = std::thread::hardware_concurrency();
-            if constexpr (config::use_hyper_threading) {
-                if (thread_index * 2 < logic_cores) {
-                    detail::set_cpu_affinity(thread_index * 2);
-                } else {
-                    detail::set_cpu_affinity(
-                        thread_index * 2 % logic_cores + 1);
-                }
-            } else {
-                detail::set_cpu_affinity(thread_index);
-            }
-#endif
-        }
-
-        void hello_world() noexcept {
-            {
-                using namespace std;
-                osyncstream synced_out{cout};
-                synced_out << "Hello, world from " << detail::this_thread.tid
-                           << endl;
-            }
-            std::this_thread::yield();
-        }
+        void init(const int thread_index, io_context *const context);
 
         void co_spawn(main_task entrance) noexcept;
 
@@ -184,8 +158,11 @@ class [[nodiscard]] io_context final {
         }
     };
 
-    ctx_swap_cur s_cur, r_cur;
-    char __padding0[cache_line_size - 2 * sizeof(ctx_swap_cur)];
+    ctx_swap_cur s_cur;
+    ctx_swap_cur r_cur;
+    liburingcxx::CQEntry *polling_cqe = nullptr;
+    char
+        __padding0[cache_line_size - 2 * sizeof(ctx_swap_cur) - sizeof(void *)];
 
     // std::counting_semaphore<1> idle_worker_quota{1};
 
@@ -205,6 +182,70 @@ class [[nodiscard]] io_context final {
   private:
     const unsigned ring_entries;
     int temp = 0;
+
+  private:
+    void forward_task(task_info *task) noexcept {
+        while (reap_swap[r_cur.slot][r_cur.tid][r_cur.off] != nullptr)
+            r_cur.next();
+        reap_swap[r_cur.slot][r_cur.tid][r_cur.off] = task;
+        r_cur.next();
+    }
+
+    void poll_submission() noexcept {
+        constexpr int swap_size = sizeof(swap_zone) / sizeof(task_info *);
+        // submit round
+        int i = 0;
+        for (; i < swap_size; ++i) {
+            if (submit_swap[s_cur.slot][s_cur.tid][s_cur.off] != nullptr) break;
+            s_cur.next();
+        }
+        if (i == swap_size) return;
+        task_info *io_info = submit_swap[s_cur.slot][s_cur.tid][s_cur.off];
+        submit_swap[s_cur.slot][s_cur.tid][s_cur.off] = nullptr;
+
+        if (io_info->type == task_info::task_type::co_spawn) {
+            forward_task(io_info);
+            s_cur.next();
+            return;
+        }
+
+        if (ring.SQSpaceLeft() == 0) return; // SQRing is full
+        liburingcxx::SQEntry *sqe = ring.getSQEntry();
+
+        sqe->cloneFrom(*io_info->sqe);
+        ring.submit();
+
+        s_cur.next();
+    }
+
+    void poll_completion() noexcept {
+        constexpr int swap_size = sizeof(swap_zone) / sizeof(task_info *);
+        // reap round
+        if (polling_cqe == nullptr) [[likely]] {
+            polling_cqe = ring.peekCQEntry();
+            if (polling_cqe == nullptr) return;
+        }
+        int i = 0;
+        for (; i < swap_size; ++i) {
+            if (reap_swap[r_cur.slot][r_cur.tid][r_cur.off] == nullptr) break;
+            r_cur.next();
+        }
+        if (i == swap_size) return;
+        task_info *io_info =
+            reinterpret_cast<task_info *>(polling_cqe->getData());
+        io_info->result = polling_cqe->getRes();
+
+        // release the io_info into the reap_swap
+        std::atomic_store_explicit(
+            reinterpret_cast<std::atomic<task_info *> *>(
+                &reap_swap[r_cur.slot][r_cur.tid][r_cur.off]),
+            io_info, std::memory_order_release);
+
+        ring.SeenCQEntry(polling_cqe);
+        polling_cqe = nullptr;
+
+        r_cur.next();
+    }
 
   public:
     io_context(unsigned io_uring_entries, uring::Params &io_uring_params)
@@ -289,74 +330,11 @@ class [[nodiscard]] io_context final {
         detail::this_thread.tid = std::thread::hardware_concurrency() - 1;
         detail::set_cpu_affinity(detail::this_thread.tid);
 #endif
-
         make_thread_pool();
 
-        auto forward_task = [this](task_info& task) noexcept {
-            while (reap_swap[r_cur.slot][r_cur.tid][r_cur.off] != nullptr)
-                r_cur.next();
-            reap_swap[r_cur.slot][r_cur.tid][r_cur.off] = &task;
-            r_cur.next();
-        };
-
-        constexpr int swap_size = sizeof(swap_zone) / sizeof(task_info *);
-        liburingcxx::CQEntry *cqe = nullptr;
         while (true) {
-            do {
-                // submit round
-                int i = 0;
-                for (; i < swap_size; ++i) {
-                    if (submit_swap[s_cur.slot][s_cur.tid][s_cur.off]
-                        != nullptr)
-                        break;
-                    s_cur.next();
-                }
-                if (i == swap_size) break;
-                task_info &io_info =
-                    *submit_swap[s_cur.slot][s_cur.tid][s_cur.off];
-                submit_swap[s_cur.slot][s_cur.tid][s_cur.off] = nullptr;
-
-                if (io_info.type == task_info::task_type::co_spawn) {
-                    forward_task(io_info);
-                    s_cur.next();
-                    break;
-                }
-
-                if (ring.SQSpaceLeft() == 0) break; // SQRing is full
-                liburingcxx::SQEntry *sqe = ring.getSQEntry();
-
-                sqe->cloneFrom(*io_info.sqe);
-                ring.submit();
-
-                s_cur.next();
-            } while (0);
-            do {
-                // reap round
-                if (cqe == nullptr) [[likely]]
-                    cqe = ring.peekCQEntry();
-                if (cqe == nullptr) break;
-                int i = 0;
-                for (; i < swap_size; ++i) {
-                    if (reap_swap[r_cur.slot][r_cur.tid][r_cur.off] == nullptr)
-                        break;
-                    r_cur.next();
-                }
-                if (i == swap_size) break;
-                task_info &io_info =
-                    *reinterpret_cast<task_info *>(cqe->getData());
-                io_info.result = cqe->getRes();
-
-                // release the io_info into the reap_swap
-                std::atomic_store_explicit(
-                    reinterpret_cast<std::atomic<task_info *> *>(
-                        &reap_swap[r_cur.slot][r_cur.tid][r_cur.off]),
-                    &io_info, std::memory_order_release);
-
-                ring.SeenCQEntry(cqe);
-                cqe = nullptr;
-
-                r_cur.next();
-            } while (0);
+            poll_submission();
+            poll_completion();
             // std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     }
@@ -390,6 +368,26 @@ namespace detail {
             off = 0;
             if (++slot == io_context::swap_slots) { slot = 0; }
         }
+    }
+
+    inline void
+    worker_meta::init(const int thread_index, io_context *const context) {
+        assert(submit_overflow_buf.empty());
+        detail::this_thread.ctx = context;
+        detail::this_thread.worker = this;
+        detail::this_thread.tid = thread_index;
+#ifdef USE_CPU_AFFINITY
+        const unsigned logic_cores = std::thread::hardware_concurrency();
+        if constexpr (config::use_hyper_threading) {
+            if (thread_index * 2 < logic_cores) {
+                detail::set_cpu_affinity(thread_index * 2);
+            } else {
+                detail::set_cpu_affinity(thread_index * 2 % logic_cores + 1);
+            }
+        } else {
+            detail::set_cpu_affinity(thread_index);
+        }
+#endif
     }
 
     inline void worker_meta::co_spawn(main_task entrance) noexcept {

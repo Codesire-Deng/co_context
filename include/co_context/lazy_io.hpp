@@ -33,17 +33,38 @@ namespace detail {
 
 inline namespace lazy {
 
-    detail::lazy_awaiter
-    read(int fd, std::span<char> buf, uint64_t offset) noexcept {
-        detail::lazy_awaiter awaiter;
-        awaiter.io_info.sqe->prepareRead(fd, buf, offset);
+    using detail::lazy_awaiter;
+
+    lazy_awaiter read(int fd, std::span<char> buf, uint64_t offset) noexcept {
+        lazy_awaiter awaiter;
+        awaiter.sqe.prepareRead(fd, buf, offset);
         return awaiter;
     }
 
-    detail::lazy_awaiter
+    lazy_awaiter
     write(int fd, std::span<const char> buf, uint64_t offset) noexcept {
-        detail::lazy_awaiter awaiter;
-        awaiter.io_info.sqe->prepareWrite(fd, buf, offset);
+        lazy_awaiter awaiter;
+        awaiter.sqe.prepareWrite(fd, buf, offset);
+        return awaiter;
+    }
+
+    lazy_awaiter
+    accept(int fd, sockaddr *addr, socklen_t *addrlen, int flags) noexcept {
+        lazy_awaiter awaiter;
+        awaiter.sqe.prepareAccept(fd, addr, addrlen, flags);
+        return awaiter;
+    }
+
+    lazy_awaiter recv(int sockfd, std::span<char> buf, int flags) noexcept {
+        lazy_awaiter awaiter;
+        awaiter.sqe.prepareRecv(sockfd, buf, flags);
+        return awaiter;
+    }
+
+    lazy_awaiter
+    send(int sockfd, std::span<const char> buf, int flags) noexcept {
+        lazy_awaiter awaiter;
+        awaiter.sqe.prepareSend(sockfd, buf, flags);
         return awaiter;
     }
 
