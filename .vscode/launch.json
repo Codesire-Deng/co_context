@@ -7,7 +7,7 @@
             "request": "launch",
             // Resolved by CMake Tools:
             "program": "${command:cmake.launchTargetPath}",
-            "args": ["README.md"],
+            "args": ["localhost", "1234"/* , ">", "/dev/null" */],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [

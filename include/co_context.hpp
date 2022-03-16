@@ -343,7 +343,7 @@ class [[nodiscard]] io_context final {
 
     ~io_context() noexcept {
         for (std::thread &t : worker_threads) {
-            t.join();
+            if (t.joinable()) t.join();
             std::destroy_at(&t);
         }
     }

@@ -1,6 +1,8 @@
 #include <mimalloc-new-delete.h>
 #include "co_context.hpp"
 #include "co_context/lazy_io.hpp"
+#include "co_context/net/socket.hpp"
+#include "co_context/net/acceptor.hpp"
 #include <filesystem>
 #include <fcntl.h>
 

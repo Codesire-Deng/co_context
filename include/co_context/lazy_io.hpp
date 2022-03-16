@@ -12,12 +12,13 @@ namespace detail {
 
         constexpr bool await_ready() const noexcept { return false; }
 
-        std::coroutine_handle<>
+        // std::coroutine_handle<>
+        void
         await_suspend(std::coroutine_handle<> current) noexcept {
             io_info.handle = current;
             auto &worker = *detail::this_thread.worker;
             worker.submit(&io_info);
-            return worker.schedule();
+            // return worker.schedule();
         }
 
         int32_t await_resume() const noexcept { return io_info.result; }
@@ -65,6 +66,25 @@ inline namespace lazy {
     send(int sockfd, std::span<const char> buf, int flags) noexcept {
         lazy_awaiter awaiter;
         awaiter.sqe.prepareSend(sockfd, buf, flags);
+        return awaiter;
+    }
+
+    lazy_awaiter
+    connect(int sockfd, const sockaddr *addr, socklen_t addrlen) noexcept {
+        lazy_awaiter awaiter;
+        awaiter.sqe.prepareConnect(sockfd, addr, addrlen);
+        return awaiter;
+    }
+
+    lazy_awaiter close(int fd) noexcept {
+        lazy_awaiter awaiter;
+        awaiter.sqe.prepareClose(fd);
+        return awaiter;
+    }
+
+    lazy_awaiter shutdown(int fd, int how) noexcept {
+        lazy_awaiter awaiter;
+        awaiter.sqe.prepareShutdown(fd, how);
         return awaiter;
     }
 

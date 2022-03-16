@@ -6,6 +6,11 @@
 #include <unistd.h>
 
 #include "co_context/net/inet_address.hpp"
+#include "co_context/net/acceptor.hpp"
+#include "co_context/net/socket.hpp"
+#include "co_context/task.hpp"
+
+#include <string_view>
 
 int write_n(int fd, const void *buf, int length) {
     int written = 0;
@@ -24,26 +29,63 @@ int write_n(int fd, const void *buf, int length) {
     return written;
 }
 
-void run(TcpStreamPtr stream) {
-    // Caution: a bad example for closing connection
-    std::thread thr([&stream]() {
+co_context::task<int>
+send_all(co_context::socket &sock, std::span<const char> buf) {
+    int written = 0;
+    while (written < buf.size()) {
+        int nw = co_await sock.send(buf, 0);
+        if (nw > 0)
+            written += nw;
+        else
+            break;
+    }
+    co_return written;
+}
+
+ // should somehow notify main thread instead
+    // }());
+
+    /*
         char buf[8192];
         int nr = 0;
-        while ((nr = stream->receiveSome(buf, sizeof(buf))) > 0) {
-            int nw = write_n(STDOUT_FILENO, buf, nr);
+        while ((nr = ::read(STDIN_FILENO, buf, sizeof(buf))) > 0) {
+            int nw = co_await send_all(peer, {buf, (size_t)nr});
             if (nw < nr) { break; }
         }
-        ::exit(0); // should somehow notify main thread instead
-    });
+        co_await peer.shutdown_write();
+    */
 
+co_context::main_task run(co_context::socket peer) {
+    using namespace co_context;
+    // Caution: a bad example for closing connection
     char buf[8192];
     int nr = 0;
-    while ((nr = ::read(STDIN_FILENO, buf, sizeof(buf))) > 0) {
-        int nw = stream->sendAll(buf, nr);
-        if (nw < nr) { break; }
+    int cnt = 0;
+    while ((nr = co_await peer.recv(buf, 0)) > 0) {
+        int nw = write_n(STDOUT_FILENO, buf, nr);
+        if (nw < nr) break;
     }
-    stream->shutdownWrite();
-    thr.join();
+    ::exit(0);
+}
+
+co_context::main_task server(uint16_t port) {
+    using namespace co_context;
+    acceptor ac{inet_address{port}};
+    for (int sockfd; (sockfd = co_await ac.accept()) >= 0;) {
+        co_spawn(run(co_context::socket{sockfd}));
+    }
+}
+
+co_context::main_task client(std::string_view hostname, uint16_t port) {
+    using namespace co_context;
+    inet_address addr;
+    if (inet_address::resolve(hostname, port, addr)) {
+        co_context::socket sock{co_context::socket::create_tcp(addr.family())};
+        co_await sock.connect(addr);
+        co_spawn(run(std::move(sock)));
+    } else {
+        printf("Unable to resolve %s\n", hostname.data());
+    }
 }
 
 int main(int argc, const char *argv[]) {
@@ -57,27 +99,12 @@ int main(int argc, const char *argv[]) {
 
     int port = atoi(argv[2]);
     if (strcmp(argv[1], "-l") == 0) {
-        std::unique_ptr<Acceptor> acceptor(new Acceptor(InetAddress(port)));
-        TcpStreamPtr stream(acceptor->accept());
-        if (stream) {
-            acceptor.reset(); // stop listening
-            run(std::move(stream));
-        } else {
-            perror("accept");
-        }
+        context.co_spawn(server(port));
     } else {
-        InetAddress addr;
-        const char *hostname = argv[1];
-        if (InetAddress::resolve(hostname, port, &addr)) {
-            TcpStreamPtr stream(TcpStream::connect(addr));
-            if (stream) {
-                run(std::move(stream));
-            } else {
-                printf("Unable to connect %s\n", addr.toIpPort().c_str());
-                perror("");
-            }
-        } else {
-            printf("Unable to resolve %s\n", hostname);
-        }
+        context.co_spawn(client(argv[1], port));
     }
+
+    context.run();
+
+    return 0;
 }

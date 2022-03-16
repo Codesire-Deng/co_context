@@ -6,6 +6,7 @@ set(CMAKE_C_STANDARD 17)
 
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
+    message("Setting default build type to Release")
 endif()
 
 project(NeedProjectName VERSION 0.2.0 LANGUAGES C CXX)
