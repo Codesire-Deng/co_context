@@ -58,3 +58,5 @@ _deps
 
 # Built Visual Studio Code Extensions
 *.vsix
+
+draft/

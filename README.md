@@ -10,6 +10,68 @@ An io_context library aimed at low-latency io, based on [liburingcxx](https://gi
 
 1. [mimalloc](https://github.com/microsoft/mimalloc)
 
+## Example
+
+创建一个 io_context，指定 io_uring 的循环队列大小：
+
+```cpp
+    using namespace co_context;
+    io_context context{32};
+```
+
+定义一个监听任务：
+
+```cpp
+co_context::main_task server(uint16_t port) {
+    using namespace co_context;
+    acceptor ac{inet_address{port}};
+    for (int sockfd; (sockfd = co_await ac.accept()) >= 0;) {// 异步接受 client
+        co_spawn(run(co_context::socket{sockfd})); // 每个连接生成一个 worker 任务
+    }
+}
+```
+
+定义一个 worker 任务：
+
+```cpp
+co_context::main_task run(co_context::socket peer) {
+    using namespace co_context;
+    char buf[8192];
+    int nr = 0;
+    // 不断接收字节流
+    while ((nr = co_await peer.recv(buf, 0)) > 0) { // 异步 socket recv
+        int nw = write_n(STDOUT_FILENO, buf, nr); // 同步打印到 stdout
+        if (nw < nr) break;
+    }
+}
+```
+
+`main()` 函数：
+
+```cpp
+int main(int argc, const char *argv[]) {
+    if (argc < 3) {
+        printf("Usage:\n  %s hostname port\n  %s -l port\n", argv[0], argv[0]);
+        return 0;
+    }
+
+    using namespace co_context;
+    io_context context{32};
+
+    int port = atoi(argv[2]);
+    if (strcmp(argv[1], "-l") == 0) {
+        context.co_spawn(server(port)); // 创建一个监听任务
+    } else {
+        context.co_spawn(client(argv[1], port));
+    }
+
+    context.run(); // 启动 io_context（多线程）
+
+    return 0;
+}
+
+```
+
 ## 谁不需要协程
 
 在我创建这个项目之前，我已经知道基于协程的异步框架很可能**不是**性能最优解，如果你正在寻找 C++ 异步的终极解决方案，且不在乎编程复杂度，我推荐你学习 **sender/receiver model**，而无需尝试协程。
@@ -22,7 +84,7 @@ An io_context library aimed at low-latency io, based on [liburingcxx](https://gi
 
 **co_context** 竭尽所能避免缓存问题：
 
-1. **co_context** 的主线程和任意 worker 的数据交换中没有使用互斥锁或原子变量。
+1. **co_context** 的主线程和任意 worker 的数据交换中没有使用互斥锁，极少使用原子变量。
 2. **co_context** 的数据结构保证「可能频繁读写」的 cacheline 最多被两个线程访问，无论并发强度有多大。这个保证本身也不经过互斥锁或原子变量。（若使用原子变量，高竞争下性能损失约 33%～70%）
 3. 对于可能被多于两个线程读写的 cacheline，**co_context** 保证乒乓缓存问题最多发生常数次。
 4. 在 AMD-5800X，3200 Mhz-ddr4 环境下，若绕过 io_uring，**co_context** 的线程交互频率可达 1.25 GHz。（线程数=6，swap_slots=256，0.980 s 内完成1.25 G 次生产消费）

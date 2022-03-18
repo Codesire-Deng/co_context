@@ -44,12 +44,11 @@ send_all(co_context::socket &sock, std::span<const char> buf) {
 
 co_context::main_task run(co_context::socket peer) {
     using namespace co_context;
-    // Caution: a bad example for closing connection
     char buf[8192];
     int nr = 0;
-    int cnt = 0;
+    // 不断接收字节流
     while ((nr = co_await peer.recv(buf, 0)) > 0) {
-        int nw = write_n(STDOUT_FILENO, buf, nr);
+        int nw = write_n(STDOUT_FILENO, buf, nr); // 将收到的字节全部打印到 stdout
         if (nw < nr) break;
     }
     ::exit(0);
@@ -58,6 +57,7 @@ co_context::main_task run(co_context::socket peer) {
 co_context::main_task server(uint16_t port) {
     using namespace co_context;
     acceptor ac{inet_address{port}};
+    // 不断接受 client，每个连接生成一个 worker 协程
     for (int sockfd; (sockfd = co_await ac.accept()) >= 0;) {
         co_spawn(run(co_context::socket{sockfd}));
     }
@@ -68,7 +68,9 @@ co_context::main_task client(std::string_view hostname, uint16_t port) {
     inet_address addr;
     if (inet_address::resolve(hostname, port, addr)) {
         co_context::socket sock{co_context::socket::create_tcp(addr.family())};
+        // 连接一个 server
         co_await sock.connect(addr);
+        // 生成一个 worker 协程
         co_spawn(run(std::move(sock)));
     } else {
         printf("Unable to resolve %s\n", hostname.data());
