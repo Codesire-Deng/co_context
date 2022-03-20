@@ -26,7 +26,7 @@ int main(int argc, char *argv[]) {
     int output_fd = ::open("output", O_WRONLY | O_TRUNC);
 
     io_context.co_spawn([&]() -> main_task {
-        constexpr int buf_size = 4096*2;
+        constexpr int buf_size = 4096 * 2;
         char buf[buf_size];
 
         for (int i = 1; i < argc; ++i) {
@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
                 const size_t to_read =
                     std::min<size_t>(buf_size, file_size - offset);
                 int res = ::read(file_fd, buf, buf_size);
-                ::write(output_fd, buf, res);
+                [[maybe_unused]] int nr = ::write(output_fd, buf, res);
                 // int res = co_await lazy::read(file_fd, buf, offset);
                 // co_await lazy::write(output_fd, {buf, res}, offset);
                 offset += res;

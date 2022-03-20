@@ -60,3 +60,6 @@ _deps
 *.vsix
 
 draft/
+
+perf.data*
+*.data

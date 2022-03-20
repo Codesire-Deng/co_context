@@ -69,6 +69,19 @@
         "thread": "cpp",
         "coroutine": "cpp",
         "variant": "cpp",
-        "cassert": "cpp"
+        "cassert": "cpp",
+        "any": "cpp",
+        "bitset": "cpp",
+        "complex": "cpp",
+        "condition_variable": "cpp",
+        "csignal": "cpp",
+        "list": "cpp",
+        "map": "cpp",
+        "set": "cpp",
+        "optional": "cpp",
+        "mutex": "cpp",
+        "typeindex": "cpp",
+        "*.ipp": "cpp",
+        "filesystem": "cpp"
     }
 }

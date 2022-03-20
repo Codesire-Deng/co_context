@@ -7,7 +7,7 @@
             "request": "launch",
             // Resolved by CMake Tools:
             "program": "${command:cmake.launchTargetPath}",
-            "args": ["localhost", "1234"/* , ">", "/dev/null" */],
+            "args": ["build/example/rand4kr", "/tmp/test_randread", "3000000"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [

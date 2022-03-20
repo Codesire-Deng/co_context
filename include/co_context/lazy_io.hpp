@@ -13,12 +13,10 @@ namespace detail {
         constexpr bool await_ready() const noexcept { return false; }
 
         // std::coroutine_handle<>
-        void
-        await_suspend(std::coroutine_handle<> current) noexcept {
+        void await_suspend(std::coroutine_handle<> current) noexcept {
             io_info.handle = current;
             auto &worker = *detail::this_thread.worker;
             worker.submit(&io_info);
-            // return worker.schedule();
         }
 
         int32_t await_resume() const noexcept { return io_info.result; }
@@ -30,11 +28,32 @@ namespace detail {
         }
     };
 
+    struct lazy_awaiter_yield {
+        task_info io_info;
+
+        constexpr bool await_ready() const noexcept { return false; }
+
+        void await_suspend(std::coroutine_handle<> current) noexcept {
+            io_info.handle = current;
+            auto &worker = *detail::this_thread.worker;
+            worker.submit(&io_info);
+        }
+
+        constexpr void await_resume() const noexcept {}
+
+        constexpr lazy_awaiter_yield() noexcept
+            : io_info(task_info::task_type::co_spawn) {
+            io_info.tid_hint = detail::this_thread.tid;
+            io_info.result = -1;
+        }
+    };
+
 } // namespace detail
 
 inline namespace lazy {
 
     using detail::lazy_awaiter;
+    using detail::lazy_awaiter_yield;
 
     lazy_awaiter read(int fd, std::span<char> buf, uint64_t offset) noexcept {
         lazy_awaiter awaiter;
@@ -87,6 +106,8 @@ inline namespace lazy {
         awaiter.sqe.prepareShutdown(fd, how);
         return awaiter;
     }
+
+    lazy_awaiter_yield yield() noexcept { return {}; }
 
 } // namespace lazy
 

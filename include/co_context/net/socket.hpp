@@ -7,6 +7,7 @@
 // #include "co_context/defer.hpp"
 // #include "co_context/config.hpp"
 #include "co_context/lazy_io.hpp"
+#include "co_context/eager_io.hpp"
 #include "co_context/net/inet_address.hpp"
 
 namespace co_context {
@@ -20,10 +21,13 @@ class socket {
     };
 
     ~socket() noexcept {
+        // TODO check ~socket()
+        /*
         if (sockfd >= 0) {
             [[maybe_unused]] int res = ::close(sockfd);
             assert(res == 0);
         }
+        */
     };
 
     socket(socket &&other) noexcept {

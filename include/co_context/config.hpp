@@ -9,7 +9,7 @@ namespace co_context {
 namespace config {
 
     inline constexpr bool use_hyper_threading = true;
-#define USE_CPU_AFFINITY
+// #define USE_CPU_AFFINITY
 #ifdef USE_CPU_AFFINITY
     inline constexpr bool use_CPU_affinity = true;
 #else
@@ -21,6 +21,7 @@ namespace config {
         std::hardware_destructive_interference_size;
 #else
     inline constexpr size_t cache_line_size = 64;
+    // inline constexpr size_t cache_line_size = 128;
 #endif
 
     // About io_context
@@ -28,16 +29,32 @@ namespace config {
 
     // inline constexpr unsigned total_threads_number = 6;
 
-    inline constexpr unsigned total_threads_number = 3;
+    inline constexpr unsigned total_threads_number = 4;
+
+    // inline constexpr unsigned total_threads_number = 2;
+
+    // inline constexpr unsigned total_threads_number = 2;
 
     inline constexpr bool low_latency_mode = true;
 
-    // inline constexpr uint16_t swap_capacity = 1024;
+    // inline constexpr uint16_t swap_capacity = 2048;
 
-    inline constexpr uint16_t swap_capacity = 32;
+    // inline constexpr uint16_t swap_capacity = 512;
+
+    // inline constexpr uint16_t swap_capacity = 256;
+
+    // inline constexpr uint16_t swap_capacity = 128;
+
+    inline constexpr uint16_t swap_capacity = 64;
+
+    // inline constexpr uint16_t swap_capacity = 8;
+
+    inline constexpr uint8_t submit_poll_rounds = 4;
+
+    inline constexpr uint8_t reap_poll_rounds = 4;
 
     // net configuration
-    inline constexpr bool loopback_only = false;
+    inline constexpr bool loopback_only = true;
 
 
 } // namespace config

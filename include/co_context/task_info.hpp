@@ -18,7 +18,7 @@ namespace detail {
         std::coroutine_handle<> handle;
         int tid_hint;
 
-        task_info(task_type type) noexcept : type(type) {}
+        constexpr task_info(task_type type) noexcept : type(type) {}
 
         static task_info nop() noexcept {
             task_info ret{task_type::nop};

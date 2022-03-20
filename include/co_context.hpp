@@ -85,8 +85,14 @@ namespace detail {
 
         void run(const int thread_index, io_context *const context) {
             init(thread_index, context);
+            // printf("%d run\n", thread_index);
+            std::this_thread::sleep_for(std::chrono::seconds{1});
 
-            while (true) { this->schedule().resume(); }
+            while (true) {
+                auto coro = this->schedule();
+                // printf("%d\n", thread_index);
+                coro.resume();
+            }
         }
 
         void run_test_swap(
@@ -191,7 +197,11 @@ class [[nodiscard]] io_context final {
         r_cur.next();
     }
 
-    void poll_submission() noexcept {
+    /**
+     * @brief poll the submission swap zone
+     * @return if load exists and capacity is healthy
+     */
+    bool poll_submission() noexcept {
         constexpr int swap_size = sizeof(swap_zone) / sizeof(task_info *);
         // submit round
         int i = 0;
@@ -199,38 +209,43 @@ class [[nodiscard]] io_context final {
             if (submit_swap[s_cur.slot][s_cur.tid][s_cur.off] != nullptr) break;
             s_cur.next();
         }
-        if (i == swap_size) return;
+        if (i == swap_size) return false;
         task_info *io_info = submit_swap[s_cur.slot][s_cur.tid][s_cur.off];
         submit_swap[s_cur.slot][s_cur.tid][s_cur.off] = nullptr;
 
         if (io_info->type == task_info::task_type::co_spawn) {
             forward_task(io_info);
             s_cur.next();
-            return;
+            return true;
         }
 
-        if (ring.SQSpaceLeft() == 0) return; // SQRing is full
+        if (ring.SQSpaceLeft() == 0) return false; // SQRing is full
         liburingcxx::SQEntry *sqe = ring.getSQEntry();
 
         sqe->cloneFrom(*io_info->sqe);
         ring.submit();
 
         s_cur.next();
+        return true;
     }
 
-    void poll_completion() noexcept {
+    /**
+     * @brief poll the completion swap zone
+     * @return if load exists and capacity is healthy
+     */
+    bool poll_completion() noexcept {
         constexpr int swap_size = sizeof(swap_zone) / sizeof(task_info *);
         // reap round
         if (polling_cqe == nullptr) [[likely]] {
             polling_cqe = ring.peekCQEntry();
-            if (polling_cqe == nullptr) return;
+            if (polling_cqe == nullptr) return false;
         }
         int i = 0;
         for (; i < swap_size; ++i) {
             if (reap_swap[r_cur.slot][r_cur.tid][r_cur.off] == nullptr) break;
             r_cur.next();
         }
-        if (i == swap_size) return;
+        if (i == swap_size) return false;
         task_info *io_info =
             reinterpret_cast<task_info *>(polling_cqe->getData());
         io_info->result = polling_cqe->getRes();
@@ -245,6 +260,7 @@ class [[nodiscard]] io_context final {
         polling_cqe = nullptr;
 
         r_cur.next();
+        return true;
     }
 
   public:
@@ -333,8 +349,14 @@ class [[nodiscard]] io_context final {
         make_thread_pool();
 
         while (true) {
-            poll_submission();
-            poll_completion();
+            for (uint8_t i = 0; i < config::submit_poll_rounds; ++i) {
+                // if (!poll_submission()) [[unlikely]] break;
+                poll_submission();
+            }
+            for (uint8_t i = 0; i < config::reap_poll_rounds; ++i) {
+                // if (!poll_completion()) break;
+                poll_completion();
+            }
             // std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     }
@@ -399,7 +421,8 @@ namespace detail {
         auto &ctx = *this_thread.ctx;
         auto &cur = this->submit_cur;
         // std::cerr << cur.slot << " " << tid << cur.off << std::endl;
-        while (ctx.submit_swap[cur.slot][tid][cur.off] != nullptr) cur.next();
+        while (ctx.submit_swap[cur.slot][tid][cur.off] != nullptr)
+            [[unlikely]] cur.next();
 
         ctx.submit_swap[cur.slot][tid][cur.off] = io_info;
         // TODO use waiting queue when overflow
@@ -410,14 +433,13 @@ namespace detail {
         const unsigned tid = this_thread.tid;
         auto &ctx = *this_thread.ctx;
         auto &cur = this->reap_cur;
-        int count = 0;
-        while (ctx.reap_swap[cur.slot][tid][cur.off] == nullptr) {
-            cur.next();
-            if (++count == 100) {
-                count = 0;
-                // std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+        // int fail_cnt = 0;
+        while (ctx.reap_swap[cur.slot][tid][cur.off] == nullptr) [[likely]] {
+                cur.next();
+                // ++fail_cnt;
             }
-        }
+        // printf("%d reap fails %d\n", tid, fail_cnt);
 
         const task_info &io_info = *ctx.reap_swap[cur.slot][tid][cur.off];
         ctx.reap_swap[cur.slot][tid][cur.off] = nullptr;
