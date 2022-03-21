@@ -136,7 +136,7 @@ int main(int argc, const char *argv[]) {
 
 ### eager_io
 
-一种激进的 IO 协程，在 `promise.inital_suspend()` 时初始化 IO 请求并提交，随后返回 `suspend_always`。
+一种激进的 IO awaiter，在构造函数中初始化 IO 请求并提交。
 
 在被 `co_await` 时，若 IO 早已完成，则无需让出。否则，需要等待 IO 完成后由调度器唤醒。
 
@@ -150,6 +150,8 @@ int main(int argc, const char *argv[]) {
 涉及多线程并行，需要同步 IO 的状态（未完成、已完成）。至少要保证：调度器必须确保 「eager_io 已经知悉 IO 已完成」，否则可能丢数据。
 
 #### eager_io 的实现
+
+TODO: 改用原子变量，弃用检查队列
 
 **co_context** 假设大多数 eager_io 会陷入「等待状态」，以此为优化立足点
 
@@ -174,16 +176,31 @@ int main(int argc, const char *argv[]) {
 
 ### lazy_io
 
-一种懒惰的 IO 协程，在 `promise.inital_suspend()` 时什么都不做。
+一种懒惰的 IO awaiter，在，在构造函数时什么都不做。
 
 在被 `co_await` 时暂停，并发起 IO 请求，未来等待由调度器唤醒。当前线程轮询可以切入的协程。
 
 #### lazy_io 的实现
 
-1. lazy_io 提供的 `operator co_await` 返回一个 `awaiter`，其中的 `await_suspend` 负责主要逻辑：
+1. lazy_io 返回一个 `awaiter`，其中的 `await_suspend` 负责主要逻辑：
    1. 提交一个 IO 请求。
    2. 找到一个已收割的 IO 请求，恢复它
 2. `awaiter` 的 `await_resume` 返回特定结果。
 3. 析构时，销毁协程。
+
+### co_semaphore
+
+仅运行在用户态 co_context 的信号量
+
+#### co_semaphore 的动机
+
+限制 `co_spawn` 和同类活跃协程的并发量
+
+#### co_semaphore 的实现
+
+1. 参考 std::semaphore，优化 binary_semaphore 的原子变量
+2. 链表模拟无锁队列
+3. `acquire` 分别在栈上创建 `awaiter`，形成等待链表
+4. `release` 时放出一个等待协程，加入当前协程的 submit
 
 </details>
