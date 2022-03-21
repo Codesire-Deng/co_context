@@ -44,6 +44,8 @@ namespace detail {
                 } */
     };
 
+    using task_info_ptr = task_info *;
+
 } // namespace detail
 
 } // namespace co_context

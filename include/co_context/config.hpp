@@ -37,15 +37,17 @@ namespace config {
 
     inline constexpr bool low_latency_mode = true;
 
+    // swap_capacity should be (N * 8)
+
     // inline constexpr uint16_t swap_capacity = 2048;
 
     // inline constexpr uint16_t swap_capacity = 512;
 
     // inline constexpr uint16_t swap_capacity = 256;
 
-    // inline constexpr uint16_t swap_capacity = 128;
+    inline constexpr uint16_t swap_capacity = 128;
 
-    inline constexpr uint16_t swap_capacity = 64;
+    // inline constexpr uint16_t swap_capacity = 64;
 
     // inline constexpr uint16_t swap_capacity = 8;
 
