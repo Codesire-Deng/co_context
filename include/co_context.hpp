@@ -289,7 +289,7 @@ class [[nodiscard]] io_context final {
         }
     }
 
-    bool try_clear_submit_overflow_buf() noexcept {
+    inline bool try_clear_submit_overflow_buf() noexcept {
         while (!submit_overflow_buf.empty()) {
             task_info_ptr task = submit_overflow_buf.front();
             // OPTIMIZE impossible for task_type::co_spawn
@@ -332,7 +332,7 @@ class [[nodiscard]] io_context final {
         }
     }
 
-    bool try_clear_reap_overflow_buf() noexcept {
+    inline bool try_clear_reap_overflow_buf() noexcept {
         while (!reap_overflow_buf.empty()) {
             task_info_ptr task = reap_overflow_buf.front();
             // OPTIMIZE impossible for task_type::co_spawn
@@ -409,18 +409,18 @@ class [[nodiscard]] io_context final {
         make_thread_pool();
 
         while (true) {
-            if (try_clear_submit_overflow_buf()) {
+            if (try_clear_submit_overflow_buf())
                 for (uint8_t i = 0; i < config::submit_poll_rounds; ++i) {
                     if (!poll_submission()) break;
                     // poll_submission();
                 }
-            }
-            if (try_clear_reap_overflow_buf()) {
+
+            if (try_clear_reap_overflow_buf())
                 for (uint8_t i = 0; i < config::reap_poll_rounds; ++i) {
                     if (!poll_completion()) break;
                     // poll_completion();
                 }
-            }
+
             // std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     }
