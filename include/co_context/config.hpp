@@ -8,7 +8,7 @@ namespace co_context {
 
 namespace config {
 
-    inline constexpr bool use_hyper_threading = true;
+    inline constexpr bool using_hyper_threading = true;
 // #define USE_CPU_AFFINITY
 #ifdef USE_CPU_AFFINITY
     inline constexpr bool use_CPU_affinity = true;
@@ -27,11 +27,13 @@ namespace config {
     // About io_context
     inline constexpr unsigned io_uring_flags = 0;
 
-    // inline constexpr unsigned total_threads_number = 6;
+    inline constexpr unsigned total_threads_number = 6;
 
-    inline constexpr unsigned total_threads_number = 2;
+    // inline constexpr unsigned total_threads_number = 5;
 
-    // inline constexpr unsigned total_threads_number = 2;
+    // inline constexpr unsigned total_threads_number = 4;
+
+    // inline constexpr unsigned total_threads_number = 3;
 
     // inline constexpr unsigned total_threads_number = 2;
 
@@ -47,16 +49,16 @@ namespace config {
 
     // inline constexpr uint16_t swap_capacity = 128;
 
-    // inline constexpr uint16_t swap_capacity = 64;
+    inline constexpr uint16_t swap_capacity = 64;
 
-    inline constexpr uint16_t swap_capacity = 8;
+    // inline constexpr uint16_t swap_capacity = 16;
 
     inline constexpr uint8_t submit_poll_rounds = 1;
 
     inline constexpr uint8_t reap_poll_rounds = 1;
 
     // net configuration
-    inline constexpr bool loopback_only = false;
+    inline constexpr bool loopback_only = true;
 
 
 } // namespace config

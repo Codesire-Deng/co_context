@@ -15,3 +15,6 @@ target_link_libraries(rand4kr PUBLIC mimalloc)
 
 add_executable(rand4kr_blocking rand4kr_blocking.cpp)
 target_link_libraries(rand4kr_blocking PUBLIC mimalloc)
+
+add_executable(nop nop.cpp)
+target_link_libraries(nop PUBLIC mimalloc)

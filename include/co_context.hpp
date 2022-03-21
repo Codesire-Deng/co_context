@@ -104,7 +104,6 @@ namespace detail {
         void run(const int thread_index, io_context *const context) {
             init(thread_index, context);
             // printf("%d run\n", thread_index);
-            std::this_thread::sleep_for(std::chrono::seconds{1});
 
             while (true) {
                 auto coro = this->schedule();
@@ -275,7 +274,11 @@ class [[nodiscard]] io_context final {
      */
     bool poll_submission() noexcept {
         // submit round
-        if (!s_cur.try_find_exist(submit_swap)) return false;
+        if (!s_cur.try_find_exist(submit_swap)) {
+            return false;
+        }
+
+        // printf("poll succ!\n");
 
         task_info_ptr const io_info = submit_swap[s_cur.tid][s_cur.off];
         submit_swap[s_cur.tid][s_cur.off] = nullptr;
@@ -312,12 +315,12 @@ class [[nodiscard]] io_context final {
 
     /**
      * @brief poll the completion swap zone
-     * @return if reap_swap capacity might be healthy
+     * @return if load exists and capacity of reap_swap might be healthy
      */
     bool poll_completion() noexcept {
         // reap round
         liburingcxx::CQEntry *polling_cqe = ring.peekCQEntry();
-        if (polling_cqe == nullptr) return true;
+        if (polling_cqe == nullptr) return false;
 
         task_info_ptr io_info =
             reinterpret_cast<task_info_ptr>(polling_cqe->getData());
@@ -406,18 +409,24 @@ class [[nodiscard]] io_context final {
         detail::this_thread.tid = std::thread::hardware_concurrency() - 1;
         detail::set_cpu_affinity(detail::this_thread.tid);
 #endif
+        // printf("run start\n");
         make_thread_pool();
+        // printf("make_thread_pool end\n");
 
         while (true) {
-            if (try_clear_submit_overflow_buf())
+            if (try_clear_submit_overflow_buf()) {
                 for (uint8_t i = 0; i < config::submit_poll_rounds; ++i) {
+                    // printf("submit start!\n");
                     if (!poll_submission()) break;
+                    // printf("submitted!\n");
                     // poll_submission();
                 }
+            }
 
             if (try_clear_reap_overflow_buf())
                 for (uint8_t i = 0; i < config::reap_poll_rounds; ++i) {
                     if (!poll_completion()) break;
+                    // printf("reapped!\n");
                     // poll_completion();
                 }
 
@@ -505,7 +514,7 @@ namespace detail {
         detail::this_thread.tid = thread_index;
 #ifdef USE_CPU_AFFINITY
         const unsigned logic_cores = std::thread::hardware_concurrency();
-        if constexpr (config::use_hyper_threading) {
+        if constexpr (config::using_hyper_threading) {
             if (thread_index * 2 < logic_cores) {
                 detail::set_cpu_affinity(thread_index * 2);
             } else {
@@ -555,6 +564,7 @@ namespace detail {
                 const task_info_ptr io_info = ctx.reap_swap[tid][cur.off];
                 ctx.reap_swap[tid][cur.off] = nullptr;
                 cur.next();
+                // printf("get task!\n");
                 return io_info->handle;
             }
             // TODO consider tid_hint here
