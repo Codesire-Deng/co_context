@@ -227,6 +227,19 @@ class SQEntry : private io_uring_sqe {
         return prepareRW(IORING_OP_SHUTDOWN, fd, nullptr, (uint32_t)how, 0);
     }
 
+    inline SQEntry &prepareFsync(int fd, uint32_t fsync_flags) noexcept {
+        prepareRW(IORING_OP_SYNC_FILE_RANGE, fd, nullptr, 0, 0);
+        this->fsync_flags = fsync_flags;
+        return *this;
+    }
+
+    inline SQEntry &prepareSyncFileRange(
+        int fd, uint32_t len, uint64_t offset, int flags) noexcept {
+        prepareRW(IORING_OP_SYNC_FILE_RANGE, fd, nullptr, len, offset);
+        this->sync_range_flags = (uint32_t)flags;
+        return *this;
+    }
+
     /* TODO: more prepare: splice, tee, cancel, epoll_ctl
      * ......
      */

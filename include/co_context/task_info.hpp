@@ -1,6 +1,7 @@
 #pragma once
 #include "../uring.hpp"
 #include <coroutine>
+#include "co_context/log/log.hpp"
 
 namespace co_context {
 namespace detail {
@@ -14,11 +15,13 @@ namespace detail {
             CQEntry *cqe;
             int32_t result;
         };
-        enum class task_type { sqe, cqe, result, co_spawn, nop } type;
         std::coroutine_handle<> handle;
         int tid_hint;
+        enum class task_type { sqe, cqe, result, co_spawn, nop } type;
 
-        constexpr task_info(task_type type) noexcept : type(type) {}
+        constexpr task_info(task_type type) noexcept : type(type) {
+            log::v("task_info generated\n");
+        }
 
         static task_info nop() noexcept {
             task_info ret{task_type::nop};

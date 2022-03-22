@@ -34,6 +34,7 @@
 #include "co_context/set_cpu_affinity.hpp"
 #include "co_context/task_info.hpp"
 #include "co_context/main_task.hpp"
+#include "co_context/log/log.hpp"
 
 #include <iostream>
 #include <syncstream>
@@ -74,8 +75,8 @@ namespace detail {
          */
         struct sharing_zone {
             std::thread host_thread;
-            worker_state state; // TODO atomic?
-            int temp;
+            // worker_state state; // TODO atomic?
+            // int temp;
         };
 
         alignas(cache_line_size) sharing_zone sharing;
@@ -103,17 +104,15 @@ namespace detail {
 
         void run(const int thread_index, io_context *const context) {
             init(thread_index, context);
-            // printf("%d run\n", thread_index);
+            log::v("worker[%d] run...\n", thread_index);
 
             while (true) {
                 auto coro = this->schedule();
-                // printf("%d\n", thread_index);
+                log::v("worker[%d] found coro to run\n", thread_index);
                 coro.resume();
+                log::v("worker[%d] idle\n", thread_index);
             }
         }
-
-        void run_test_swap(
-            const int thread_index, io_context *const context) noexcept;
     };
 
 } // namespace detail
@@ -228,6 +227,8 @@ class [[nodiscard]] io_context final {
     std::queue<task_info_ptr> submit_overflow_buf;
     std::queue<task_info_ptr> reap_overflow_buf;
 
+    alignas(cache_line_size) char __cacheline_barrier[64];
+
     // std::counting_semaphore<1> idle_worker_quota{1};
 
   public:
@@ -238,6 +239,7 @@ class [[nodiscard]] io_context final {
     alignas(cache_line_size) worker_meta worker[config::worker_threads_number];
 
   private:
+    bool will_stop = false;
     const unsigned ring_entries;
 
   private:
@@ -246,8 +248,10 @@ class [[nodiscard]] io_context final {
         if (r_cur.try_find_empty(reap_swap)) [[likely]] {
             reap_swap[r_cur.tid][r_cur.off] = task;
             r_cur.next();
+            log::v("ctx forward_task to [%u][%u]\n", r_cur.tid, r_cur.off);
         } else {
             reap_overflow_buf.push(task);
+            log::d("ctx forward_task to reap_OF\n");
         }
     }
 
@@ -258,6 +262,7 @@ class [[nodiscard]] io_context final {
         }
 
         if (ring.SQSpaceLeft() == 0) [[unlikely]] {
+            log::d("ctx try_submit failed SQfull\n");
             return false; // SQRing is full
         }
 
@@ -265,6 +270,9 @@ class [[nodiscard]] io_context final {
 
         sqe->cloneFrom(*task->sqe);
         ring.submit();
+
+        log::v("ctx submit to ring\n");
+
         return true;
     }
 
@@ -274,41 +282,46 @@ class [[nodiscard]] io_context final {
      */
     bool poll_submission() noexcept {
         // submit round
-        if (!s_cur.try_find_exist(submit_swap)) {
-            return false;
-        }
-
-        // printf("poll succ!\n");
+        if (!s_cur.try_find_exist(submit_swap)) { return false; }
 
         task_info_ptr const io_info = submit_swap[s_cur.tid][s_cur.off];
         submit_swap[s_cur.tid][s_cur.off] = nullptr;
+        log::v("ctx poll_submission at [%u][%u]\n", s_cur.tid, s_cur.off);
         s_cur.next();
 
         if (try_submit(io_info)) [[likely]] {
             return true;
         } else {
             submit_overflow_buf.push(io_info);
+            log::d("ctx poll_submission failed submit_OF\n");
             return false;
         }
     }
 
     inline bool try_clear_submit_overflow_buf() noexcept {
-        while (!submit_overflow_buf.empty()) {
+        if (submit_overflow_buf.empty()) return true;
+        do {
             task_info_ptr task = submit_overflow_buf.front();
             // OPTIMIZE impossible for task_type::co_spawn
             if (try_submit(task)) {
                 submit_overflow_buf.pop();
             } else {
+                log::d("ctx try_clear_submit (partially) failed\n");
                 return false;
             }
-        }
+        } while (!submit_overflow_buf.empty());
+        log::d("ctx try_clear_submit succ\n");
         return true;
     }
 
     bool try_reap(task_info_ptr task) noexcept {
-        if (!r_cur.try_find_empty(reap_swap)) [[unlikely]] { return false; }
+        if (!r_cur.try_find_empty(reap_swap)) [[unlikely]] {
+            log::d("ctx try_reap failed reap_swap is full\n");
+            return false;
+        }
 
         r_cur.release(reap_swap, task);
+        log::v("ctx try_reap at [%u][%u]\n", r_cur.tid, r_cur.off);
         r_cur.next();
         return true;
     }
@@ -322,6 +335,8 @@ class [[nodiscard]] io_context final {
         liburingcxx::CQEntry *polling_cqe = ring.peekCQEntry();
         if (polling_cqe == nullptr) return false;
 
+        log::v("ctx poll_completion found\n");
+
         task_info_ptr io_info =
             reinterpret_cast<task_info_ptr>(polling_cqe->getData());
         io_info->result = polling_cqe->getRes();
@@ -331,21 +346,31 @@ class [[nodiscard]] io_context final {
             return true;
         } else {
             reap_overflow_buf.push(io_info);
+            log::d("ctx poll_completion failed reap_OF\n");
             return false;
         }
     }
 
     inline bool try_clear_reap_overflow_buf() noexcept {
-        while (!reap_overflow_buf.empty()) {
+        if (reap_overflow_buf.empty()) return true;
+        do {
             task_info_ptr task = reap_overflow_buf.front();
             // OPTIMIZE impossible for task_type::co_spawn
             if (try_reap(task)) {
                 reap_overflow_buf.pop();
             } else {
+                log::d("ctx try_clear_reap (partially) failed\n");
                 return false;
             }
-        }
+        } while (!reap_overflow_buf.empty());
+        log::d("ctx try_clear_reap succ\n");
         return true;
+    }
+
+    [[noreturn]] void stop() noexcept {
+        log::i("ctx stopped\n");
+        std::this_thread::sleep_for(std::chrono::minutes{1});
+        ::exit(0);
     }
 
   public:
@@ -392,16 +417,20 @@ class [[nodiscard]] io_context final {
     }
 
     void co_spawn(main_task entrance) {
-        const unsigned tid = detail::this_thread.tid;
+        const uint32_t tid = detail::this_thread.tid;
         if (tid < config::worker_threads_number)
             return worker[tid].co_spawn(entrance);
         if (r_cur.try_find_empty(reap_swap)) [[likely]] {
             r_cur.release(reap_swap, entrance.get_io_info_ptr());
+            log::d("ctx co_spawn at [%u][%u]\n", r_cur.tid, r_cur.off);
             r_cur.next();
         } else {
             reap_overflow_buf.push(entrance.get_io_info_ptr());
+            log::d("ctx co_spawn failed reap_OF\n");
         }
     }
+
+    void can_stop() noexcept { will_stop = true; }
 
     [[noreturn]] void run() {
         detail::this_thread.worker = nullptr;
@@ -409,29 +438,32 @@ class [[nodiscard]] io_context final {
         detail::this_thread.tid = std::thread::hardware_concurrency() - 1;
         detail::set_cpu_affinity(detail::this_thread.tid);
 #endif
-        // printf("run start\n");
+        log::v("ctx making thread pool\n");
         make_thread_pool();
-        // printf("make_thread_pool end\n");
+        log::v("ctx make_thread_pool end\n");
 
-        while (true) {
-            if (try_clear_submit_overflow_buf()) {
-                for (uint8_t i = 0; i < config::submit_poll_rounds; ++i) {
-                    // printf("submit start!\n");
-                    if (!poll_submission()) break;
-                    // printf("submitted!\n");
-                    // poll_submission();
+        while (!will_stop) [[likely]] {
+                log::v("ctx polling\n");
+                if (try_clear_submit_overflow_buf()) {
+                    for (uint8_t i = 0; i < config::submit_poll_rounds; ++i) {
+                        // printf("submit start!\n");
+                        if (!poll_submission()) break;
+                        // printf("submitted!\n");
+                        // poll_submission();
+                    }
                 }
+
+                if (try_clear_reap_overflow_buf())
+                    for (uint8_t i = 0; i < config::reap_poll_rounds; ++i) {
+                        if (!poll_completion()) break;
+                        // printf("reapped!\n");
+                        // poll_completion();
+                    }
+
+                // std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
 
-            if (try_clear_reap_overflow_buf())
-                for (uint8_t i = 0; i < config::reap_poll_rounds; ++i) {
-                    if (!poll_completion()) break;
-                    // printf("reapped!\n");
-                    // poll_completion();
-                }
-
-            // std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        }
+        this->stop();
     }
 
     inline uring &io() noexcept { return ring; }
@@ -454,6 +486,14 @@ class [[nodiscard]] io_context final {
 
 inline void co_spawn(main_task entrance) noexcept {
     detail::this_thread.ctx->co_spawn(entrance);
+}
+
+inline void co_context_stop() noexcept {
+    detail::this_thread.ctx->can_stop();
+}
+
+inline uint32_t co_get_tid() noexcept {
+    return detail::this_thread.tid;
 }
 
 namespace detail {
@@ -537,16 +577,20 @@ namespace detail {
         // std::cerr << cur.slot << " " << tid << cur.off << std::endl;
         if (cur.try_find_empty(ctx.submit_swap)) [[likely]] {
             cur.release(ctx.submit_swap, io_info);
+            log::v("worker[%u] submit at [%u]\n", tid, cur.off);
             cur.next();
         } else {
             this->submit_overflow_buf.push(io_info);
+            log::d("worker[%u] submit to OF\n", tid);
         }
     }
 
     inline std::coroutine_handle<> worker_meta::schedule() noexcept {
         const uint32_t tid = this_thread.tid;
         auto &ctx = *this_thread.ctx;
-        auto &cur = this->reap_cur;
+        auto &r_cur = this->reap_cur;
+
+        log::v("worker[%u] scheduling\n", tid);
 
         while (true) {
             // handle overflowed submission
@@ -556,14 +600,18 @@ namespace detail {
                     task_info_ptr task = this->submit_overflow_buf.front();
                     this->submit_overflow_buf.pop();
                     s_cur.release_relaxed(ctx.submit_swap, task);
+                    log::d(
+                        "worker[%u] submit from OF_buf to [%u]\n", tid,
+                        s_cur.off);
                     s_cur.next();
                 }
             }
 
-            if (cur.try_find_exist(ctx.reap_swap)) [[likely]] {
-                const task_info_ptr io_info = ctx.reap_swap[tid][cur.off];
-                ctx.reap_swap[tid][cur.off] = nullptr;
-                cur.next();
+            if (r_cur.try_find_exist(ctx.reap_swap)) {
+                const task_info_ptr io_info = ctx.reap_swap[tid][r_cur.off];
+                ctx.reap_swap[tid][r_cur.off] = nullptr;
+                log::d("worker[%u] found [%u]\n", tid, r_cur.off);
+                r_cur.next();
                 // printf("get task!\n");
                 return io_info->handle;
             }

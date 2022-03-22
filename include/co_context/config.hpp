@@ -27,11 +27,11 @@ namespace config {
     // About io_context
     inline constexpr unsigned io_uring_flags = 0;
 
-    inline constexpr unsigned total_threads_number = 6;
+    // inline constexpr unsigned total_threads_number = 6;
 
     // inline constexpr unsigned total_threads_number = 5;
 
-    // inline constexpr unsigned total_threads_number = 4;
+    inline constexpr unsigned total_threads_number = 4;
 
     // inline constexpr unsigned total_threads_number = 3;
 
@@ -41,6 +41,14 @@ namespace config {
 
     // swap_capacity should be (N * 8)
 
+    // inline constexpr uint16_t swap_capacity = 32768;
+
+    // inline constexpr uint16_t swap_capacity = 16384;
+
+    // inline constexpr uint16_t swap_capacity = 8192;
+
+    // inline constexpr uint16_t swap_capacity = 4096;
+
     // inline constexpr uint16_t swap_capacity = 2048;
 
     // inline constexpr uint16_t swap_capacity = 512;
@@ -49,9 +57,11 @@ namespace config {
 
     // inline constexpr uint16_t swap_capacity = 128;
 
-    inline constexpr uint16_t swap_capacity = 64;
+    // inline constexpr uint16_t swap_capacity = 64;
 
     // inline constexpr uint16_t swap_capacity = 16;
+
+    inline constexpr uint16_t swap_capacity = 8;
 
     inline constexpr uint8_t submit_poll_rounds = 1;
 
@@ -60,11 +70,26 @@ namespace config {
     // net configuration
     inline constexpr bool loopback_only = true;
 
-
 } // namespace config
 
-namespace test {
-    inline constexpr int64_t swap_tot = 1'250'000'000;
-} // namespace test
+// logging config
+namespace config {
+    enum class level : int8_t {
+        v, // verbose
+        d, // debug
+        i, // info
+        w, // warning
+        e, // error
+        no_log
+    };
+
+    // inline constexpr level log_level = level::v;
+    // inline constexpr level log_level = level::d;
+    // inline constexpr level log_level = level::i;
+    // inline constexpr level log_level = level::w;
+    // inline constexpr level log_level = level::e;
+    inline constexpr level log_level = level::no_log;
+
+} // namespace config
 
 } // namespace co_context

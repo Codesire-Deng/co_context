@@ -13,13 +13,21 @@ using namespace co_context;
 
 int times;
 std::atomic_int finish = 0;
-constexpr int concur = 3;
+constexpr int concur = 2;
 
-main_task run() {
-    if (finish.fetch_add(1) + 1 == times) {
+main_task workload() {
+    int now = finish.fetch_add(1) + 1;
+    if (now > times) { printf("logic error!\n"); }
+    if (now == times) {
         printf("All done!\n");
         ::exit(0);
     }
+
+    co_await eager::nop();
+}
+
+main_task gen_task() {
+    for (int i = 0; i < times / concur; ++i) { co_spawn(workload()); }
     co_await eager::nop();
 }
 
@@ -35,10 +43,7 @@ int main(int argc, char *argv[]) {
     io_context context{256};
 
     for (int i = 0; i < concur; ++i)
-        context.co_spawn([]() -> main_task {
-            for (int i = 0; i < times / concur; ++i) { co_spawn(run()); }
-            co_await eager::nop();
-        }());
+        context.co_spawn(gen_task());
 
     context.run();
 
