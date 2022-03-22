@@ -32,6 +32,8 @@ main_task run(size_t offset) {
     int nr;
     // nr = co_await lazy::read(file_fd, buf, offset);
     nr = ::pread(file_fd, buf, BLOCK_LEN, offset);
+    // buf[15] = '\0';
+    // printf("%lu %s", offset, buf);
     co_await eager::nop();
 
     int now = finish.fetch_add(1) + 1;

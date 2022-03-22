@@ -107,6 +107,19 @@ inline namespace lazy {
         return awaiter;
     }
 
+    lazy_awaiter fsync(int fd, uint32_t fsync_flags) noexcept {
+        lazy_awaiter awaiter;
+        awaiter.sqe.prepareFsync(fd, fsync_flags);
+        return awaiter;
+    }
+
+    lazy_awaiter
+    sync_file_range(int fd, uint32_t len, uint64_t offset, int flags) noexcept {
+        lazy_awaiter awaiter;
+        awaiter.sqe.prepareSyncFileRange(fd, len, offset, flags);
+        return awaiter;
+    }
+
     lazy_awaiter_yield yield() noexcept { return {}; }
 
 } // namespace lazy

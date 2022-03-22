@@ -34,6 +34,7 @@
 #include "co_context/set_cpu_affinity.hpp"
 #include "co_context/task_info.hpp"
 #include "co_context/main_task.hpp"
+#include "co_context/log/log.hpp"
 
 #include <iostream>
 #include <syncstream>
@@ -46,13 +47,23 @@ class io_context;
 // class eager_io;
 // class lazy_io;
 
+namespace config {
+    inline constexpr bool is_SQPOLL = io_uring_flags & IORING_SETUP_SQPOLL;
+
+    inline constexpr unsigned worker_threads_number =
+        total_threads_number - 1 - is_SQPOLL;
+} // namespace config
+
 namespace detail {
     class worker_meta;
+
+    using swap_zone =
+        task_info_ptr[config::worker_threads_number][config::swap_capacity];
 
     struct alignas(cache_line_size) thread_meta {
         io_context *ctx;
         worker_meta *worker;
-        int tid;
+        uint32_t tid;
     };
 
     inline static thread_local thread_meta this_thread;
@@ -62,14 +73,22 @@ namespace detail {
         /**
          * @brief sharing zone with main thread
          */
-        struct alignas(cache_line_size) {
-            worker_state state; // TODO atomic?
-            int temp;
+        struct sharing_zone {
+            std::thread host_thread;
+            // worker_state state; // TODO atomic?
+            // int temp;
         };
+
+        alignas(cache_line_size) sharing_zone sharing;
+
         struct swap_cur {
-            uint16_t slot = 0;
             uint16_t off = 0;
             void next() noexcept;
+            bool try_find_empty(swap_zone &swap) noexcept;
+            bool try_find_exist(swap_zone &swap) noexcept;
+            void release(swap_zone &swap, task_info_ptr task) const noexcept;
+            void
+            release_relaxed(swap_zone &swap, task_info_ptr task) const noexcept;
         };
         swap_cur submit_cur;
         swap_cur reap_cur;
@@ -85,63 +104,50 @@ namespace detail {
 
         void run(const int thread_index, io_context *const context) {
             init(thread_index, context);
-            // printf("%d run\n", thread_index);
-            std::this_thread::sleep_for(std::chrono::seconds{1});
+            log::v("worker[%d] run...\n", thread_index);
 
             while (true) {
                 auto coro = this->schedule();
-                // printf("%d\n", thread_index);
+                log::v("worker[%d] found coro to run\n", thread_index);
                 coro.resume();
+                log::v("worker[%d] idle\n", thread_index);
             }
         }
-
-        void run_test_swap(
-            const int thread_index, io_context *const context) noexcept;
     };
 
 } // namespace detail
 
+/*
 inline constexpr uint16_t task_info_number_per_cache_line =
     cache_line_size / sizeof(detail::task_info *);
+*/
 
 class [[nodiscard]] io_context final {
   public:
-    static constexpr unsigned io_uring_flags = config::io_uring_flags;
-
-    static constexpr unsigned total_threads_number =
-        config::total_threads_number;
-
-    static constexpr bool low_latency_mode = config::low_latency_mode;
-
+    /*
     static constexpr uint16_t swap_slots =
         config::swap_capacity / task_info_number_per_cache_line;
 
     static constexpr uint16_t task_info_number_per_thread =
         task_info_number_per_cache_line * swap_slots;
-
-    static constexpr bool is_SQPOLL = io_uring_flags & IORING_SETUP_SQPOLL;
+    */
 
     /**
      * One thread for io_context submit/reap. Another thread for io_uring (if
      * needed).
      */
-    static constexpr unsigned worker_threads_number =
-        total_threads_number - 1 - is_SQPOLL;
 
-    static_assert(worker_threads_number >= 1);
+    static_assert(config::worker_threads_number >= 1);
 
-    using uring = liburingcxx::URing<io_uring_flags>;
+    using uring = liburingcxx::URing<config::io_uring_flags>;
 
     using task_info = detail::task_info;
 
-    using swap_zone = task_info
-        *[swap_slots][worker_threads_number][task_info_number_per_cache_line];
+    using task_info_ptr = detail::task_info_ptr;
 
-    // Not necessary to read/write atomicly, since there is no order consistency
-    // problem.
-    /* using swap_zone =
-        std::atomic<task_info *>[swap_slots][worker_threads_number]
-                                [task_info_number_per_cache_line]; */
+    // May not necessary to read/write atomicly.
+    using swap_zone =
+        task_info_ptr[config::worker_threads_number][config::swap_capacity];
 
   private:
     alignas(cache_line_size) uring ring;
@@ -149,26 +155,79 @@ class [[nodiscard]] io_context final {
     alignas(cache_line_size) swap_zone reap_swap;
 
     struct ctx_swap_cur {
-        uint16_t slot = 0;
-        unsigned tid = 0;
+        uint16_t tid = 0;
         uint16_t off = 0;
 
         inline void next() {
-            if (++off == task_info_number_per_cache_line) [[unlikely]] {
-                off = 0;
-                if (++tid == worker_threads_number) [[unlikely]] {
-                    tid = 0;
-                    if (++slot == swap_slots) [[unlikely]] { slot = 0; }
-                }
+            if (++tid == config::worker_threads_number) [[unlikely]] {
+                tid = 0;
+                off = (off + 1) % config::swap_capacity;
             }
+        }
+
+        inline bool try_find_empty(const swap_zone &swap) noexcept {
+            constexpr uint32_t swap_size =
+                sizeof(swap_zone) / sizeof(task_info_ptr);
+            int i = 0;
+            while (i < swap_size && swap[tid][off] != nullptr) {
+                ++i;
+                next();
+            }
+            if (i != swap_size) [[likely]] {
+                return true;
+            } else {
+                next();
+                return false;
+            }
+        }
+
+        // inline void wait_for_empty(const swap_zone &swap) noexcept {
+        //     while (swap[tid][off] != nullptr) next();
+        // }
+
+        inline bool try_find_exist(const swap_zone &swap) noexcept {
+            constexpr uint32_t swap_size =
+                sizeof(swap_zone) / sizeof(task_info_ptr);
+            int i = 0;
+            while (i < swap_size && swap[tid][off] == nullptr) {
+                ++i;
+                next();
+            }
+            if (i != swap_size) [[likely]] {
+                return true;
+            } else {
+                next();
+                return false;
+            }
+        }
+
+        // inline void wait_for_exist(const swap_zone &swap) noexcept {
+        //     while (swap[tid][off] == nullptr) next();
+        // }
+
+        // release the task into the swap zone
+        inline void
+        release(swap_zone &swap, task_info_ptr task) const noexcept {
+            std::atomic_store_explicit(
+                reinterpret_cast<std::atomic<task_info_ptr> *>(&swap[tid][off]),
+                task, std::memory_order_release);
+        }
+
+        inline void
+        release_relaxed(swap_zone &swap, task_info_ptr task) const noexcept {
+            std::atomic_store_explicit(
+                reinterpret_cast<std::atomic<task_info_ptr> *>(&swap[tid][off]),
+                task, std::memory_order_relaxed);
         }
     };
 
+    // place main thread's high frequency data here
     ctx_swap_cur s_cur;
     ctx_swap_cur r_cur;
-    liburingcxx::CQEntry *polling_cqe = nullptr;
-    char
-        __padding0[cache_line_size - 2 * sizeof(ctx_swap_cur) - sizeof(void *)];
+    std::queue<task_info_ptr> submit_overflow_buf;
+    std::queue<task_info_ptr> reap_overflow_buf;
+
+    alignas(cache_line_size) char __cacheline_barrier[64];
 
     // std::counting_semaphore<1> idle_worker_quota{1};
 
@@ -177,90 +236,141 @@ class [[nodiscard]] io_context final {
     friend worker_meta;
 
   private:
-    alignas(cache_line_size) worker_meta worker[worker_threads_number];
-
-    union alignas(cache_line_size) {
-        std::thread worker_threads[worker_threads_number];
-    };
-
-  public:
+    alignas(cache_line_size) worker_meta worker[config::worker_threads_number];
 
   private:
+    bool will_stop = false;
     const unsigned ring_entries;
-    int temp = 0;
 
   private:
-    void forward_task(task_info *task) noexcept {
-        while (reap_swap[r_cur.slot][r_cur.tid][r_cur.off] != nullptr)
+    void forward_task(task_info_ptr task) noexcept {
+        // TODO optimize scheduling strategy
+        if (r_cur.try_find_empty(reap_swap)) [[likely]] {
+            reap_swap[r_cur.tid][r_cur.off] = task;
             r_cur.next();
-        reap_swap[r_cur.slot][r_cur.tid][r_cur.off] = task;
-        r_cur.next();
+            log::v("ctx forward_task to [%u][%u]\n", r_cur.tid, r_cur.off);
+        } else {
+            reap_overflow_buf.push(task);
+            log::d("ctx forward_task to reap_OF\n");
+        }
+    }
+
+    bool try_submit(task_info_ptr task) noexcept {
+        if (task->type == task_info::task_type::co_spawn) {
+            forward_task(task);
+            return true;
+        }
+
+        if (ring.SQSpaceLeft() == 0) [[unlikely]] {
+            log::d("ctx try_submit failed SQfull\n");
+            return false; // SQRing is full
+        }
+
+        liburingcxx::SQEntry *sqe = ring.getSQEntry();
+
+        sqe->cloneFrom(*task->sqe);
+        ring.submit();
+
+        log::v("ctx submit to ring\n");
+
+        return true;
     }
 
     /**
      * @brief poll the submission swap zone
-     * @return if load exists and capacity is healthy
+     * @return if submit_swap capacity might be healthy
      */
     bool poll_submission() noexcept {
-        constexpr int swap_size = sizeof(swap_zone) / sizeof(task_info *);
         // submit round
-        int i = 0;
-        for (; i < swap_size; ++i) {
-            if (submit_swap[s_cur.slot][s_cur.tid][s_cur.off] != nullptr) break;
-            s_cur.next();
-        }
-        if (i == swap_size) return false;
-        task_info *io_info = submit_swap[s_cur.slot][s_cur.tid][s_cur.off];
-        submit_swap[s_cur.slot][s_cur.tid][s_cur.off] = nullptr;
+        if (!s_cur.try_find_exist(submit_swap)) { return false; }
 
-        if (io_info->type == task_info::task_type::co_spawn) {
-            forward_task(io_info);
-            s_cur.next();
-            return true;
-        }
-
-        if (ring.SQSpaceLeft() == 0) return false; // SQRing is full
-        liburingcxx::SQEntry *sqe = ring.getSQEntry();
-
-        sqe->cloneFrom(*io_info->sqe);
-        ring.submit();
-
+        task_info_ptr const io_info = submit_swap[s_cur.tid][s_cur.off];
+        submit_swap[s_cur.tid][s_cur.off] = nullptr;
+        log::v("ctx poll_submission at [%u][%u]\n", s_cur.tid, s_cur.off);
         s_cur.next();
+
+        if (try_submit(io_info)) [[likely]] {
+            return true;
+        } else {
+            submit_overflow_buf.push(io_info);
+            log::d("ctx poll_submission failed submit_OF\n");
+            return false;
+        }
+    }
+
+    inline bool try_clear_submit_overflow_buf() noexcept {
+        if (submit_overflow_buf.empty()) return true;
+        do {
+            task_info_ptr task = submit_overflow_buf.front();
+            // OPTIMIZE impossible for task_type::co_spawn
+            if (try_submit(task)) {
+                submit_overflow_buf.pop();
+            } else {
+                log::d("ctx try_clear_submit (partially) failed\n");
+                return false;
+            }
+        } while (!submit_overflow_buf.empty());
+        log::d("ctx try_clear_submit succ\n");
+        return true;
+    }
+
+    bool try_reap(task_info_ptr task) noexcept {
+        if (!r_cur.try_find_empty(reap_swap)) [[unlikely]] {
+            log::d("ctx try_reap failed reap_swap is full\n");
+            return false;
+        }
+
+        r_cur.release(reap_swap, task);
+        log::v("ctx try_reap at [%u][%u]\n", r_cur.tid, r_cur.off);
+        r_cur.next();
         return true;
     }
 
     /**
      * @brief poll the completion swap zone
-     * @return if load exists and capacity is healthy
+     * @return if load exists and capacity of reap_swap might be healthy
      */
     bool poll_completion() noexcept {
-        constexpr int swap_size = sizeof(swap_zone) / sizeof(task_info *);
         // reap round
-        if (polling_cqe == nullptr) [[likely]] {
-            polling_cqe = ring.peekCQEntry();
-            if (polling_cqe == nullptr) return false;
-        }
-        int i = 0;
-        for (; i < swap_size; ++i) {
-            if (reap_swap[r_cur.slot][r_cur.tid][r_cur.off] == nullptr) break;
-            r_cur.next();
-        }
-        if (i == swap_size) return false;
-        task_info *io_info =
-            reinterpret_cast<task_info *>(polling_cqe->getData());
+        liburingcxx::CQEntry *polling_cqe = ring.peekCQEntry();
+        if (polling_cqe == nullptr) return false;
+
+        log::v("ctx poll_completion found\n");
+
+        task_info_ptr io_info =
+            reinterpret_cast<task_info_ptr>(polling_cqe->getData());
         io_info->result = polling_cqe->getRes();
-
-        // release the io_info into the reap_swap
-        std::atomic_store_explicit(
-            reinterpret_cast<std::atomic<task_info *> *>(
-                &reap_swap[r_cur.slot][r_cur.tid][r_cur.off]),
-            io_info, std::memory_order_release);
-
         ring.SeenCQEntry(polling_cqe);
-        polling_cqe = nullptr;
 
-        r_cur.next();
+        if (try_reap(io_info)) [[likely]] {
+            return true;
+        } else {
+            reap_overflow_buf.push(io_info);
+            log::d("ctx poll_completion failed reap_OF\n");
+            return false;
+        }
+    }
+
+    inline bool try_clear_reap_overflow_buf() noexcept {
+        if (reap_overflow_buf.empty()) return true;
+        do {
+            task_info_ptr task = reap_overflow_buf.front();
+            // OPTIMIZE impossible for task_type::co_spawn
+            if (try_reap(task)) {
+                reap_overflow_buf.pop();
+            } else {
+                log::d("ctx try_clear_reap (partially) failed\n");
+                return false;
+            }
+        } while (!reap_overflow_buf.empty());
+        log::d("ctx try_clear_reap succ\n");
         return true;
+    }
+
+    [[noreturn]] void stop() noexcept {
+        log::i("ctx stopped\n");
+        std::this_thread::sleep_for(std::chrono::minutes{1});
+        ::exit(0);
     }
 
   public:
@@ -287,58 +397,40 @@ class [[nodiscard]] io_context final {
 
     void probe() const {
         using namespace std;
+        using namespace co_context::config;
         cout << "number of logic cores: " << std::thread::hardware_concurrency()
              << endl;
         cout << "size of io_context: " << sizeof(io_context) << endl;
         cout << "size of uring: " << sizeof(uring) << endl;
-        cout << "size of single swap_zone: " << sizeof(swap_zone) << endl;
-        cout << "size of single atomic_ptr: " << sizeof(submit_swap[0][0][0])
-             << endl;
+        cout << "size of two swap_zone: " << 2 * sizeof(swap_zone) << endl;
         // cout << "swap_zone is_lock_free: "
         //      << submit_swap[0][0][0].is_lock_free() << endl;
         cout << "number of worker_threads: " << worker_threads_number << endl;
-        cout << "size of single swap_zone per thread: "
-             << swap_slots * cache_line_size << endl;
-        cout << "length of fixed swap_queue: "
-             << swap_slots * task_info_number_per_cache_line << endl;
+        cout << "swap_capacity per thread: " << swap_capacity << endl;
         cout << "size of single worker_meta: " << sizeof(worker_meta) << endl;
     }
 
     void make_thread_pool() {
-        for (int i = 0; i < worker_threads_number; ++i)
-            std::construct_at(
-                worker_threads + i, &worker_meta::run, worker + i, i, this);
-    }
-
-    void make_test_thread_pool() {
-        for (int i = 0; i < worker_threads_number; ++i)
-            std::construct_at(
-                worker_threads + i, &worker_meta::run_test_swap, worker + i, i,
-                this);
-    }
-
-    void run_test_swap() {
-        for (int64_t recv = 0; recv < test::swap_tot / worker_threads_number
-                                          * worker_threads_number;) {
-            while (submit_swap[s_cur.slot][s_cur.tid][s_cur.off] == nullptr)
-                s_cur.next();
-            submit_swap[s_cur.slot][s_cur.tid][s_cur.off] = nullptr;
-            ++recv;
-            s_cur.next();
-        }
-        printf("io_context::run(): done\n");
+        for (int i = 0; i < config::worker_threads_number; ++i)
+            worker[i].sharing.host_thread =
+                std::thread{&worker_meta::run, worker + i, i, this};
     }
 
     void co_spawn(main_task entrance) {
-        const unsigned tid = detail::this_thread.tid;
-        if (tid < worker_threads_number) return worker[tid].co_spawn(entrance);
-        while (reap_swap[r_cur.slot][r_cur.tid][r_cur.off] != nullptr)
+        const uint32_t tid = detail::this_thread.tid;
+        if (tid < config::worker_threads_number)
+            return worker[tid].co_spawn(entrance);
+        if (r_cur.try_find_empty(reap_swap)) [[likely]] {
+            r_cur.release(reap_swap, entrance.get_io_info_ptr());
+            log::d("ctx co_spawn at [%u][%u]\n", r_cur.tid, r_cur.off);
             r_cur.next();
-
-        reap_swap[r_cur.slot][r_cur.tid][r_cur.off] =
-            entrance.get_io_info_ptr();
-        r_cur.next();
+        } else {
+            reap_overflow_buf.push(entrance.get_io_info_ptr());
+            log::d("ctx co_spawn failed reap_OF\n");
+        }
     }
+
+    void can_stop() noexcept { will_stop = true; }
 
     [[noreturn]] void run() {
         detail::this_thread.worker = nullptr;
@@ -346,27 +438,40 @@ class [[nodiscard]] io_context final {
         detail::this_thread.tid = std::thread::hardware_concurrency() - 1;
         detail::set_cpu_affinity(detail::this_thread.tid);
 #endif
+        log::v("ctx making thread pool\n");
         make_thread_pool();
+        log::v("ctx make_thread_pool end\n");
 
-        while (true) {
-            for (uint8_t i = 0; i < config::submit_poll_rounds; ++i) {
-                // if (!poll_submission()) [[unlikely]] break;
-                poll_submission();
+        while (!will_stop) [[likely]] {
+                log::v("ctx polling\n");
+                if (try_clear_submit_overflow_buf()) {
+                    for (uint8_t i = 0; i < config::submit_poll_rounds; ++i) {
+                        // printf("submit start!\n");
+                        if (!poll_submission()) break;
+                        // printf("submitted!\n");
+                        // poll_submission();
+                    }
+                }
+
+                if (try_clear_reap_overflow_buf())
+                    for (uint8_t i = 0; i < config::reap_poll_rounds; ++i) {
+                        if (!poll_completion()) break;
+                        // printf("reapped!\n");
+                        // poll_completion();
+                    }
+
+                // std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
-            for (uint8_t i = 0; i < config::reap_poll_rounds; ++i) {
-                // if (!poll_completion()) break;
-                poll_completion();
-            }
-            // std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        }
+
+        this->stop();
     }
 
     inline uring &io() noexcept { return ring; }
 
     ~io_context() noexcept {
-        for (std::thread &t : worker_threads) {
+        for (int i = 0; i < config::worker_threads_number; ++i) {
+            std::thread &t = worker[i].sharing.host_thread;
             if (t.joinable()) t.join();
-            std::destroy_at(&t);
         }
     }
 
@@ -383,13 +488,62 @@ inline void co_spawn(main_task entrance) noexcept {
     detail::this_thread.ctx->co_spawn(entrance);
 }
 
+inline void co_context_stop() noexcept {
+    detail::this_thread.ctx->can_stop();
+}
+
+inline uint32_t co_get_tid() noexcept {
+    return detail::this_thread.tid;
+}
+
 namespace detail {
 
     inline void worker_meta::swap_cur::next() noexcept {
-        if (++off == task_info_number_per_cache_line) {
-            off = 0;
-            if (++slot == io_context::swap_slots) { slot = 0; }
+        off = (off + 1) % co_context::config::swap_capacity;
+    }
+
+    inline bool
+    worker_meta::swap_cur::try_find_empty(swap_zone &swap) noexcept {
+        uint16_t i = 0;
+        const uint32_t tid = this_thread.tid;
+        while (i < config::swap_capacity && swap[tid][off] != nullptr) {
+            next();
         }
+        if (i == config::swap_capacity) [[unlikely]] {
+            next();
+            return false;
+        }
+        return true;
+    }
+
+    inline bool
+    worker_meta::swap_cur::try_find_exist(swap_zone &swap) noexcept {
+        uint16_t i = 0;
+        const uint32_t tid = this_thread.tid;
+        while (i < config::swap_capacity && swap[tid][off] == nullptr) {
+            next();
+        }
+        if (i == config::swap_capacity) [[unlikely]] {
+            next();
+            return false;
+        }
+        return true;
+    }
+
+    inline void worker_meta::swap_cur::release(
+        swap_zone &swap, task_info_ptr task) const noexcept {
+        const uint32_t tid = this_thread.tid;
+        std::atomic_store_explicit(
+            reinterpret_cast<std::atomic<task_info_ptr> *>(&swap[tid][off]),
+            task, std::memory_order_release);
+    }
+
+    inline void worker_meta::swap_cur::release_relaxed(
+        swap_zone &swap, task_info_ptr task) const noexcept {
+        const uint32_t tid = this_thread.tid;
+        std::atomic_store_explicit(
+            reinterpret_cast<std::atomic<task_info_ptr> *>(&swap[tid][off]),
+            task, std::memory_order_relaxed);
     }
 
     inline void
@@ -400,7 +554,7 @@ namespace detail {
         detail::this_thread.tid = thread_index;
 #ifdef USE_CPU_AFFINITY
         const unsigned logic_cores = std::thread::hardware_concurrency();
-        if constexpr (config::use_hyper_threading) {
+        if constexpr (config::using_hyper_threading) {
             if (thread_index * 2 < logic_cores) {
                 detail::set_cpu_affinity(thread_index * 2);
             } else {
@@ -416,52 +570,52 @@ namespace detail {
         this->submit(entrance.get_io_info_ptr());
     }
 
-    inline void worker_meta::submit(task_info *io_info) noexcept {
+    inline void worker_meta::submit(task_info_ptr io_info) noexcept {
         const unsigned tid = this_thread.tid;
         auto &ctx = *this_thread.ctx;
         auto &cur = this->submit_cur;
         // std::cerr << cur.slot << " " << tid << cur.off << std::endl;
-        while (ctx.submit_swap[cur.slot][tid][cur.off] != nullptr)
-            [[unlikely]] cur.next();
-
-        ctx.submit_swap[cur.slot][tid][cur.off] = io_info;
-        // TODO use waiting queue when overflow
-        cur.next();
+        if (cur.try_find_empty(ctx.submit_swap)) [[likely]] {
+            cur.release(ctx.submit_swap, io_info);
+            log::v("worker[%u] submit at [%u]\n", tid, cur.off);
+            cur.next();
+        } else {
+            this->submit_overflow_buf.push(io_info);
+            log::d("worker[%u] submit to OF\n", tid);
+        }
     }
 
     inline std::coroutine_handle<> worker_meta::schedule() noexcept {
-        const unsigned tid = this_thread.tid;
+        const uint32_t tid = this_thread.tid;
         auto &ctx = *this_thread.ctx;
-        auto &cur = this->reap_cur;
+        auto &r_cur = this->reap_cur;
 
-        // int fail_cnt = 0;
-        while (ctx.reap_swap[cur.slot][tid][cur.off] == nullptr) [[likely]] {
-                cur.next();
-                // ++fail_cnt;
+        log::v("worker[%u] scheduling\n", tid);
+
+        while (true) {
+            // handle overflowed submission
+            if (!this->submit_overflow_buf.empty()) {
+                auto &s_cur = this->submit_cur;
+                if (s_cur.try_find_empty(ctx.submit_swap)) {
+                    task_info_ptr task = this->submit_overflow_buf.front();
+                    this->submit_overflow_buf.pop();
+                    s_cur.release_relaxed(ctx.submit_swap, task);
+                    log::d(
+                        "worker[%u] submit from OF_buf to [%u]\n", tid,
+                        s_cur.off);
+                    s_cur.next();
+                }
             }
-        // printf("%d reap fails %d\n", tid, fail_cnt);
 
-        const task_info &io_info = *ctx.reap_swap[cur.slot][tid][cur.off];
-        ctx.reap_swap[cur.slot][tid][cur.off] = nullptr;
-        cur.next();
-
-        // TODO consider tid_hint here
-        return io_info.handle;
-    }
-
-    inline void worker_meta::run_test_swap(
-        const int thread_index, io_context *const context) noexcept {
-        init(thread_index, context);
-        auto &submit_swap = context->submit_swap;
-        const int tid = detail::this_thread.tid;
-
-        for (int64_t send = 0;
-             send < test::swap_tot / io_context::worker_threads_number;) {
-            swap_cur &cur = submit_cur;
-            while (submit_swap[cur.slot][tid][cur.off] != nullptr) cur.next();
-            submit_swap[cur.slot][tid][cur.off] = (detail::task_info *)this;
-            ++send;
-            cur.next();
+            if (r_cur.try_find_exist(ctx.reap_swap)) {
+                const task_info_ptr io_info = ctx.reap_swap[tid][r_cur.off];
+                ctx.reap_swap[tid][r_cur.off] = nullptr;
+                log::d("worker[%u] found [%u]\n", tid, r_cur.off);
+                r_cur.next();
+                // printf("get task!\n");
+                return io_info->handle;
+            }
+            // TODO consider tid_hint here
         }
     }
 

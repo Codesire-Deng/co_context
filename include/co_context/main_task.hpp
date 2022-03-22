@@ -7,6 +7,7 @@
 #include "task_info.hpp"
 #include <memory>
 #include <cassert>
+#include "co_context/log/log.hpp"
 
 namespace co_context {
 
@@ -28,6 +29,7 @@ class main_task {
             auto handle =
                 std::coroutine_handle<promise_type>::from_promise(*this);
             io_info.handle = handle;
+            log::v("main_task generated\n");
             return main_task{handle};
         }
 

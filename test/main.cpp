@@ -19,10 +19,6 @@ int main(int argc, char *argv[]) {
 
     // io_context.probe();
 
-    // io_context.make_test_thread_pool();
-
-    // io_context.run_test_swap();
-
     int output_fd = ::open("output", O_WRONLY | O_TRUNC);
 
     io_context.co_spawn([&]() -> main_task {

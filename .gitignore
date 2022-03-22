@@ -63,3 +63,5 @@ draft/
 
 perf.data*
 *.data
+
+.log
