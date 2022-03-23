@@ -208,8 +208,8 @@ void io_context::forward_task(task_info_ptr task) noexcept {
     // TODO optimize scheduling strategy
     if (r_cur.try_find_empty(reap_swap)) [[likely]] {
         reap_swap[r_cur.tid][r_cur.off] = task;
-        r_cur.next();
         log::v("ctx forward_task to [%u][%u]\n", r_cur.tid, r_cur.off);
+        r_cur.next();
     } else {
         reap_overflow_buf.push(task);
         log::d("ctx forward_task to reap_OF\n");
