@@ -75,7 +75,7 @@ class SQEntry : private io_uring_sqe {
         return *this;
     }
 
-    SQEntry &prepareRW(
+    inline SQEntry &prepareRW(
         uint8_t op,
         int fd,
         const void *addr,
