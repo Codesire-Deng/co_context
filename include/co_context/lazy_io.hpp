@@ -1,6 +1,7 @@
 #pragma once
 
-#include "../co_context.hpp"
+#include "co_context.hpp"
+#include <cassert>
 
 namespace co_context {
 
@@ -15,8 +16,8 @@ namespace detail {
         // std::coroutine_handle<>
         void await_suspend(std::coroutine_handle<> current) noexcept {
             io_info.handle = current;
-            auto &worker = *detail::this_thread.worker;
-            worker.submit(&io_info);
+            worker_meta *worker = detail::this_thread.worker;
+            worker->submit(&io_info);
         }
 
         int32_t await_resume() const noexcept { return io_info.result; }
@@ -55,72 +56,74 @@ inline namespace lazy {
     using detail::lazy_awaiter;
     using detail::lazy_awaiter_yield;
 
-    lazy_awaiter read(int fd, std::span<char> buf, uint64_t offset) noexcept {
+    inline lazy_awaiter
+    read(int fd, std::span<char> buf, uint64_t offset) noexcept {
         lazy_awaiter awaiter;
         awaiter.sqe.prepareRead(fd, buf, offset);
         return awaiter;
     }
 
-    lazy_awaiter
+    inline lazy_awaiter
     write(int fd, std::span<const char> buf, uint64_t offset) noexcept {
         lazy_awaiter awaiter;
         awaiter.sqe.prepareWrite(fd, buf, offset);
         return awaiter;
     }
 
-    lazy_awaiter
+    inline lazy_awaiter
     accept(int fd, sockaddr *addr, socklen_t *addrlen, int flags) noexcept {
         lazy_awaiter awaiter;
         awaiter.sqe.prepareAccept(fd, addr, addrlen, flags);
         return awaiter;
     }
 
-    lazy_awaiter recv(int sockfd, std::span<char> buf, int flags) noexcept {
+    inline lazy_awaiter
+    recv(int sockfd, std::span<char> buf, int flags) noexcept {
         lazy_awaiter awaiter;
         awaiter.sqe.prepareRecv(sockfd, buf, flags);
         return awaiter;
     }
 
-    lazy_awaiter
+    inline lazy_awaiter
     send(int sockfd, std::span<const char> buf, int flags) noexcept {
         lazy_awaiter awaiter;
         awaiter.sqe.prepareSend(sockfd, buf, flags);
         return awaiter;
     }
 
-    lazy_awaiter
+    inline lazy_awaiter
     connect(int sockfd, const sockaddr *addr, socklen_t addrlen) noexcept {
         lazy_awaiter awaiter;
         awaiter.sqe.prepareConnect(sockfd, addr, addrlen);
         return awaiter;
     }
 
-    lazy_awaiter close(int fd) noexcept {
+    inline lazy_awaiter close(int fd) noexcept {
         lazy_awaiter awaiter;
         awaiter.sqe.prepareClose(fd);
         return awaiter;
     }
 
-    lazy_awaiter shutdown(int fd, int how) noexcept {
+    inline lazy_awaiter shutdown(int fd, int how) noexcept {
         lazy_awaiter awaiter;
         awaiter.sqe.prepareShutdown(fd, how);
         return awaiter;
     }
 
-    lazy_awaiter fsync(int fd, uint32_t fsync_flags) noexcept {
+    inline lazy_awaiter fsync(int fd, uint32_t fsync_flags) noexcept {
         lazy_awaiter awaiter;
         awaiter.sqe.prepareFsync(fd, fsync_flags);
         return awaiter;
     }
 
-    lazy_awaiter
+    inline lazy_awaiter
     sync_file_range(int fd, uint32_t len, uint64_t offset, int flags) noexcept {
         lazy_awaiter awaiter;
         awaiter.sqe.prepareSyncFileRange(fd, len, offset, flags);
         return awaiter;
     }
 
-    lazy_awaiter_yield yield() noexcept { return {}; }
+    inline lazy_awaiter_yield yield() noexcept { return {}; }
 
 } // namespace lazy
 

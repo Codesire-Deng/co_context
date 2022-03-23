@@ -1,10 +1,11 @@
-#include <mimalloc-new-delete.h>
+// #include <mimalloc-new-delete.h>
 #include "co_context.hpp"
 #include "co_context/lazy_io.hpp"
 #include "co_context/net/socket.hpp"
 #include "co_context/net/acceptor.hpp"
 #include <filesystem>
 #include <fcntl.h>
+#include <iostream>
 
 int main(int argc, char *argv[]) {
     using std::cout, std::endl, std::cerr;
