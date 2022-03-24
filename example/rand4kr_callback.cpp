@@ -26,8 +26,8 @@ std::atomic_int remain, buf_idx = 0;
 
 constexpr size_t BLOCK_LEN = 4096;
 // constexpr int MAX_ON_FLY = 24; // 6 worker thread
-// constexpr int MAX_ON_FLY = 24; // 3 worker thread
-constexpr int MAX_ON_FLY = 4; // 1 worker thread
+constexpr int MAX_ON_FLY = 24; // 3 worker thread
+// constexpr int MAX_ON_FLY = 4; // 1 worker thread
 constexpr unsigned threads = config::worker_threads_number;
 
 alignas(config::cache_line_size) char buf[threads][BLOCK_LEN];
@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
     // file_size = argc == 4 ? atoll(argv[3]) : 60'000'000;
     file_size = argc == 4 ? atoll(argv[3]) : 1'000'000'000;
 
-    io_context context{512};
+    io_context context{2048};
 
     int concur = std::min(MAX_ON_FLY, times);
     remain.store(times - concur);

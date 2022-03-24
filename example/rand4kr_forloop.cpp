@@ -1,41 +1,42 @@
 // #include <mimalloc-new-delete.h>
 #include "co_context.hpp"
+#include "co_context/lazy_io.hpp"
 #include <filesystem>
 #include <random>
 #include <fcntl.h>
 #include <atomic>
 #include <chrono>
-#include <thread>
-#include <vector>
 #include <ctime>
+
+using namespace co_context;
 
 int file_fd;
 size_t file_size;
 int times;
-volatile std::atomic_int remain, buf_idx = 0;
+std::atomic_int remain;
 
 constexpr size_t BLOCK_LEN = 4096;
-constexpr unsigned threads = 4;
+constexpr unsigned threads = config::worker_threads_number;
+constexpr int MAX_ON_FLY = threads * 2;
 
-alignas(512) char buf[threads][BLOCK_LEN];
+alignas(512) char buf[MAX_ON_FLY][BLOCK_LEN];
 
 std::mt19937_64 rng(time(nullptr));
 
-void run(const uint32_t idx) {
-restart: 
+main_task run(const uint32_t idx) {
+restart:
     const size_t off = (rng() % file_size) & ~(BLOCK_LEN - 1);
-    (void)buf_idx.fetch_add(1);
-    int nr = ::pread(file_fd, buf[idx], BLOCK_LEN, off);
+    int nr = co_await lazy::read(file_fd, buf[idx], off);
     if (nr < 0) { perror("read err"); }
 
     int ref = remain.fetch_sub(1);
     if (ref <= 0) [[unlikely]] {
         if (ref == 0) {
             printf("All done\n");
+            co_context_stop();
             ::close(file_fd);
             ::exit(0);
         }
-        return;
     } else [[likely]] {
         goto restart;
     }
@@ -47,7 +48,7 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    file_fd = ::open(argv[1], O_RDONLY, O_DIRECT);
+    file_fd = ::open(argv[1], O_RDONLY);
     if (file_fd < 0) {
         throw std::system_error{errno, std::system_category(), "open"};
     }
@@ -56,16 +57,14 @@ int main(int argc, char *argv[]) {
     // file_size = argc == 4 ? atoll(argv[3]) : 60'000'000;
     file_size = argc == 4 ? atoll(argv[3]) : 15'000'000'000ULL;
 
-    volatile co_context::io_context context{256};
+    co_context::io_context context{64};
 
-    const int concur = std::min<int>(threads, times);
+    const int concur = std::min<int>(MAX_ON_FLY, times);
     remain.store(times - concur);
 
-    std::vector<std::thread> ths;
+    for (int i = 0; i < concur; ++i) { context.co_spawn(run(i)); }
 
-    for (int i = 0; i < concur; ++i) { ths.emplace_back(run, i); }
+    context.run();
 
-    for (int i = 0; i < concur; ++i) { ths[i].join(); }
-  
     return 0;
 }
