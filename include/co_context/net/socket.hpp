@@ -4,7 +4,7 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/socket.h>
-// #include "co_context/defer.hpp"
+// #include "co_context/utility/defer.hpp"
 // #include "co_context/config.hpp"
 #include "co_context/lazy_io.hpp"
 #include "co_context/eager_io.hpp"
@@ -88,66 +88,6 @@ class socket {
   private:
     int sockfd;
 };
-
-inline socket &socket::bind(const inet_address &addr) {
-    int res = ::bind(sockfd, addr.get_sockaddr(), addr.length());
-    if (res != 0) {
-        perror("socket::bind");
-        abort();
-    }
-
-    return *this;
-}
-
-inline socket &socket::listen() {
-    int res = ::listen(sockfd, SOMAXCONN);
-    if (res != 0) {
-        perror("socket::listen");
-        abort();
-    }
-
-    return *this;
-}
-
-inline socket &socket::set_reuse_addr(bool on) {
-    int optval = on;
-    if (::setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval)
-        < 0) {
-        perror("socket::setReuseAddr");
-    }
-    return *this;
-}
-
-inline socket &socket::set_tcp_no_delay(bool on) {
-    int optval = on ? 1 : 0;
-    if (::setsockopt(
-            sockfd, IPPROTO_TCP, TCP_NODELAY, &optval,
-            static_cast<socklen_t>(sizeof optval))
-        < 0) {
-        perror("socket::setTcpNoDelay");
-    }
-    return *this;
-}
-
-inline inet_address socket::get_local_addr() const {
-    struct sockaddr_storage localaddr;
-    socklen_t addrlen = sizeof localaddr;
-    struct sockaddr *addr = reinterpret_cast<struct sockaddr *>(&localaddr);
-    if (::getsockname(sockfd, addr, &addrlen) < 0) {
-        perror("socket::getLocalAddr");
-    }
-    return inet_address(*addr);
-}
-
-inline inet_address socket::get_peer_addr() const {
-    struct sockaddr_storage peeraddr;
-    socklen_t addrlen = sizeof peeraddr;
-    struct sockaddr *addr = reinterpret_cast<struct sockaddr *>(&peeraddr);
-    if (::getpeername(sockfd, addr, &addrlen) < 0) {
-        perror("socket::getPeerAddr");
-    }
-    return inet_address(*addr);
-}
 
 inline socket socket::create_tcp(sa_family_t family) {
     int sockfd = ::socket(family, SOCK_STREAM | SOCK_CLOEXEC, IPPROTO_TCP);

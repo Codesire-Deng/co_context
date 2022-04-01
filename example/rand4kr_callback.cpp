@@ -1,56 +1,58 @@
-#include <mimalloc-new-delete.h>
+// #include <mimalloc-new-delete.h>
 #include "co_context.hpp"
 #include "co_context/net/acceptor.hpp"
 #include "co_context/buffer.hpp"
+#include "co_context/lazy_io.hpp"
 
 #include <filesystem>
 #include <random>
 #include <fcntl.h>
 #include <atomic>
 #include <chrono>
-#include <semaphore>
 
 using namespace co_context;
+
+/**
+ * total_threads_number = 5;
+ * swap_capacity = 16;
+ * MAX_ON_FLY = 24
+ * file_size = 1e9 bytes
+ */
 
 int file_fd;
 size_t file_size;
 int times;
-std::atomic_int alive = 0, finish = 0;
+std::atomic_int remain, buf_idx = 0;
 
 constexpr size_t BLOCK_LEN = 4096;
+// constexpr int MAX_ON_FLY = 24; // 6 worker thread
 constexpr int MAX_ON_FLY = 24; // 3 worker thread
-// constexpr int MAX_ON_FLY = 2; // 1 worker thread
+// constexpr int MAX_ON_FLY = 4; // 1 worker thread
+constexpr unsigned threads = config::worker_threads_number;
 
-char buf[4][BLOCK_LEN];
+alignas(config::cache_line_size) char buf[threads][BLOCK_LEN];
+
 std::mt19937_64 rng(0);
 
 main_task run() {
-    log::d("r4kr at ?? run()\n");
-    const uint32_t tid = co_get_tid();
-    const int32_t pid = ::gettid();
-    log::d("r4kr at [%u](%d) run()\n", tid, pid);
-
-    const size_t idx = alive.fetch_add(1);
-    log::d("r4kr at [%u](%d) read()\n", tid, pid);
+    // log::d("r4kr at [%u] read()\n", co_get_tid());
     const size_t off = (rng() % file_size) & ~(BLOCK_LEN - 1);
-    // const size_t off = (idx % file_size) & ~(BLOCK_LEN - 1);
-    int nr = co_await lazy::read(file_fd, buf[tid], off);
+    const int idx = buf_idx.fetch_add(1) % threads;
+    int nr = co_await lazy::read(file_fd, buf[idx], off);
     if (nr < 0) { perror("read err"); }
 
-    int now = finish.fetch_add(1) + 1;
-    if (now == times) [[unlikely]] {
+    if (remain.fetch_sub(1) == 0) [[unlikely]] {
         printf("All done\n");
         co_context_stop();
         ::close(file_fd);
         ::exit(0);
-    } else if (idx + 1 < times) [[likely]] {
-        log::d("r4kr at [%u](%d) callback\n", tid, pid);
+    } else [[likely]] {
+        // log::d("r4kr at [%u] callback\n", co_get_tid());
         auto t = run();
-        log::d("r4kr at [%u](%d) spawn ready\n", tid, pid);
+        // log::d("r4kr at [%u] spawn ready\n", co_get_tid());
         co_spawn(t);
-        log::d("r4kr at [%u](%d) spawn end\n", tid, pid);
     }
-    log::d("r4kr at [%u](%d) end\n", tid, pid);
+    // log::d("r4kr at [%u] end\n", co_get_tid());
 }
 
 int main(int argc, char *argv[]) {
@@ -68,10 +70,11 @@ int main(int argc, char *argv[]) {
     // file_size = argc == 4 ? atoll(argv[3]) : 60'000'000;
     file_size = argc == 4 ? atoll(argv[3]) : 1'000'000'000;
 
-    io_context context{256};
+    io_context context{2048};
 
-    for (int i = 0; i < std::min(MAX_ON_FLY, times); ++i)
-        context.co_spawn(run());
+    int concur = std::min(MAX_ON_FLY, times);
+    remain.store(times - concur);
+    for (int i = 0; i < concur; ++i) context.co_spawn(run());
 
     context.run();
 

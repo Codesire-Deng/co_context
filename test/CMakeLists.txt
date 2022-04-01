@@ -1,9 +1,11 @@
-add_executable(cat cat.cpp)
+# for each "example/x.cpp", generate "x"
+file(GLOB_RECURSE all_tests *.cpp)
+foreach(v ${all_tests})
+    string(REGEX MATCH "test/.*" relative_path ${v})
+    # message(${relative_path})
+    string(REGEX REPLACE "test/" "" target_name ${relative_path})
+    string(REGEX REPLACE ".cpp" "" target_name ${target_name})
 
-add_executable(httpd httpd.cpp)
-
-add_executable(main main.cpp)
-target_link_libraries(main PUBLIC mimalloc)
-
-# add_executable(netcat netcat.cpp)
-# target_link_libraries(netcat PUBLIC mimalloc)
+    add_executable(${target_name} ${v})
+    target_link_libraries(${target_name} PUBLIC mimalloc co_context)
+endforeach()

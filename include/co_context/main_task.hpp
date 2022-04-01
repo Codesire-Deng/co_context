@@ -4,6 +4,7 @@
 #include <variant>
 #include <concepts>
 #include <exception>
+#include <atomic>
 #include "task_info.hpp"
 #include <memory>
 #include <cassert>
@@ -39,30 +40,11 @@ class main_task {
     };
 
     main_task(std::coroutine_handle<promise_type> handle) noexcept
-        : handle(handle) {
-    }
+        : handle(handle) {}
 
     main_task(const main_task &) noexcept = default;
 
-/* 
-    main_task(const main_task &) = delete;
-
-    main_task(main_task &&other) noexcept
-        : handle(other.handle) {
-        other.handle = nullptr;
-    }
-
-    main_task &operator=(const main_task &other) = delete;
-
-    main_task &operator=(main_task &&other) noexcept {
-        if (this != &other) {
-            handle = other.handle;
-            other.handle = nullptr;
-        }
-    }
- */
-
-    inline detail::task_info* get_io_info_ptr() const noexcept {
+    inline detail::task_info *get_io_info_ptr() const noexcept {
         return &handle.promise().io_info;
     }
 

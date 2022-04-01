@@ -7,7 +7,7 @@
             "request": "launch",
             // Resolved by CMake Tools:
             "program": "${command:cmake.launchTargetPath}",
-            "args": ["build/example/rand4kr", "draft/man", "10000000"],
+            "args": ["draft/test_1G", "3"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [

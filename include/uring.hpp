@@ -37,9 +37,9 @@
 #include <cstring>
 #include <span>
 #include <cassert>
-#include "liburing/compat.h"
-#include "liburing/io_uring.h"
-#include "liburing/barrier.h"
+#include "uring/compat.h"
+#include "uring/io_uring.h"
+#include "uring/barrier.h"
 #include "uring/syscall.hpp"
 
 namespace liburingcxx {

@@ -27,11 +27,11 @@ namespace config {
     // About io_context
     inline constexpr unsigned io_uring_flags = 0;
 
-    // inline constexpr unsigned total_threads_number = 6;
+    inline constexpr unsigned total_threads_number = 4;
 
     // inline constexpr unsigned total_threads_number = 5;
 
-    inline constexpr unsigned total_threads_number = 4;
+    // inline constexpr unsigned total_threads_number = 4;
 
     // inline constexpr unsigned total_threads_number = 3;
 
@@ -59,13 +59,15 @@ namespace config {
 
     // inline constexpr uint16_t swap_capacity = 64;
 
+    inline constexpr uint16_t swap_capacity = 32;
+
     // inline constexpr uint16_t swap_capacity = 16;
 
-    inline constexpr uint16_t swap_capacity = 8;
+    // inline constexpr uint16_t swap_capacity = 8;
 
-    inline constexpr uint8_t submit_poll_rounds = 1;
+    inline constexpr uint8_t submit_poll_rounds = 6;
 
-    inline constexpr uint8_t reap_poll_rounds = 1;
+    inline constexpr uint8_t reap_poll_rounds = 6;
 
     // net configuration
     inline constexpr bool loopback_only = true;
