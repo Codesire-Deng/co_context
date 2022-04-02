@@ -269,7 +269,9 @@ void io_context::co_spawn(main_task entrance) {
     if (tid < config::worker_threads_number)
         return worker[tid].co_spawn(entrance);
     if (reap_swap.try_find_empty(r_cur)) [[likely]] {
-        reap_swap.store(r_cur, entrance.get_io_info_ptr()->handle, std::memory_order_release);
+        reap_swap.store(
+            r_cur, entrance.get_io_info_ptr()->handle,
+            std::memory_order_release);
         log::d("ctx co_spawn at [%u][%u]\n", r_cur.tid, r_cur.off);
         r_cur.next();
     } else {
