@@ -56,6 +56,9 @@ _deps
 # Local History for Visual Studio Code
 .history/
 
+# clangd
+.cache/
+
 # Built Visual Studio Code Extensions
 *.vsix
 

@@ -12,6 +12,8 @@
 
 #include <string_view>
 
+// TODO 性能受 swap_capacity 影响明显，需分析原因
+
 int write_n(int fd, const void *buf, int length) {
     int written = 0;
     // while (written < length) 

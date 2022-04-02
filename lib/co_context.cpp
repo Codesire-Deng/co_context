@@ -12,56 +12,6 @@ namespace detail {
 
     thread_local thread_meta this_thread;
 
-    inline void worker_meta::swap_cur::next() noexcept {
-        off = (off + 1) % co_context::config::swap_capacity;
-    }
-
-    inline bool
-    worker_meta::swap_cur::try_find_empty(swap_zone &swap) noexcept {
-        uint16_t i = 0;
-        const uint32_t tid = this_thread.tid;
-        while (i < config::swap_capacity && swap[tid][off] != nullptr) {
-            ++i;
-            next();
-        }
-        if (i == config::swap_capacity) [[unlikely]] {
-            next();
-            return false;
-        }
-        return true;
-    }
-
-    inline bool
-    worker_meta::swap_cur::try_find_exist(swap_zone &swap) noexcept {
-        uint16_t i = 0;
-        const uint32_t tid = this_thread.tid;
-        while (i < config::swap_capacity && swap[tid][off] == nullptr) {
-            ++i;
-            next();
-        }
-        if (i == config::swap_capacity) [[unlikely]] {
-            next();
-            return false;
-        }
-        return true;
-    }
-
-    inline void worker_meta::swap_cur::release(
-        swap_zone &swap, task_info_ptr task) const noexcept {
-        const uint32_t tid = this_thread.tid;
-        std::atomic_store_explicit(
-            reinterpret_cast<std::atomic<task_info_ptr> *>(&swap[tid][off]),
-            task, std::memory_order_release);
-    }
-
-    inline void worker_meta::swap_cur::release_relaxed(
-        swap_zone &swap, task_info_ptr task) const noexcept {
-        const uint32_t tid = this_thread.tid;
-        std::atomic_store_explicit(
-            reinterpret_cast<std::atomic<task_info_ptr> *>(&swap[tid][off]),
-            task, std::memory_order_relaxed);
-    }
-
     inline void
     worker_meta::init(const int thread_index, io_context *const context) {
         assert(submit_overflow_buf.empty());
@@ -88,11 +38,11 @@ namespace detail {
 
     void worker_meta::submit(task_info_ptr io_info) noexcept {
         const unsigned tid = this_thread.tid;
-        auto &ctx = *this_thread.ctx;
+        auto &swap = this_thread.ctx->submit_swap[tid];
         auto &cur = this->submit_cur;
         // std::cerr << cur.slot << " " << tid << cur.off << std::endl;
-        if (cur.try_find_empty(ctx.submit_swap)) [[likely]] {
-            cur.release(ctx.submit_swap, io_info);
+        if (swap.try_find_empty(cur)) [[likely]] {
+            swap.store(cur, io_info, std::memory_order_release);
             log::v("worker[%u] submit at [%u]\n", tid, cur.off);
             cur.next();
         } else {
@@ -117,32 +67,35 @@ namespace detail {
     inline std::coroutine_handle<> worker_meta::schedule() noexcept {
         const uint32_t tid = this_thread.tid;
         auto &ctx = *this_thread.ctx;
-        auto &r_cur = this->reap_cur;
+        auto &submit_swap = ctx.submit_swap[tid];
+        auto &reap_swap = ctx.reap_swap[tid];
 
         log::v("worker[%u] scheduling\n", tid);
 
         while (true) {
             // handle overflowed submission
             if (!this->submit_overflow_buf.empty()) {
-                auto &s_cur = this->submit_cur;
-                if (s_cur.try_find_empty(ctx.submit_swap)) {
+                if (submit_swap.try_find_empty(submit_cur)) {
                     task_info_ptr task = this->submit_overflow_buf.front();
                     this->submit_overflow_buf.pop();
-                    s_cur.release_relaxed(ctx.submit_swap, task);
+                    submit_swap.store(
+                        submit_cur, task, std::memory_order_release);
                     log::d(
                         "worker[%u] submit from OF_buf to [%u]\n", tid,
-                        s_cur.off);
-                    s_cur.next();
+                        submit_cur.off);
+                    submit_cur.next();
                 }
             }
 
-            if (r_cur.try_find_exist(ctx.reap_swap)) {
-                const task_info_ptr io_info = ctx.reap_swap[tid][r_cur.off];
-                ctx.reap_swap[tid][r_cur.off] = nullptr;
-                log::d("worker[%u] found [%u]\n", tid, r_cur.off);
-                r_cur.next();
+            if (reap_swap.try_find_exist(reap_cur)) {
+                // TODO judge this memory order
+                const std::coroutine_handle<> handle =
+                    reap_swap.load(reap_cur, std::memory_order_consume);
+                reap_swap[reap_cur] = nullptr;
+                log::d("worker[%u] found [%u]\n", tid, reap_cur.off);
+                reap_cur.next();
                 // printf("get task!\n");
-                return io_info->handle;
+                return handle;
             }
             // TODO consider tid_hint here
         }
@@ -150,91 +103,49 @@ namespace detail {
 
 } // namespace detail
 
-inline void io_context::ctx_swap_cur::next() noexcept {
-    if (++tid == config::worker_threads_number) [[unlikely]] {
-        tid = 0;
-        off = (off + 1) % config::swap_capacity;
-    }
-}
-
-inline bool
-io_context::ctx_swap_cur::try_find_empty(const swap_zone &swap) noexcept {
-    constexpr uint32_t swap_size = sizeof(swap_zone) / sizeof(task_info_ptr);
-    int i = 0;
-    while (i < swap_size && swap[tid][off] != nullptr) {
-        ++i;
-        next();
-    }
-    if (i != swap_size) [[likely]] {
-        return true;
-    } else {
-        next();
-        return false;
-    }
-}
-
-inline bool
-io_context::ctx_swap_cur::try_find_exist(const swap_zone &swap) noexcept {
-    constexpr uint32_t swap_size = sizeof(swap_zone) / sizeof(task_info_ptr);
-    int i = 0;
-    while (i < swap_size && swap[tid][off] == nullptr) {
-        ++i;
-        next();
-    }
-    if (i != swap_size) [[likely]] {
-        return true;
-    } else {
-        next();
-        return false;
-    }
-}
-
-// release the task into the swap zone
-inline void io_context::ctx_swap_cur::release(
-    swap_zone &swap, task_info_ptr task) const noexcept {
-    std::atomic_store_explicit(
-        reinterpret_cast<std::atomic<task_info_ptr> *>(&swap[tid][off]), task,
-        std::memory_order_release);
-}
-
-inline void io_context::ctx_swap_cur::release_relaxed(
-    swap_zone &swap, task_info_ptr task) const noexcept {
-    std::atomic_store_explicit(
-        reinterpret_cast<std::atomic<task_info_ptr> *>(&swap[tid][off]), task,
-        std::memory_order_relaxed);
-}
-
 void io_context::forward_task(task_info_ptr task) noexcept {
     // TODO optimize scheduling strategy
-    if (r_cur.try_find_empty(reap_swap)) [[likely]] {
-        reap_swap[r_cur.tid][r_cur.off] = task;
+    if (reap_swap.try_find_empty(r_cur)) [[likely]] {
+        reap_swap.store(r_cur, task->handle, std::memory_order_release);
         log::v("ctx forward_task to [%u][%u]\n", r_cur.tid, r_cur.off);
         r_cur.next();
     } else {
-        reap_overflow_buf.push(task);
+        reap_overflow_buf.push(task->handle);
         log::d("ctx forward_task to reap_OF\n");
     }
 }
 
+void io_context::handle_semaphore_release(task_info_ptr sem_release) noexcept {
+    // TODO
+}
+
 bool io_context::try_submit(task_info_ptr task) noexcept {
-    if (task->type == task_info::task_type::co_spawn) {
-        forward_task(task);
-        return true;
+    liburingcxx::SQEntry *sqe;
+    using kind = task_info::task_type;
+
+    switch (task->type) {
+        case kind::co_spawn:
+            forward_task(task);
+            return true;
+
+        case kind::semaphore_release:
+
+            return true;
+
+        // submit to ring
+        default:
+            if (ring.SQSpaceLeft() == 0) [[unlikely]] {
+                log::d("ctx try_submit failed SQfull\n");
+                return false; // SQRing is full
+            }
+            sqe = ring.getSQEntry();
+            sqe->cloneFrom(*task->sqe);
+            ring.submit();
+
+            log::v("ctx submit to ring\n");
+
+            return true;
     }
-
-    if (ring.SQSpaceLeft() == 0) [[unlikely]] {
-        log::d("ctx try_submit failed SQfull\n");
-        return false; // SQRing is full
-    }
-
-    liburingcxx::SQEntry *sqe = ring.getSQEntry();
-
-    sqe->cloneFrom(*task->sqe);
-    ring.submit();
-
-    log::v("ctx submit to ring\n");
-
-    return true;
 }
 
 /**
@@ -243,10 +154,12 @@ bool io_context::try_submit(task_info_ptr task) noexcept {
  */
 bool io_context::poll_submission() noexcept {
     // submit round
-    if (!s_cur.try_find_exist(submit_swap)) { return false; }
+    if (!submit_swap.try_find_exist(s_cur)) { return false; }
 
-    task_info_ptr const io_info = submit_swap[s_cur.tid][s_cur.off];
-    submit_swap[s_cur.tid][s_cur.off] = nullptr;
+    // TODO judge this memory order
+    task_info_ptr const io_info =
+        submit_swap.load(s_cur, std::memory_order_consume);
+    submit_swap[s_cur] = nullptr;
     log::v("ctx poll_submission at [%u][%u]\n", s_cur.tid, s_cur.off);
     s_cur.next();
 
@@ -262,7 +175,7 @@ bool io_context::poll_submission() noexcept {
 bool io_context::try_clear_submit_overflow_buf() noexcept {
     if (submit_overflow_buf.empty()) return true;
     do {
-        task_info_ptr task = submit_overflow_buf.front();
+        task_info_ptr const task = submit_overflow_buf.front();
         // OPTIMIZE impossible for task_type::co_spawn
         if (try_submit(task)) {
             submit_overflow_buf.pop();
@@ -275,13 +188,13 @@ bool io_context::try_clear_submit_overflow_buf() noexcept {
     return true;
 }
 
-bool io_context::try_reap(task_info_ptr task) noexcept {
-    if (!r_cur.try_find_empty(reap_swap)) [[unlikely]] {
+bool io_context::try_reap(std::coroutine_handle<> handle) noexcept {
+    if (!reap_swap.try_find_empty(r_cur)) [[unlikely]] {
         log::d("ctx try_reap failed reap_swap is full\n");
         return false;
     }
 
-    r_cur.release(reap_swap, task);
+    reap_swap.store(r_cur, handle, std::memory_order_release);
     log::v("ctx try_reap at [%u][%u]\n", r_cur.tid, r_cur.off);
     r_cur.next();
     return true;
@@ -303,10 +216,10 @@ bool io_context::poll_completion() noexcept {
     io_info->result = polling_cqe->getRes();
     ring.SeenCQEntry(polling_cqe);
 
-    if (try_reap(io_info)) [[likely]] {
+    if (try_reap(io_info->handle)) [[likely]] {
         return true;
     } else {
-        reap_overflow_buf.push(io_info);
+        reap_overflow_buf.push(io_info->handle);
         log::d("ctx poll_completion failed reap_OF\n");
         return false;
     }
@@ -315,9 +228,9 @@ bool io_context::poll_completion() noexcept {
 bool io_context::try_clear_reap_overflow_buf() noexcept {
     if (reap_overflow_buf.empty()) return true;
     do {
-        task_info_ptr task = reap_overflow_buf.front();
+        std::coroutine_handle<> handle = reap_overflow_buf.front();
         // OPTIMIZE impossible for task_type::co_spawn
-        if (try_reap(task)) {
+        if (try_reap(handle)) {
             reap_overflow_buf.pop();
         } else {
             log::d("ctx try_clear_reap (partially) failed\n");
@@ -329,8 +242,6 @@ bool io_context::try_clear_reap_overflow_buf() noexcept {
 }
 
 void io_context::init() noexcept {
-    memset(submit_swap, 0, sizeof(submit_swap));
-    memset(reap_swap, 0, sizeof(reap_swap));
     detail::this_thread.ctx = this;
     detail::this_thread.tid = std::thread::hardware_concurrency() - 1;
 }
@@ -340,7 +251,7 @@ void io_context::probe() const {
     log::i("number of logic cores: %u\n", std::thread::hardware_concurrency());
     log::i("size of io_context: %u\n", sizeof(io_context));
     log::i("size of uring: %u\n", sizeof(uring));
-    log::i("size of two swap_zone: %u\n", 2 * sizeof(swap_zone));
+    log::i("size of two swap_zone: %u\n", 2 * sizeof(submit_swap));
     log::i("atomic::is_lock_free: %d\n", std::atomic<void *>{}.is_lock_free());
     log::i("number of worker_threads: %u\n", worker_threads_number);
     log::i("swap_capacity per thread: %u\n", swap_capacity);
@@ -357,12 +268,12 @@ void io_context::co_spawn(main_task entrance) {
     const uint32_t tid = detail::this_thread.tid;
     if (tid < config::worker_threads_number)
         return worker[tid].co_spawn(entrance);
-    if (r_cur.try_find_empty(reap_swap)) [[likely]] {
-        r_cur.release(reap_swap, entrance.get_io_info_ptr());
+    if (reap_swap.try_find_empty(r_cur)) [[likely]] {
+        reap_swap.store(r_cur, entrance.get_io_info_ptr()->handle, std::memory_order_release);
         log::d("ctx co_spawn at [%u][%u]\n", r_cur.tid, r_cur.off);
         r_cur.next();
     } else {
-        reap_overflow_buf.push(entrance.get_io_info_ptr());
+        reap_overflow_buf.push(entrance.get_io_info_ptr()->handle);
         log::d("ctx co_spawn failed reap_OF\n");
     }
 }

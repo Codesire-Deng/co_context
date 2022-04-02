@@ -3,6 +3,7 @@
 #include <new>
 #include <cstddef>
 #include <cstdint>
+#include "uring/io_uring.h"
 
 namespace co_context {
 
@@ -27,7 +28,12 @@ namespace config {
     // About io_context
     inline constexpr unsigned io_uring_flags = 0;
 
-    inline constexpr unsigned total_threads_number = 4;
+    inline constexpr bool is_SQPOLL = io_uring_flags & IORING_SETUP_SQPOLL;
+
+    inline constexpr unsigned total_threads_number = 2;
+
+    inline constexpr unsigned worker_threads_number =
+        total_threads_number - 1 - is_SQPOLL;
 
     // inline constexpr unsigned total_threads_number = 5;
 
@@ -38,6 +44,10 @@ namespace config {
     // inline constexpr unsigned total_threads_number = 2;
 
     inline constexpr bool low_latency_mode = true;
+
+    // swap zone
+    using worker_swap_zone_width_t = uint16_t;
+    using thread_zone_width_t = uint16_t;
 
     // swap_capacity should be (N * 8)
 
@@ -59,18 +69,21 @@ namespace config {
 
     // inline constexpr uint16_t swap_capacity = 64;
 
-    inline constexpr uint16_t swap_capacity = 32;
+    // inline constexpr uint16_t swap_capacity = 32;
 
     // inline constexpr uint16_t swap_capacity = 16;
 
-    // inline constexpr uint16_t swap_capacity = 8;
+    inline constexpr uint16_t swap_capacity = 8;
 
-    inline constexpr uint8_t submit_poll_rounds = 6;
+    inline constexpr uint8_t submit_poll_rounds = 1;
 
-    inline constexpr uint8_t reap_poll_rounds = 6;
+    inline constexpr uint8_t reap_poll_rounds = 1;
 
     // net configuration
     inline constexpr bool loopback_only = true;
+
+    // co configuration
+    using semaphore_underlying_type = std::ptrdiff_t;
 
 } // namespace config
 

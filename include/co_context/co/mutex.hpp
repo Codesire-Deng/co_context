@@ -1,6 +1,5 @@
 #pragma once
 
-#include "co_context.hpp"
 #include <cstdint>
 #include <coroutine>
 #include <atomic>
@@ -13,9 +12,9 @@ class mutex final {
       public:
         explicit lock_awaiter(mutex &mtx) noexcept : mtx(mtx) {}
 
-        bool await_ready() const noexcept { return false; }
+        constexpr bool await_ready() const noexcept { return false; }
         bool await_suspend(std::coroutine_handle<> current) noexcept;
-        void await_resume() const noexcept {}
+        constexpr void await_resume() const noexcept {}
 
       private:
         friend class mutex;
