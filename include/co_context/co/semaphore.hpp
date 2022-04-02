@@ -42,12 +42,18 @@ class semaphore final {
 
     bool try_acquire() noexcept;
 
-    acquire_awaiter acquire() noexcept { return acquire_awaiter{*this}; }
+    acquire_awaiter acquire() noexcept {
+        log::d("semaphore %lx acquiring\n", this);
+        return acquire_awaiter{*this};
+    }
 
     void release(T update = 1) noexcept;
 
   private:
     friend class io_context;
+    std::coroutine_handle<> try_release() noexcept;
+
+  private:
     std::atomic<acquire_awaiter *> awaiting;
     acquire_awaiter *to_resume;
     std::atomic<T> counter;

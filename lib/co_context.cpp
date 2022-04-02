@@ -1,6 +1,7 @@
 #include <mimalloc-2.0/mimalloc-new-delete.h>
 #include "co_context.hpp"
 #include "co_context/utility/set_cpu_affinity.hpp"
+#include "co_context/co/semaphore.hpp"
 #include <atomic>
 
 // fold level = 3 (ctrl+a, ctrl+k, ctrl+3 in vscode)
@@ -33,6 +34,9 @@ namespace detail {
     }
 
     inline void worker_meta::co_spawn(main_task entrance) noexcept {
+        log::v(
+            "worker[%u] co_spawn coro %lx\n", this_thread.tid,
+            entrance.get_io_info_ptr()->handle.address());
         this->submit(entrance.get_io_info_ptr());
     }
 
@@ -58,7 +62,9 @@ namespace detail {
 
         while (true) {
             auto coro = this->schedule();
-            log::v("worker[%d] found coro to run\n", thread_index);
+            log::v(
+                "worker[%d] found coro %lx to run\n", thread_index,
+                coro.address());
             coro.resume();
             log::v("worker[%d] idle\n", thread_index);
         }
@@ -103,20 +109,38 @@ namespace detail {
 
 } // namespace detail
 
-void io_context::forward_task(task_info_ptr task) noexcept {
+void io_context::forward_task(std::coroutine_handle<> handle) noexcept {
     // TODO optimize scheduling strategy
     if (reap_swap.try_find_empty(r_cur)) [[likely]] {
-        reap_swap.store(r_cur, task->handle, std::memory_order_release);
-        log::v("ctx forward_task to [%u][%u]\n", r_cur.tid, r_cur.off);
+        reap_swap.store(r_cur, handle, std::memory_order_release);
+        log::v(
+            "ctx forward_task to [%u][%u]: %lx\n", r_cur.tid, r_cur.off,
+            handle.address());
         r_cur.next();
     } else {
-        reap_overflow_buf.push(task->handle);
+        reap_overflow_buf.push(handle);
         log::d("ctx forward_task to reap_OF\n");
     }
 }
 
 void io_context::handle_semaphore_release(task_info_ptr sem_release) noexcept {
-    // TODO
+    semaphore &sem = *sem_release->sem;
+    const semaphore::T update = sem_release->update;
+
+    // TODO consider tid_hint
+    delete sem_release;
+
+    semaphore::T done = 0;
+    std::coroutine_handle<> handle;
+    while (done < update && bool(handle = sem.try_release())) {
+        log::d(
+            "ctx handle_semaphore_release: forwarding %lx\n", handle.address());
+        forward_task(handle);
+        ++done;
+    }
+
+    // TODO determine this memory order
+    sem.counter.fetch_add(update, std::memory_order_acq_rel);
 }
 
 bool io_context::try_submit(task_info_ptr task) noexcept {
@@ -125,11 +149,11 @@ bool io_context::try_submit(task_info_ptr task) noexcept {
 
     switch (task->type) {
         case kind::co_spawn:
-            forward_task(task);
+            forward_task(task->handle);
             return true;
 
         case kind::semaphore_release:
-
+            handle_semaphore_release(task);
             return true;
 
         // submit to ring
@@ -272,7 +296,9 @@ void io_context::co_spawn(main_task entrance) {
         reap_swap.store(
             r_cur, entrance.get_io_info_ptr()->handle,
             std::memory_order_release);
-        log::d("ctx co_spawn at [%u][%u]\n", r_cur.tid, r_cur.off);
+        log::d(
+            "ctx co_spawn %lx at [%u][%u]\n",
+            entrance.get_io_info_ptr()->handle.address(), r_cur.tid, r_cur.off);
         r_cur.next();
     } else {
         reap_overflow_buf.push(entrance.get_io_info_ptr()->handle);
@@ -291,7 +317,7 @@ void io_context::co_spawn(main_task entrance) {
     log::v("ctx make_thread_pool end\n");
 
     while (!will_stop) [[likely]] {
-            log::v("ctx polling\n");
+            // log::v("ctx polling\n");
             if (try_clear_submit_overflow_buf()) {
                 for (uint8_t i = 0; i < config::submit_poll_rounds; ++i) {
                     if (!poll_submission()) break;
