@@ -72,6 +72,12 @@ int main(int argc, const char *argv[]) {
 
 ```
 
+## 已有功能
+
+1. Lazy IO: `read`, `write`, `accept`, `recv`, `send`, `connect`, `close`, `shutdown`, `fsync`, `sync_file_range`
+2. Scheduling: `nop`, `yield`
+3. Concurrency support: `mutex`, `semaphore`
+
 ## 谁不需要协程
 
 在我创建这个项目之前，我已经知道基于协程的异步框架很可能**不是**性能最优解，如果你正在寻找 C++ 异步的终极解决方案，且不在乎编程复杂度，我推荐你学习 **sender/receiver model**，而无需尝试协程。
@@ -189,19 +195,19 @@ TODO: 改用原子变量，弃用检查队列
 2. `awaiter` 的 `await_resume` 返回特定结果。
 3. 析构时，销毁协程。
 
-### co_semaphore
+### semaphore
 
 仅运行在用户态 co_context 的信号量
 
-#### co_semaphore 的动机
+#### semaphore 的动机
 
 限制 `co_spawn` 和同类活跃协程的并发量
 
-#### co_semaphore 的实现
+#### semaphore 的实现
 
 1. 参考 std::semaphore，优化 binary_semaphore 的原子变量
-2. 链表模拟无锁队列
+2. 链表栈模拟无锁队列，均摊O(1)
 3. `acquire` 分别在栈上创建 `awaiter`，形成等待链表
-4. `release` 时放出一个等待协程，加入当前协程的 submit
+4. `release` 时放出一个release请求，由io_context处理（强制单消费者），放入某个reap_swap
 
 </details>
