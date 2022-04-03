@@ -1,4 +1,5 @@
 #include "co_context/co/mutex.hpp"
+#include "co_context.hpp"
 #include <cassert>
 
 namespace co_context {
@@ -44,12 +45,17 @@ void mutex::unlock() {
     assert(resume_head != nullptr);
 
     to_resume = resume_head->next;
-    resume_head->handle.resume();
+
+    using namespace co_context::detail;
+    auto *worker = this_thread.worker;
+    assert(
+        worker != nullptr && "mutex::unlock() must run inside an io_context");
+    worker->submit(&resume_head->awaken_task);
 }
 
 bool mutex::lock_awaiter::await_suspend(
     std::coroutine_handle<> current) noexcept {
-    this->handle = current;
+    this->awaken_task.handle = current;
     std::uintptr_t old_state = mtx.awaiting.load(std::memory_order_acquire);
     while (true) {
         if (old_state == mutex::not_locked) {

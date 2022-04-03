@@ -1,6 +1,6 @@
 #pragma once
 
-#include <new>
+// #include <new>
 #include <cstddef>
 #include <cstdint>
 #include "uring/io_uring.h"
@@ -30,11 +30,16 @@ namespace config {
 
     inline constexpr bool is_SQPOLL = io_uring_flags & IORING_SETUP_SQPOLL;
 
+    using threads_number_width_t = uint16_t;
+    using tid_t = threads_number_width_t;
+
+    inline constexpr unsigned total_threads_number = 11;
+
     // inline constexpr unsigned total_threads_number = 6;
 
     // inline constexpr unsigned total_threads_number = 5;
 
-    inline constexpr unsigned total_threads_number = 4;
+    // inline constexpr unsigned total_threads_number = 4;
 
     // inline constexpr unsigned total_threads_number = 3;
 
@@ -46,8 +51,7 @@ namespace config {
     inline constexpr bool low_latency_mode = true;
 
     // swap zone
-    using worker_swap_zone_width_t = uint16_t;
-    using thread_zone_width_t = uint16_t;
+    using swap_capacity_width_t = uint16_t;
 
     // swap_capacity should be (N * 8)
 
@@ -69,11 +73,11 @@ namespace config {
 
     // inline constexpr uint16_t swap_capacity = 64;
 
-    // inline constexpr uint16_t swap_capacity = 32;
+    inline constexpr uint16_t swap_capacity = 32;
 
     // inline constexpr uint16_t swap_capacity = 16;
 
-    inline constexpr uint16_t swap_capacity = 8;
+    // inline constexpr uint16_t swap_capacity = 8;
 
     inline constexpr uint8_t submit_poll_rounds = 1;
 
@@ -99,9 +103,9 @@ namespace config {
     };
 
     // inline constexpr level log_level = level::v;
-    inline constexpr level log_level = level::d;
+    // inline constexpr level log_level = level::d;
     // inline constexpr level log_level = level::i;
-    // inline constexpr level log_level = level::w;
+    inline constexpr level log_level = level::w;
     // inline constexpr level log_level = level::e;
     // inline constexpr level log_level = level::no_log;
 

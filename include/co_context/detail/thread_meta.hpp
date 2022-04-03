@@ -13,7 +13,7 @@ namespace detail {
     struct alignas(config::cache_line_size) thread_meta {
         io_context *ctx;
         worker_meta *worker;
-        uint32_t tid;
+        config::tid_t tid;
     };
 
     extern thread_local thread_meta this_thread;

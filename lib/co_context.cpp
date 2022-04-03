@@ -19,6 +19,9 @@ namespace detail {
         detail::this_thread.ctx = context;
         detail::this_thread.worker = this;
         detail::this_thread.tid = thread_index;
+        this->tid = thread_index;
+        this->submit_swap_ptr = &context->submit_swap[thread_index];
+        this->reap_swap_ptr = &context->reap_swap[thread_index];
 #ifdef USE_CPU_AFFINITY
         const unsigned logic_cores = std::thread::hardware_concurrency();
         if constexpr (config::using_hyper_threading) {
@@ -33,16 +36,8 @@ namespace detail {
 #endif
     }
 
-    inline void worker_meta::co_spawn(main_task entrance) noexcept {
-        log::v(
-            "worker[%u] co_spawn coro %lx\n", this_thread.tid,
-            entrance.get_io_info_ptr()->handle.address());
-        this->submit(entrance.get_io_info_ptr());
-    }
-
     void worker_meta::submit(task_info_ptr io_info) noexcept {
-        const unsigned tid = this_thread.tid;
-        auto &swap = this_thread.ctx->submit_swap[tid];
+        auto &swap = *this->submit_swap_ptr;
         auto &cur = this->submit_cur;
         // std::cerr << cur.slot << " " << tid << cur.off << std::endl;
         if (swap.try_find_empty(cur)) [[likely]] {
@@ -71,10 +66,8 @@ namespace detail {
     }
 
     inline std::coroutine_handle<> worker_meta::schedule() noexcept {
-        const uint32_t tid = this_thread.tid;
-        auto &ctx = *this_thread.ctx;
-        auto &submit_swap = ctx.submit_swap[tid];
-        auto &reap_swap = ctx.reap_swap[tid];
+        auto &submit_swap = *this->submit_swap_ptr;
+        auto &reap_swap = *this->reap_swap_ptr;
 
         log::v("worker[%u] scheduling\n", tid);
 
@@ -125,10 +118,10 @@ void io_context::forward_task(std::coroutine_handle<> handle) noexcept {
 
 void io_context::handle_semaphore_release(task_info_ptr sem_release) noexcept {
     semaphore &sem = *sem_release->sem;
-    const semaphore::T update = sem_release->update;
-
-    // TODO consider tid_hint
-    delete sem_release;
+    const semaphore::T update =
+        as_atomic(sem_release->update).exchange(0, std::memory_order_relaxed);
+    if (update == 0) [[unlikely]]
+        return;
 
     semaphore::T done = 0;
     std::coroutine_handle<> handle;
@@ -266,7 +259,9 @@ bool io_context::try_clear_reap_overflow_buf() noexcept {
 }
 
 void io_context::init() noexcept {
+    // TODO support multiple io_context in one thread?
     detail::this_thread.ctx = this;
+    detail::this_thread.worker = nullptr;
     detail::this_thread.tid = std::thread::hardware_concurrency() - 1;
 }
 
@@ -289,9 +284,7 @@ inline void io_context::make_thread_pool() {
 }
 
 void io_context::co_spawn(main_task entrance) {
-    const uint32_t tid = detail::this_thread.tid;
-    if (tid < config::worker_threads_number)
-        return worker[tid].co_spawn(entrance);
+    assert(detail::this_thread.worker == nullptr);
     if (reap_swap.try_find_empty(r_cur)) [[likely]] {
         reap_swap.store(
             r_cur, entrance.get_io_info_ptr()->handle,
@@ -307,9 +300,7 @@ void io_context::co_spawn(main_task entrance) {
 }
 
 [[noreturn]] void io_context::run() {
-    detail::this_thread.worker = nullptr;
 #ifdef USE_CPU_AFFINITY
-    detail::this_thread.tid = std::thread::hardware_concurrency() - 1;
     detail::set_cpu_affinity(detail::this_thread.tid);
 #endif
     log::v("ctx making thread pool\n");

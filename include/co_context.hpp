@@ -156,14 +156,17 @@ class [[nodiscard]] io_context final {
 };
 
 inline void co_spawn(main_task entrance) noexcept {
-    detail::this_thread.ctx->co_spawn(entrance);
+    if (detail::this_thread.worker != nullptr) [[likely]]
+        detail::this_thread.worker->co_spawn(entrance);
+    else
+        detail::this_thread.ctx->co_spawn(entrance);
 }
 
 inline void co_context_stop() noexcept {
     detail::this_thread.ctx->can_stop();
 }
 
-inline uint32_t co_get_tid() noexcept {
+inline config::tid_t co_get_tid() noexcept {
     return detail::this_thread.tid;
 }
 

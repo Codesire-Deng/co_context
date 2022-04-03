@@ -22,10 +22,11 @@ void semaphore::release(T update) noexcept {
     using namespace co_context::detail;
     auto *worker = this_thread.worker;
     assert(
-        this_thread.worker != nullptr
+        worker != nullptr
         && "semaphore::release() must run inside an io_context");
     log::d("semaphore %lx released\n", this);
-    worker->submit(task_info::new_semaphore_release(this, update));
+    as_atomic(awaken_task.update).fetch_add(update, std::memory_order_relaxed);
+    worker->submit(&awaken_task);
 };
 
 std::coroutine_handle<> semaphore::try_release() noexcept {
