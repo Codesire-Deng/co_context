@@ -75,22 +75,22 @@ namespace detail {
         // Automatically deconstruct `value`, done by std::variant.
         ~task_promise() = default;
 
-        inline task<T> get_return_object() noexcept;
+        task<T> get_return_object() noexcept;
 
-        inline void unhandled_exception() noexcept {
+        void unhandled_exception() noexcept {
             value.template emplace<std::exception_ptr>(
                 std::current_exception());
         }
 
         template<typename Value>
             requires std::convertible_to<Value &&, T>
-        inline void return_value(Value &&result) noexcept(
+        void return_value(Value &&result) noexcept(
             std::is_nothrow_constructible_v<T, Value &&>) {
             value.template emplace<T>(std::forward<Value>(result));
         }
 
         // get the lvalue ref
-        inline T &result() & {
+        T &result() & {
             if (value.index() == 2) [[unlikely]]
                 std::rethrow_exception(get<std::exception_ptr>(value));
             assert(value.index() == 1);
@@ -98,7 +98,7 @@ namespace detail {
         }
 
         // get the prvalue
-        inline T &&result() && {
+        T &&result() && {
             if (value.index() == 2) [[unlikely]]
                 std::rethrow_exception(get<std::exception_ptr>(value));
             assert(value.index() == 1);
@@ -114,11 +114,15 @@ namespace detail {
       public:
         task_promise() noexcept = default;
 
-        inline task<void> get_return_object() noexcept;
+        task<void> get_return_object() noexcept;
 
-        inline constexpr void return_void() noexcept {}
+        constexpr void return_void() noexcept {}
 
-        inline void result() {
+        void unhandled_exception() noexcept {
+            exception_ptr = std::current_exception();
+        }
+
+        void result() {
             if (this->exception_ptr)
                 std::rethrow_exception(this->exception_ptr);
         }
@@ -134,15 +138,15 @@ namespace detail {
 
         task<T &> get_return_object() noexcept;
 
-        inline void unhandled_exception() noexcept {
+        void unhandled_exception() noexcept {
             this->exception_ptr = std::current_exception();
         }
 
-        inline void return_value(T &result) noexcept {
+        void return_value(T &result) noexcept {
             value = std::addressof(result);
         }
 
-        inline T &result() {
+        T &result() {
             if (exception_ptr) [[unlikely]]
                 std::rethrow_exception(exception_ptr);
             return *value;

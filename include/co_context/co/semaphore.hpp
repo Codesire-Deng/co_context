@@ -2,12 +2,13 @@
 
 #include "co_context.hpp"
 #include <type_traits>
-#include <atomic>
+#include "co_context/utility/as_atomic.hpp"
 
 namespace co_context {
 
 class semaphore final {
   private:
+    using task_info = detail::task_info;
     using T = config::semaphore_underlying_type;
     static_assert(std::is_integral_v<T>);
 
@@ -34,7 +35,13 @@ class semaphore final {
 
   public:
     constexpr explicit semaphore(T desired) noexcept
-        : counter(desired), awaiting(nullptr), to_resume(nullptr) {}
+        : counter(desired)
+        , awaiting(nullptr)
+        , to_resume(nullptr)
+        , awaken_task(task_info::task_type::semaphore_release) {
+        awaken_task.sem = this;
+        as_atomic(awaken_task.update).store(0, std::memory_order_relaxed);
+    }
 
     semaphore(const semaphore &) = delete;
 
@@ -42,15 +49,23 @@ class semaphore final {
 
     bool try_acquire() noexcept;
 
-    acquire_awaiter acquire() noexcept { return acquire_awaiter{*this}; }
+    acquire_awaiter acquire() noexcept {
+        log::d("semaphore %lx acquiring\n", this);
+        return acquire_awaiter{*this};
+    }
 
     void release(T update = 1) noexcept;
 
   private:
     friend class io_context;
+    std::coroutine_handle<> try_release() noexcept;
+
+  private:
     std::atomic<acquire_awaiter *> awaiting;
     acquire_awaiter *to_resume;
     std::atomic<T> counter;
+
+    task_info awaken_task;
 };
 
 } // namespace co_context

@@ -3,11 +3,14 @@
 #include <cstdint>
 #include <coroutine>
 #include <atomic>
+#include "co_context/task_info.hpp"
 
 namespace co_context {
 
 class mutex final {
   private:
+    using task_info = detail::task_info;
+
     class lock_awaiter final {
       public:
         explicit lock_awaiter(mutex &mtx) noexcept : mtx(mtx) {}
@@ -20,7 +23,7 @@ class mutex final {
         friend class mutex;
         mutex &mtx;
         lock_awaiter *next;
-        std::coroutine_handle<> handle;
+        task_info awaken_task{task_info::task_type::co_spawn};
     };
 
   public:

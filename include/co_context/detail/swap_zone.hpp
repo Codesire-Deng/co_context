@@ -4,6 +4,7 @@
 #include <type_traits>
 #include <atomic>
 #include "co_context/config.hpp"
+#include "co_context/utility/as_atomic.hpp"
 
 namespace co_context {
 
@@ -13,8 +14,18 @@ namespace detail {
     concept swap_zone_content = std::is_trivially_copyable_v<T> && sizeof(T)
                                 == sizeof(std::uintptr_t);
 
+    template<swap_zone_content T>
+    inline std::uintptr_t &as_uint(T &value) noexcept {
+        return *reinterpret_cast<uintptr_t *>(std::addressof(value));
+    }
+
+    template<swap_zone_content T>
+    inline const std::uintptr_t &as_uint(const T &value) noexcept {
+        return *reinterpret_cast<const uintptr_t *>(std::addressof(value));
+    }
+
     struct worker_swap_cur final {
-        using T = config::worker_swap_zone_width_t;
+        using T = config::swap_capacity_width_t;
         T off = 0;
 
         void next() noexcept {
@@ -24,7 +35,7 @@ namespace detail {
 
     template<swap_zone_content T>
     struct worker_swap_zone final {
-        using sz_t = config::worker_swap_zone_width_t;
+        using sz_t = config::swap_capacity_width_t;
 
         T data[config::swap_capacity];
 
@@ -39,11 +50,8 @@ namespace detail {
         }
 
         bool try_find_empty(worker_swap_cur &cur) const noexcept {
-            const std::uintptr_t value =
-                *reinterpret_cast<const std::uintptr_t *>(
-                    std::addressof(data[cur.off]));
             sz_t i = 0;
-            while (i < config::swap_capacity && value != 0) {
+            while (i < config::swap_capacity && as_uint(data[cur.off]) != 0) {
                 ++i;
                 cur.next();
             }
@@ -55,11 +63,8 @@ namespace detail {
         }
 
         bool try_find_exist(worker_swap_cur &cur) const noexcept {
-            const std::uintptr_t value =
-                *reinterpret_cast<const std::uintptr_t *>(
-                    std::addressof(data[cur.off]));
             sz_t i = 0;
-            while (i < config::swap_capacity && value == 0) {
+            while (i < config::swap_capacity && as_uint(data[cur.off]) == 0) {
                 ++i;
                 cur.next();
             }
@@ -70,31 +75,24 @@ namespace detail {
             return true;
         }
 
-        T load(
+        inline T load(
             const worker_swap_cur cur, std::memory_order order) const noexcept {
-            return std::atomic_load_explicit(
-                reinterpret_cast<const std::atomic<T> *>(
-                    std::addressof((*this)[cur])),
-                order);
+            return as_atomic((*this)[cur]).load(order);
         }
 
-        void store(
+        inline void store(
             const worker_swap_cur cur,
             T value,
             std::memory_order order) noexcept {
-            std::atomic_store_explicit(
-                reinterpret_cast<std::atomic<T> *>(
-                    std::addressof((*this)[cur])),
-                value, order);
+            as_atomic((*this)[cur]).store(value, order);
         }
     };
 
     struct context_swap_cur final {
-        using T = config::worker_swap_zone_width_t;
+        using T = config::swap_capacity_width_t;
         T off = 0;
 
-        using U = config::thread_zone_width_t;
-        U tid = 0;
+        config::tid_t tid = 0;
 
         void next() noexcept {
             if (++tid == config::worker_threads_number) [[unlikely]] {
@@ -106,7 +104,7 @@ namespace detail {
 
     template<swap_zone_content T>
     struct swap_zone final {
-        using sz_t = config::worker_swap_zone_width_t;
+        using sz_t = config::swap_capacity_width_t;
 
         static constexpr uint32_t swap_length =
             config::worker_threads_number * config::swap_capacity;
@@ -130,12 +128,9 @@ namespace detail {
         }
 
         bool try_find_empty(context_swap_cur &cur) const noexcept {
-            const std::uintptr_t value =
-                *reinterpret_cast<const std::uintptr_t *>(
-                    std::addressof((*this)[cur]));
             uint32_t i = 0;
 
-            while (i < swap_length && value != 0) {
+            while (i < swap_length && as_uint((*this)[cur]) != 0) {
                 ++i;
                 cur.next();
             }
@@ -149,8 +144,7 @@ namespace detail {
 
         bool try_find_exist(context_swap_cur &cur) const noexcept {
             sz_t i = 0;
-            while (i < swap_length
-                   && reinterpret_cast<std::uintptr_t>((*this)[cur]) == 0) {
+            while (i < swap_length && as_uint((*this)[cur]) == 0) {
                 ++i;
                 cur.next();
             }
@@ -161,22 +155,16 @@ namespace detail {
             return true;
         }
 
-        T load(const context_swap_cur cur, std::memory_order order)
+        inline T load(const context_swap_cur cur, std::memory_order order)
             const noexcept {
-            return std::atomic_load_explicit(
-                reinterpret_cast<const std::atomic<T> *>(
-                    std::addressof((*this)[cur])),
-                order);
+            return as_atomic((*this)[cur]).load(order);
         }
 
-        void store(
+        inline void store(
             const context_swap_cur cur,
             T value,
             std::memory_order order) noexcept {
-            std::atomic_store_explicit(
-                reinterpret_cast<std::atomic<T> *>(
-                    std::addressof((*this)[cur])),
-                value, order);
+            as_atomic((*this)[cur]).store(value, order);
         }
     };
 

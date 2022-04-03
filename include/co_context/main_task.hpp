@@ -1,13 +1,8 @@
 #pragma once
 
 #include <coroutine>
-#include <variant>
-#include <concepts>
 #include <exception>
-#include <atomic>
 #include "task_info.hpp"
-#include <memory>
-#include <cassert>
 #include "co_context/log/log.hpp"
 
 namespace co_context {
