@@ -117,13 +117,13 @@ void io_context::forward_task(std::coroutine_handle<> handle) noexcept {
 }
 
 void io_context::handle_semaphore_release(task_info_ptr sem_release) noexcept {
-    semaphore &sem = *sem_release->sem;
-    const semaphore::T update =
+    counting_semaphore &sem = *sem_release->sem;
+    const counting_semaphore::T update =
         as_atomic(sem_release->update).exchange(0, std::memory_order_relaxed);
     if (update == 0) [[unlikely]]
         return;
 
-    semaphore::T done = 0;
+    counting_semaphore::T done = 0;
     std::coroutine_handle<> handle;
     while (done < update && bool(handle = sem.try_release())) {
         log::d(

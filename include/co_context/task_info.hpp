@@ -11,7 +11,7 @@ class CQEntry;
 
 namespace co_context {
 
-class semaphore;
+class counting_semaphore;
 
 namespace detail {
 
@@ -23,7 +23,7 @@ namespace detail {
             SQEntry *sqe;
             CQEntry *cqe;
             int32_t result;
-            semaphore *sem;
+            counting_semaphore *sem;
         };
         union {
             std::coroutine_handle<> handle;

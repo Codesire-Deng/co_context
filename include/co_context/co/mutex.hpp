@@ -11,7 +11,7 @@ class mutex final {
   private:
     using task_info = detail::task_info;
 
-    class lock_awaiter final {
+    class [[nodiscard("Did you forget to co_await?")]] lock_awaiter final {
       public:
         explicit lock_awaiter(mutex &mtx) noexcept : mtx(mtx) {}
 

@@ -3,18 +3,16 @@
 #include <cstddef>
 #include <iomanip>
 #include <iostream>
-#include "co_context/co/mutex.hpp"
+#include <mutex>
 #include <random>
-#include "co_context/co/semaphore.hpp"
-#include "co_context.hpp"
-#include "co_context/task.hpp"
-
-using namespace co_context;
+#include <semaphore>
+#include <thread>
+#include <vector>
 using namespace std::literals;
 
 constexpr std::size_t max_threads{10U};       // change and see the effect
 constexpr std::ptrdiff_t max_sema_threads{3}; // {1} for binary semaphore
-co_context::counting_semaphore sem{max_sema_threads};
+std::counting_semaphore sem{max_sema_threads};
 constexpr auto time_tick{10ms};
 
 unsigned rnd() {
@@ -26,7 +24,7 @@ unsigned rnd() {
 }
 
 class alignas(128 /*std::hardware_destructive_interference_size*/) Guide {
-    inline static co_context::mutex cout_mutex;
+    inline static std::mutex cout_mutex;
     inline static std::chrono::time_point<std::chrono::high_resolution_clock>
         started_at;
     unsigned delay{rnd()}, occupy{rnd()}, wait_on_sema{};
@@ -48,18 +46,17 @@ class alignas(128 /*std::hardware_destructive_interference_size*/) Guide {
         std::this_thread::sleep_for(occupy * time_tick);
     }
 
-    task<void> visualize(unsigned id, unsigned x_scale = 2) const {
+    void visualize(unsigned id, unsigned x_scale = 2) const {
         auto cout_n = [=](auto str, unsigned n) {
             n *= x_scale;
             while (n-- > 0) { std::cout << str; }
         };
-        co_await cout_mutex.lock();
+        std::lock_guard lk{cout_mutex};
         std::cout << "#" << std::setw(2) << id << " ";
         cout_n("░", delay);
         cout_n("▒", wait_on_sema);
         cout_n("█", occupy);
         std::cout << '\n';
-        cout_mutex.unlock();
     }
 
     static void show_info() {
@@ -73,23 +70,22 @@ class alignas(128 /*std::hardware_destructive_interference_size*/) Guide {
 
 std::array<Guide, max_threads> guides;
 
-main_task workerThread(unsigned id) {
+void workerThread(unsigned id) {
     guides[id].initial_delay(); // emulate some work before sema acquisition
-    co_await sem.acquire();     // wait until a free sema slot is available
+    sem.acquire();        // wait until a free sema slot is available
     guides[id].occupy_sema();   // emulate some work while sema is acquired
     sem.release();
-    co_await guides[id].visualize(id);
+    guides[id].visualize(id);
 }
 
 int main() {
-    io_context ctx{32};
-
-    for (auto id{0U}; id != max_threads; ++id) {
-        ctx.co_spawn(workerThread(id));
-    }
+    std::vector<std::jthread> threads;
+    threads.reserve(max_threads);
 
     Guide::show_info();
     Guide::start_time();
 
-    ctx.run();
+    for (auto id{0U}; id != max_threads; ++id) {
+        threads.push_back(std::jthread(workerThread, id));
+    }
 }

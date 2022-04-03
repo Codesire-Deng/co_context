@@ -83,5 +83,6 @@
         "typeindex": "cpp",
         "*.ipp": "cpp",
         "filesystem": "cpp"
-    }
+    },
+    "C_Cpp.dimInactiveRegions": true
 }

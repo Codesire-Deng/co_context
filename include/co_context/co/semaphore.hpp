@@ -6,15 +6,15 @@
 
 namespace co_context {
 
-class semaphore final {
+class counting_semaphore final {
   private:
     using task_info = detail::task_info;
     using T = config::semaphore_underlying_type;
     static_assert(std::is_integral_v<T>);
 
-    class acquire_awaiter final {
+    class [[nodiscard("Did you forget to co_await?")]] acquire_awaiter final {
       public:
-        explicit acquire_awaiter(semaphore &sem) noexcept : sem(sem) {}
+        explicit acquire_awaiter(counting_semaphore & sem) noexcept : sem(sem) {}
 
         bool await_ready() noexcept {
             T old_counter =
@@ -26,15 +26,15 @@ class semaphore final {
         void await_resume() const noexcept {}
 
       private:
-        friend class semaphore;
+        friend class counting_semaphore;
         friend class io_context;
-        semaphore &sem;
+        counting_semaphore &sem;
         acquire_awaiter *next;
         std::coroutine_handle<> handle;
     };
 
   public:
-    constexpr explicit semaphore(T desired) noexcept
+    constexpr explicit counting_semaphore(T desired) noexcept
         : counter(desired)
         , awaiting(nullptr)
         , to_resume(nullptr)
@@ -43,9 +43,9 @@ class semaphore final {
         as_atomic(awaken_task.update).store(0, std::memory_order_relaxed);
     }
 
-    semaphore(const semaphore &) = delete;
+    counting_semaphore(const counting_semaphore &) = delete;
 
-    ~semaphore() noexcept;
+    ~counting_semaphore() noexcept;
 
     bool try_acquire() noexcept;
 
