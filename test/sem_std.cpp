@@ -51,7 +51,8 @@ class alignas(128 /*std::hardware_destructive_interference_size*/) Guide {
             n *= x_scale;
             while (n-- > 0) { std::cout << str; }
         };
-        std::lock_guard lk{cout_mutex};
+        auto lk = std::lock_guard(cout_mutex);
+
         std::cout << "#" << std::setw(2) << id << " ";
         cout_n("░", delay);
         cout_n("▒", wait_on_sema);
@@ -72,7 +73,7 @@ std::array<Guide, max_threads> guides;
 
 void workerThread(unsigned id) {
     guides[id].initial_delay(); // emulate some work before sema acquisition
-    sem.acquire();        // wait until a free sema slot is available
+    sem.acquire();              // wait until a free sema slot is available
     guides[id].occupy_sema();   // emulate some work while sema is acquired
     sem.release();
     guides[id].visualize(id);

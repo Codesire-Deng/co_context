@@ -53,13 +53,12 @@ class alignas(128 /*std::hardware_destructive_interference_size*/) Guide {
             n *= x_scale;
             while (n-- > 0) { std::cout << str; }
         };
-        co_await cout_mutex.lock();
+        auto guard = co_await cout_mutex.lock_guard();
         std::cout << "#" << std::setw(2) << id << " ";
         cout_n("░", delay);
         cout_n("▒", wait_on_sema);
         cout_n("█", occupy);
         std::cout << '\n';
-        cout_mutex.unlock();
     }
 
     static void show_info() {
