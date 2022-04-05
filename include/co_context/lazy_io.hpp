@@ -7,7 +7,7 @@ namespace co_context {
 
 namespace detail {
 
-    struct lazy_awaiter {
+    struct [[nodiscard("Did you forget to co_await?")]] lazy_awaiter {
         task_info io_info;
         liburingcxx::SQEntry sqe;
 

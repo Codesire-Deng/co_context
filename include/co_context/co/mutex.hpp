@@ -1,29 +1,100 @@
 #pragma once
 
-#include <cstdint>
 #include <coroutine>
 #include <atomic>
 #include "co_context/task_info.hpp"
+#include <cassert>
 
 namespace co_context {
 
+namespace detail {
+    class cv_wait_awaiter;
+} // namespace detail
+
 class mutex final {
-  private:
+  public:
     using task_info = detail::task_info;
 
-    class lock_awaiter final {
+    class [[nodiscard("Did you forget to co_await?")]] lock_awaiter {
       public:
-        explicit lock_awaiter(mutex &mtx) noexcept : mtx(mtx) {}
+        explicit lock_awaiter(mutex & mtx) noexcept : mtx(mtx) {}
 
         constexpr bool await_ready() const noexcept { return false; }
-        bool await_suspend(std::coroutine_handle<> current) noexcept;
-        constexpr void await_resume() const noexcept {}
 
-      private:
-        friend class mutex;
+        bool await_suspend(std::coroutine_handle<> current) noexcept {
+            register_coroutine(current);
+            return register_awaiting();
+        }
+
+        void await_resume() const noexcept {}
+
+      protected:
+        void register_coroutine(std::coroutine_handle<> handle) noexcept {
+            awaken_task.handle = handle;
+        }
+
+        std::coroutine_handle<> get_coroutine() noexcept {
+            return awaken_task.handle;
+        }
+
+        /**
+         * @brief lock, and when it needs, register handle to awaiting list
+         * @return if the coro needs to suspend
+         */
+        bool register_awaiting() noexcept;
+
+        void unlock_ahead() noexcept {
+            mtx.unlock();
+        }
+
+      protected:
         mutex &mtx;
         lock_awaiter *next;
         task_info awaken_task{task_info::task_type::co_spawn};
+        friend class mutex;
+        friend class locked_mutex;
+        friend class detail::cv_wait_awaiter;
+        friend class io_context;
+    };
+
+    class [[nodiscard("Did you forget to co_await?")]] lock_guard_awaiter final
+        : public lock_awaiter {
+      private:
+        friend class mutex;
+
+        class [[nodiscard(
+            "Remember to hold the lock_guard.")]] lock_guard final {
+          public:
+            explicit lock_guard(mutex & mtx) noexcept : mtx(mtx) {}
+            ~lock_guard() noexcept { mtx.unlock(); }
+
+            lock_guard(const lock_guard &) = delete;
+#ifdef __INTELLISENSE__
+            // clang-format off
+            [[deprecated(
+                "This function is for cheating intellisense, "
+                "who doesn't sense RVO. "
+                "You should NEVER use this explicitly or implicitly.")]]
+            // clang-format on
+            lock_guard(lock_guard && other) noexcept
+                : mtx(other.mtx) {
+                assert(false && "Mandatory copy elision failed!");
+            };
+#else
+            lock_guard(lock_guard && other) = delete;
+#endif
+
+            lock_guard &operator=(const lock_guard &) = delete;
+            lock_guard &operator=(lock_guard &&) = delete;
+
+          private:
+            mutex &mtx;
+        };
+
+      public:
+        using lock_awaiter::lock_awaiter;
+
+        lock_guard await_resume() const noexcept { return lock_guard{mtx}; }
     };
 
   public:
@@ -58,13 +129,17 @@ class mutex final {
      */
     lock_awaiter lock() noexcept { return lock_awaiter{*this}; }
 
+    lock_guard_awaiter lock_guard() noexcept {
+        return lock_guard_awaiter{*this};
+    }
+
     /**
      * @brief Unlock the mutex.
      *
      * @note Must only be called by the current lock-holder. One of the waiting
      * coroutine will be resumed inside this call.
      */
-    void unlock();
+    void unlock() noexcept;
 
   private:
     inline static constexpr std::uintptr_t locked_no_awaiting = 0;

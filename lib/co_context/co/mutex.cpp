@@ -17,7 +17,15 @@ bool mutex::try_lock() noexcept {
         std::memory_order_relaxed);
 }
 
-void mutex::unlock() {
+inline static void send_task(detail::task_info_ptr awaken_task) noexcept {
+    using namespace co_context::detail;
+    auto *worker = this_thread.worker;
+    assert(
+        worker != nullptr && "mutex::unlock() must run inside an io_context");
+    worker->submit(awaken_task);
+}
+
+void mutex::unlock() noexcept {
     assert(awaiting.load(std::memory_order_relaxed) != not_locked);
     lock_awaiter *resume_head = to_resume;
     if (resume_head == nullptr) {
@@ -45,17 +53,10 @@ void mutex::unlock() {
     assert(resume_head != nullptr);
 
     to_resume = resume_head->next;
-
-    using namespace co_context::detail;
-    auto *worker = this_thread.worker;
-    assert(
-        worker != nullptr && "mutex::unlock() must run inside an io_context");
-    worker->submit(&resume_head->awaken_task);
+    send_task(&resume_head->awaken_task);
 }
 
-bool mutex::lock_awaiter::await_suspend(
-    std::coroutine_handle<> current) noexcept {
-    this->awaken_task.handle = current;
+bool mutex::lock_awaiter::register_awaiting() noexcept {
     std::uintptr_t old_state = mtx.awaiting.load(std::memory_order_acquire);
     while (true) {
         if (old_state == mutex::not_locked) {

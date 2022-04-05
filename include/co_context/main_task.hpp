@@ -7,7 +7,7 @@
 
 namespace co_context {
 
-class main_task {
+class [[nodiscard("Did you forget to co_spawn?")]] main_task {
   public:
     struct promise_type {
         detail::task_info io_info{detail::task_info::task_type::co_spawn};

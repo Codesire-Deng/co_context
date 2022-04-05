@@ -5,6 +5,7 @@
 #include <atomic>
 #include "co_context/config.hpp"
 #include "co_context/utility/as_atomic.hpp"
+#include <cstring>
 
 namespace co_context {
 
