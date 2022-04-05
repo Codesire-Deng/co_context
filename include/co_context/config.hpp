@@ -94,7 +94,7 @@ namespace config {
 
 // logging config
 namespace config {
-    enum class level : int8_t {
+    enum class level : uint8_t {
         v, // verbose
         d, // debug
         i, // info

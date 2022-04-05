@@ -41,7 +41,7 @@ namespace detail {
 
         config::tid_t tid_hint;
 
-        enum class task_type {
+        enum class task_type : uint8_t {
             sqe,
             cqe,
             result,
