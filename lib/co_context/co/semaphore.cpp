@@ -1,4 +1,5 @@
 #include "co_context/co/semaphore.hpp"
+#include "co_context.hpp"
 #include "co_context/log/log.hpp"
 #include <cassert>
 
@@ -17,16 +18,19 @@ bool counting_semaphore::try_acquire() noexcept {
                std::memory_order_relaxed);
 }
 
-void counting_semaphore::release(T update) noexcept {
-    // register semaphore-update event, to io_context(worker)
+inline static void send_task(detail::task_info_ptr awaken_task) noexcept {
     using namespace co_context::detail;
     auto *worker = this_thread.worker;
     assert(
         worker != nullptr
         && "semaphore::release() must run inside an io_context");
-    log::d("semaphore %lx released\n", this);
+    worker->submit(awaken_task);
+}
+
+void counting_semaphore::release(T update) noexcept {
+    // register semaphore-update event, to io_context(worker)
     as_atomic(awaken_task.update).fetch_add(update, std::memory_order_relaxed);
-    worker->submit(&awaken_task);
+    send_task(&awaken_task);
 };
 
 std::coroutine_handle<> counting_semaphore::try_release() noexcept {

@@ -33,7 +33,7 @@ namespace config {
     using threads_number_width_t = uint16_t;
     using tid_t = threads_number_width_t;
 
-    inline constexpr unsigned total_threads_number = 11;
+    // inline constexpr unsigned total_threads_number = 11;
 
     // inline constexpr unsigned total_threads_number = 6;
 
@@ -41,7 +41,7 @@ namespace config {
 
     // inline constexpr unsigned total_threads_number = 4;
 
-    // inline constexpr unsigned total_threads_number = 3;
+    inline constexpr unsigned total_threads_number = 3;
 
     // inline constexpr unsigned total_threads_number = 2;
 
@@ -87,7 +87,8 @@ namespace config {
     inline constexpr bool loopback_only = true;
 
     // co configuration
-    using semaphore_underlying_type = std::ptrdiff_t;
+    using semaphore_counting_type = std::ptrdiff_t;
+    using condition_variable_counting_type = std::uintptr_t;
 
 } // namespace config
 

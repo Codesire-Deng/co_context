@@ -2,6 +2,7 @@
 #include "co_context.hpp"
 #include "co_context/utility/set_cpu_affinity.hpp"
 #include "co_context/co/semaphore.hpp"
+#include "co_context/co/condition_variable.hpp"
 #include <atomic>
 
 // fold level = 3 (ctrl+a, ctrl+k, ctrl+3 in vscode)
@@ -136,6 +137,38 @@ void io_context::handle_semaphore_release(task_info_ptr sem_release) noexcept {
     sem.counter.fetch_add(update, std::memory_order_acq_rel);
 }
 
+void io_context::handle_condition_variable_notify(
+    task_info_ptr cv_notify) noexcept {
+    condition_variable &cv = *cv_notify->cv;
+    const condition_variable::T notify_counter =
+        as_atomic(cv_notify->notify_counter)
+            .exchange(0, std::memory_order_relaxed);
+
+    if (notify_counter == 0) [[unlikely]]
+        return;
+
+    if (cv.awaiting.load(std::memory_order_relaxed) != nullptr)
+        cv.to_resume_fetch_all();
+
+    condition_variable::T done = 0;
+    const bool is_nofity_all = notify_counter & cv.notify_all_flag;
+    while ((is_nofity_all || done < notify_counter)
+           && cv.to_resume_head != nullptr) {
+        mutex::lock_awaiter &to_awake = cv.to_resume_head->lock_awaken_handle;
+        // let the coroutine get the lock
+        if (!to_awake.register_awaiting())
+            // lock succ, wakeup
+            forward_task(to_awake.get_coroutine());
+        // lock failed, just wait for another mutex.unlock()
+
+        cv.to_resume_head = cv.to_resume_head->next;
+        ++done;
+    }
+    
+    if (cv.to_resume_head == nullptr)
+        cv.to_resume_tail = nullptr;
+}
+
 bool io_context::try_submit(task_info_ptr task) noexcept {
     liburingcxx::SQEntry *sqe;
     using kind = task_info::task_type;
@@ -147,6 +180,10 @@ bool io_context::try_submit(task_info_ptr task) noexcept {
 
         case kind::semaphore_release:
             handle_semaphore_release(task);
+            return true;
+
+        case kind::condition_variable_notify:
+            handle_condition_variable_notify(task);
             return true;
 
         // submit to ring

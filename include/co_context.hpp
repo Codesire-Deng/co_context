@@ -83,6 +83,8 @@ class [[nodiscard]] io_context final {
     void forward_task(std::coroutine_handle<> handle) noexcept;
 
     void handle_semaphore_release(task_info_ptr sem_release) noexcept;
+    
+    void handle_condition_variable_notify(task_info_ptr cv_notify) noexcept;
 
     bool try_submit(task_info_ptr task) noexcept;
 

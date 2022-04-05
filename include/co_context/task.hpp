@@ -160,7 +160,7 @@ namespace detail {
 } // namespace detail
 
 template<typename T = void>
-class [[nodiscard]] task {
+class [[nodiscard("Did you forget to co_await?")]] task {
   public:
     using promise_type = detail::task_promise<T>;
     using value_type = T;

@@ -12,6 +12,7 @@ class CQEntry;
 namespace co_context {
 
 class counting_semaphore;
+class condition_variable;
 
 namespace detail {
 
@@ -24,10 +25,12 @@ namespace detail {
             CQEntry *cqe;
             int32_t result;
             counting_semaphore *sem;
+            condition_variable *cv;
         };
         union {
             std::coroutine_handle<> handle;
-            config::semaphore_underlying_type update;
+            config::semaphore_counting_type update;
+            config::condition_variable_counting_type notify_counter;
         };
 
         config::tid_t tid_hint;
@@ -38,6 +41,7 @@ namespace detail {
             result,
             co_spawn,
             semaphore_release,
+            condition_variable_notify,
             nop
         };
 

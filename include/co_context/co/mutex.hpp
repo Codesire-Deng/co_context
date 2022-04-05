@@ -7,8 +7,12 @@
 
 namespace co_context {
 
+namespace detail {
+    class cv_wait_awaiter;
+} // namespace detail
+
 class mutex final {
-  private:
+  public:
     using task_info = detail::task_info;
 
     class [[nodiscard("Did you forget to co_await?")]] lock_awaiter {
@@ -16,14 +20,41 @@ class mutex final {
         explicit lock_awaiter(mutex & mtx) noexcept : mtx(mtx) {}
 
         constexpr bool await_ready() const noexcept { return false; }
-        bool await_suspend(std::coroutine_handle<> current) noexcept;
-        constexpr void await_resume() const noexcept {}
+
+        bool await_suspend(std::coroutine_handle<> current) noexcept {
+            register_coroutine(current);
+            return register_awaiting();
+        }
+
+        void await_resume() const noexcept {}
 
       protected:
-        friend class mutex;
+        void register_coroutine(std::coroutine_handle<> handle) noexcept {
+            awaken_task.handle = handle;
+        }
+
+        std::coroutine_handle<> get_coroutine() noexcept {
+            return awaken_task.handle;
+        }
+
+        /**
+         * @brief lock, and when it needs, register handle to awaiting list
+         * @return if the coro needs to suspend
+         */
+        bool register_awaiting() noexcept;
+
+        void unlock_ahead() noexcept {
+            mtx.unlock();
+        }
+
+      protected:
         mutex &mtx;
         lock_awaiter *next;
         task_info awaken_task{task_info::task_type::co_spawn};
+        friend class mutex;
+        friend class locked_mutex;
+        friend class detail::cv_wait_awaiter;
+        friend class io_context;
     };
 
     class [[nodiscard("Did you forget to co_await?")]] lock_guard_awaiter final
@@ -42,7 +73,7 @@ class mutex final {
             // clang-format off
             [[deprecated(
                 "This function is for cheating intellisense, "
-                "which doesn't sense RVO. "
+                "who doesn't sense RVO. "
                 "You should NEVER use this explicitly or implicitly.")]]
             // clang-format on
             lock_guard(lock_guard && other) noexcept
@@ -108,7 +139,7 @@ class mutex final {
      * @note Must only be called by the current lock-holder. One of the waiting
      * coroutine will be resumed inside this call.
      */
-    void unlock();
+    void unlock() noexcept;
 
   private:
     inline static constexpr std::uintptr_t locked_no_awaiting = 0;
