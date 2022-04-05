@@ -1,8 +1,9 @@
 #pragma once
 
-#include <new>
+// #include <new>
 #include <cstddef>
 #include <cstdint>
+#include "uring/io_uring.h"
 
 namespace co_context {
 
@@ -27,17 +28,30 @@ namespace config {
     // About io_context
     inline constexpr unsigned io_uring_flags = 0;
 
-    inline constexpr unsigned total_threads_number = 4;
+    inline constexpr bool is_SQPOLL = io_uring_flags & IORING_SETUP_SQPOLL;
+
+    using threads_number_width_t = uint16_t;
+    using tid_t = threads_number_width_t;
+
+    // inline constexpr unsigned total_threads_number = 11;
+
+    // inline constexpr unsigned total_threads_number = 6;
 
     // inline constexpr unsigned total_threads_number = 5;
 
     // inline constexpr unsigned total_threads_number = 4;
 
-    // inline constexpr unsigned total_threads_number = 3;
+    inline constexpr unsigned total_threads_number = 3;
 
     // inline constexpr unsigned total_threads_number = 2;
 
+    inline constexpr unsigned worker_threads_number =
+        total_threads_number - 1 - is_SQPOLL;
+
     inline constexpr bool low_latency_mode = true;
+
+    // swap zone
+    using swap_capacity_width_t = uint16_t;
 
     // swap_capacity should be (N * 8)
 
@@ -72,6 +86,10 @@ namespace config {
     // net configuration
     inline constexpr bool loopback_only = true;
 
+    // co configuration
+    using semaphore_counting_type = std::ptrdiff_t;
+    using condition_variable_counting_type = std::uintptr_t;
+
 } // namespace config
 
 // logging config
@@ -88,9 +106,9 @@ namespace config {
     // inline constexpr level log_level = level::v;
     // inline constexpr level log_level = level::d;
     // inline constexpr level log_level = level::i;
-    // inline constexpr level log_level = level::w;
+    inline constexpr level log_level = level::w;
     // inline constexpr level log_level = level::e;
-    inline constexpr level log_level = level::no_log;
+    // inline constexpr level log_level = level::no_log;
 
 } // namespace config
 

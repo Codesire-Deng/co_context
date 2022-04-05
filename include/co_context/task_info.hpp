@@ -2,6 +2,12 @@
 #include <coroutine>
 #include <atomic>
 #include "co_context/log/log.hpp"
+#include "co_context/detail/thread_meta.hpp"
+
+namespace liburingcxx {
+class SQEntry;
+class CQEntry;
+}
 
 
 namespace liburingcxx {
@@ -10,6 +16,10 @@ class CQEntry;
 }
 
 namespace co_context {
+
+class counting_semaphore;
+class condition_variable;
+
 namespace detail {
 
     using liburingcxx::SQEntry;
@@ -20,19 +30,32 @@ namespace detail {
             SQEntry *sqe;
             CQEntry *cqe;
             int32_t result;
-            std::atomic_int_fast32_t *remaining_count;
+            counting_semaphore *sem;
+            condition_variable *cv;
         };
-        std::coroutine_handle<> handle;
-        int tid_hint;
-        enum class task_type { sqe, cqe, result, co_spawn, nop } type;
+        union {
+            std::coroutine_handle<> handle;
+            config::semaphore_counting_type update;
+            config::condition_variable_counting_type notify_counter;
+        };
+
+        config::tid_t tid_hint;
+
+        enum class task_type {
+            sqe,
+            cqe,
+            result,
+            co_spawn,
+            semaphore_release,
+            condition_variable_notify,
+            nop
+        };
+
+        const task_type type;
 
         constexpr task_info(task_type type) noexcept : type(type) {
             log::v("task_info generated\n");
         }
-
-        // static task_info nop() noexcept;
-
-        // static task_info *new_sqe();
     };
 
     using task_info_ptr = task_info *;

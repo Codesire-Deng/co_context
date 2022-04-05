@@ -26,6 +26,8 @@
 #include "co_context/config.hpp"
 #include "co_context/task_info.hpp"
 #include "co_context/main_task.hpp"
+#include "co_context/detail/thread_meta.hpp"
+#include "co_context/detail/worker_meta.hpp"
 
 namespace co_context {
 
@@ -34,71 +36,6 @@ using config::cache_line_size;
 class io_context;
 // class eager_io;
 // class lazy_io;
-
-namespace config {
-    inline constexpr bool is_SQPOLL = io_uring_flags & IORING_SETUP_SQPOLL;
-
-    inline constexpr unsigned worker_threads_number =
-        total_threads_number - 1 - is_SQPOLL;
-} // namespace config
-
-namespace detail {
-    class worker_meta;
-
-    using swap_zone =
-        task_info_ptr[config::worker_threads_number][config::swap_capacity];
-
-    struct alignas(cache_line_size) thread_meta {
-        io_context *ctx;
-        worker_meta *worker;
-        uint32_t tid;
-    };
-
-    extern thread_local thread_meta this_thread;
-
-    struct alignas(cache_line_size) worker_meta {
-        enum class worker_state : uint8_t { running, idle, blocked };
-        /**
-         * @brief sharing zone with main thread
-         */
-        struct sharing_zone {
-            std::thread host_thread;
-            // worker_state state; // TODO atomic?
-            // int temp;
-        };
-
-        alignas(cache_line_size) sharing_zone sharing;
-
-        struct swap_cur {
-            uint16_t off = 0;
-            void next() noexcept;
-            bool try_find_empty(swap_zone &swap) noexcept;
-            bool try_find_exist(swap_zone &swap) noexcept;
-            void release(swap_zone &swap, task_info_ptr task) const noexcept;
-            void
-            release_relaxed(swap_zone &swap, task_info_ptr task) const noexcept;
-        };
-        swap_cur submit_cur;
-        swap_cur reap_cur;
-        std::queue<task_info *> submit_overflow_buf;
-
-        void submit(task_info_ptr io_info) noexcept;
-
-        std::coroutine_handle<> schedule() noexcept;
-
-        void init(const int thread_index, io_context *const context);
-
-        void co_spawn(main_task entrance) noexcept;
-
-        void run(const int thread_index, io_context *const context);
-    };
-
-} // namespace detail
-
-/*
-inline constexpr uint16_t task_info_number_per_cache_line =
-    cache_line_size / sizeof(detail::task_info *);
-*/
 
 class [[nodiscard]] io_context final {
   public:
@@ -114,34 +51,19 @@ class [[nodiscard]] io_context final {
 
     using task_info_ptr = detail::task_info_ptr;
 
-    // May not necessary to read/write atomicly.
-    using swap_zone =
-        task_info_ptr[config::worker_threads_number][config::swap_capacity];
-
   private:
     alignas(cache_line_size) uring ring;
-    alignas(cache_line_size) swap_zone submit_swap;
-    alignas(cache_line_size) swap_zone reap_swap;
-
-    struct ctx_swap_cur {
-        uint16_t tid = 0;
-        uint16_t off = 0;
-
-        void next() noexcept;
-        bool try_find_empty(const swap_zone &swap) noexcept;
-        bool try_find_exist(const swap_zone &swap) noexcept;
-        // release the task into the swap zone
-        void release(swap_zone &swap, task_info_ptr task) const noexcept;
-        void
-        release_relaxed(swap_zone &swap, task_info_ptr task) const noexcept;
-    };
+    alignas(cache_line_size) detail::swap_zone<task_info_ptr> submit_swap;
+    alignas(
+        cache_line_size) detail::swap_zone<std::coroutine_handle<>> reap_swap;
 
     // place main thread's high frequency data here
-    ctx_swap_cur s_cur;
-    ctx_swap_cur r_cur;
+    detail::context_swap_cur s_cur;
+    detail::context_swap_cur r_cur;
     std::queue<task_info_ptr> submit_overflow_buf;
-    std::queue<task_info_ptr> reap_overflow_buf;
+    std::queue<std::coroutine_handle<>> reap_overflow_buf;
 
+    // TODO determine the size of this barrier
     alignas(cache_line_size) char __cacheline_barrier[64];
 
   public:
@@ -158,6 +80,12 @@ class [[nodiscard]] io_context final {
   private:
     void forward_task(task_info_ptr task) noexcept;
 
+    void forward_task(std::coroutine_handle<> handle) noexcept;
+
+    void handle_semaphore_release(task_info_ptr sem_release) noexcept;
+    
+    void handle_condition_variable_notify(task_info_ptr cv_notify) noexcept;
+
     bool try_submit(task_info_ptr task) noexcept;
 
     /**
@@ -168,7 +96,7 @@ class [[nodiscard]] io_context final {
 
     bool try_clear_submit_overflow_buf() noexcept;
 
-    bool try_reap(task_info_ptr task) noexcept;
+    bool try_reap(std::coroutine_handle<> handle) noexcept;
 
     /**
      * @brief poll the completion swap zone
@@ -230,14 +158,17 @@ class [[nodiscard]] io_context final {
 };
 
 inline void co_spawn(main_task entrance) noexcept {
-    detail::this_thread.ctx->co_spawn(entrance);
+    if (detail::this_thread.worker != nullptr) [[likely]]
+        detail::this_thread.worker->co_spawn(entrance);
+    else
+        detail::this_thread.ctx->co_spawn(entrance);
 }
 
 inline void co_context_stop() noexcept {
     detail::this_thread.ctx->can_stop();
 }
 
-inline uint32_t co_get_tid() noexcept {
+inline config::tid_t co_get_tid() noexcept {
     return detail::this_thread.tid;
 }
 

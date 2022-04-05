@@ -1,10 +1,16 @@
 # co_context
 
-An io_context library aimed at low-latency io, based on [liburingcxx](https://github.com/Codesire-Deng/liburingcxx).
+A coroutine framework aimed at high-concurrency or(and) low-latency io, based on [liburingcxx](https://github.com/Codesire-Deng/liburingcxx).
 
-**co_context** 是一个**协程**异步多线程并发框架，主要瞄准性能（倾向低延迟）。**co_context** 也致力于减轻用户的心智负担，让 C++ 初学者也能轻松写出高并发程序。
+**co_context** 是一个**协程**异步多线程并发框架，以提供可靠的性能为使命，也致力于减轻用户的心智负担，让 C++ 初学者也能轻松写出高并发程序。
 
-目前 **co_context** 的设计仍处于极早期的混沌状态。No timeline and no roadmap yet.
+目前 **co_context** 已经完成开题报告和蓝图设计，预计5月中旬发布正式版。
+
+## 已有功能
+
+1. Lazy IO: `read`, `write`, `accept`, `recv`, `send`, `connect`, `close`, `shutdown`, `fsync`, `sync_file_range`
+2. Concurrency support: `mutex`, `semaphore`
+3. Scheduling hint: `yield`
 
 ## Requirement
 
@@ -19,7 +25,7 @@ An io_context library aimed at low-latency io, based on [liburingcxx](https://gi
     io_context context{32};
 ```
 
-定义一个监听任务：
+定义一个 socket 监听任务：
 
 ```cpp
 co_context::main_task server(uint16_t port) {
@@ -31,7 +37,7 @@ co_context::main_task server(uint16_t port) {
 }
 ```
 
-定义一个 worker 任务：
+描述业务逻辑（以 netcat 为例）：
 
 ```cpp
 co_context::main_task run(co_context::socket peer) {
@@ -71,6 +77,12 @@ int main(int argc, const char *argv[]) {
 }
 
 ```
+
+## 已有功能
+
+1. Lazy IO: `read`, `write`, `accept`, `recv`, `send`, `connect`, `close`, `shutdown`, `fsync`, `sync_file_range`
+2. Scheduling: `nop`, `yield`
+3. Concurrency support: `mutex`, `semaphore`
 
 ## 谁不需要协程
 
@@ -189,19 +201,19 @@ TODO: 改用原子变量，弃用检查队列
 2. `awaiter` 的 `await_resume` 返回特定结果。
 3. 析构时，销毁协程。
 
-### co_semaphore
+### semaphore
 
 仅运行在用户态 co_context 的信号量
 
-#### co_semaphore 的动机
+#### semaphore 的动机
 
 限制 `co_spawn` 和同类活跃协程的并发量
 
-#### co_semaphore 的实现
+#### semaphore 的实现
 
 1. 参考 std::semaphore，优化 binary_semaphore 的原子变量
-2. 链表模拟无锁队列
+2. 链表栈模拟无锁队列，均摊O(1)
 3. `acquire` 分别在栈上创建 `awaiter`，形成等待链表
-4. `release` 时放出一个等待协程，加入当前协程的 submit
+4. `release` 时放出一个release请求，由io_context处理（强制单消费者），放入某个reap_swap
 
 </details>
