@@ -75,6 +75,8 @@ class SQEntry : private io_uring_sqe {
         return *this;
     }
 
+    inline void *getPadding() noexcept { return __pad2; }
+
     inline SQEntry &prepareRW(
         uint8_t op,
         int fd,

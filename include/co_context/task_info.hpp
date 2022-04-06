@@ -1,8 +1,7 @@
 #pragma once
 #include <coroutine>
-#include <atomic>
+#include "co_context/config.hpp"
 #include "co_context/log/log.hpp"
-#include "co_context/detail/thread_meta.hpp"
 
 namespace liburingcxx {
 class SQEntry;

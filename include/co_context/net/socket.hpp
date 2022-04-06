@@ -36,6 +36,7 @@ class socket {
     }
 
     socket &operator=(socket &&other) noexcept {
+        assert(this != std::addressof(other));
         sockfd = other.sockfd;
         other.sockfd = -1;
         return *this;

@@ -108,7 +108,6 @@ class [[nodiscard]] io_context final {
 
     [[noreturn]] void stop() noexcept {
         log::i("ctx stopped\n");
-        std::this_thread::sleep_for(std::chrono::minutes{1});
         ::exit(0);
     }
 
