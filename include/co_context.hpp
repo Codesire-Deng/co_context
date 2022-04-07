@@ -78,8 +78,6 @@ class [[nodiscard]] io_context final {
     const unsigned ring_entries;
 
   private:
-    void forward_task(task_info_ptr task) noexcept;
-
     void forward_task(std::coroutine_handle<> handle) noexcept;
 
     void handle_semaphore_release(task_info_ptr sem_release) noexcept;

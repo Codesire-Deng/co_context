@@ -8,8 +8,8 @@ A coroutine framework aimed at high-concurrency or(and) low-latency io, based on
 
 ## 已有功能
 
-1. Lazy IO: `read`, `write`, `accept`, `recv`, `send`, `connect`, `close`, `shutdown`, `fsync`, `sync_file_range`
-2. Concurrency support: `mutex`, `semaphore`
+1. Lazy IO: `read`, `write`, `accept`, `recv`, `send`, `connect`, `close`, `shutdown`, `fsync`, `sync_file_range`, `timeout`
+2. Concurrency support: `mutex`, `semaphore`, `condition_variable`
 3. Scheduling hint: `yield`
 
 ## Requirement
@@ -77,12 +77,6 @@ int main(int argc, const char *argv[]) {
 }
 
 ```
-
-## 已有功能
-
-1. Lazy IO: `read`, `write`, `accept`, `recv`, `send`, `connect`, `close`, `shutdown`, `fsync`, `sync_file_range`
-2. Scheduling: `nop`, `yield`
-3. Concurrency support: `mutex`, `semaphore`
 
 ## 谁不需要协程
 
