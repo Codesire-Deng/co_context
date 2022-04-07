@@ -1,7 +1,6 @@
 #pragma once
 
 #include <coroutine>
-#include <variant>
 #include <concepts>
 #include <cassert>
 
@@ -67,46 +66,61 @@ namespace detail {
     template<typename T>
     class task_promise final : public task_promise_base {
       public:
-        using var = std::variant<std::monostate, T, std::exception_ptr>;
+        task_promise() noexcept : state(value_state::mono){};
 
-      public:
-        task_promise() noexcept = default;
-
-        // Automatically deconstruct `value`, done by std::variant.
-        ~task_promise() = default;
+        ~task_promise() {
+            // clang-format off
+            switch (state) {
+                [[likely]]
+                case value_state::value:
+                    value.~T();
+                    break;
+                case value_state::exception:
+                    ex_ptr.~exception_ptr();
+                    [[fallthrough]];
+                default:
+                    break;
+            }
+            // clang-format on
+        };
 
         task<T> get_return_object() noexcept;
 
         void unhandled_exception() noexcept {
-            value.template emplace<std::exception_ptr>(
-                std::current_exception());
+            ex_ptr = std::current_exception();
+            state = value_state::exception;
         }
 
         template<typename Value>
             requires std::convertible_to<Value &&, T>
         void return_value(Value &&result) noexcept(
             std::is_nothrow_constructible_v<T, Value &&>) {
-            value.template emplace<T>(std::forward<Value>(result));
+            std::construct_at(
+                std::addressof(value), std::forward<Value>(result));
         }
 
         // get the lvalue ref
         T &result() & {
-            if (value.index() == 2) [[unlikely]]
-                std::rethrow_exception(get<std::exception_ptr>(value));
-            assert(value.index() == 1);
-            return get<T>(value);
+            if (state == value_state::exception) [[unlikely]]
+                std::rethrow_exception(ex_ptr);
+            assert(state == value_state::value);
+            return value;
         }
 
         // get the prvalue
         T &&result() && {
-            if (value.index() == 2) [[unlikely]]
-                std::rethrow_exception(get<std::exception_ptr>(value));
-            assert(value.index() == 1);
-            return std::move(get<T>(value));
+            if (state == value_state::exception) [[unlikely]]
+                std::rethrow_exception(ex_ptr);
+            assert(state == value_state::value);
+            return std::move(value);
         }
 
       private:
-        var value;
+        union {
+            T value;
+            std::exception_ptr ex_ptr;
+        };
+        enum class value_state : uint8_t { mono, value, exception } state;
     };
 
     template<>
@@ -189,7 +203,7 @@ class [[nodiscard("Did you forget to co_await?")]] task {
     explicit task(std::coroutine_handle<promise_type> current) noexcept
         : handle(current) {}
 
-    task(task &&other) noexcept : handle(other) { other.handle = nullptr; }
+    task(task && other) noexcept : handle(other) { other.handle = nullptr; }
 
     // Ban copy
     task(const task &) = delete;
