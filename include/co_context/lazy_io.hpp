@@ -584,6 +584,25 @@ inline namespace lazy {
         return {};
     }
 
+    /**
+     * @pre Either fd_in or fd_out must be a pipe.
+     * @param off_in If fd_in refers to a pipe, off_in must be (int64_t) -1;
+     *               If fd_in does not refer to a pipe and off_in is (int64_t)
+     * -1, then bytes are read from fd_in starting from the file offset and it
+     * is adjust appropriately; If fd_in does not refer to a pipe and off_in is
+     * not (int64_t) -1, then the starting offset of fd_in will be off_in.
+     * @param off_out The description of off_in also applied to off_out.
+     * @param splice_flags see man splice(2) for description of flags.
+     *
+     * This splice operation can be used to implement sendfile by splicing to an
+     * intermediate pipe first, then splice to the final destination. In fact,
+     * the implementation of sendfile in kernel uses splice internally.
+     *
+     * NOTE that even if fd_in or fd_out refers to a pipe, the splice operation
+     * can still failed with EINVAL if one of the fd doesn't explicitly support
+     * splice operation, e.g. reading from terminal is unsupported from
+     * kernel 5.7 to 5.11. Check issue #291 for more information.
+     */
     inline detail::lazy_splice splice(
         int fd_in,
         int64_t off_in,
@@ -601,6 +620,7 @@ inline namespace lazy {
     ) noexcept {
         return detail::lazy_tee{fd_in, fd_out, nbytes, splice_flags};
     }
+
 } // namespace lazy
 
 } // namespace co_context
