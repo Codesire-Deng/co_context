@@ -8,7 +8,7 @@ A coroutine framework aimed at high-concurrency or(and) low-latency io, based on
 
 ## 已有功能
 
-1. Lazy IO: `read`, `write`, `accept`, `recv`, `send`, `connect`, `close`, `shutdown`, `fsync`, `sync_file_range`, `timeout`
+1. Lazy IO: `read{,v,_fixed}`, `write{,v,_fixed}`, `accept`, `accept_direct`, `recv(msg)`, `send(msg)`, `connect`, `close`, `shutdown`, `fsync`, `sync_file_range`, `timeout`, `uring_nop`, `files_update`, `fallocate`, `openat`, `openat_direct`, `openat2`, `openat2_direct`,  `statx`, `unlinkat`, `renameat`, `mkdirat`, `symlinkat`, `linkat`, `splice`, `tee`.
 2. Concurrency support: `mutex`, `semaphore`, `condition_variable`
 3. Scheduling hint: `yield`
 

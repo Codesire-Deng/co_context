@@ -42,96 +42,279 @@ namespace detail {
 #endif
     };
 
-    struct lazy_awaiter_read : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_awaiter_read(
+    struct lazy_read : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_read(
             int fd, std::span<char> buf, uint64_t offset
         ) noexcept {
             sqe.prepareRead(fd, buf, offset);
         }
     };
 
-    struct lazy_awaiter_write : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_awaiter_write(
+    struct lazy_readv : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_readv(
+            int fd, std::span<const iovec> iovecs, uint64_t offset
+        ) noexcept {
+            sqe.prepareReadv(fd, iovecs, offset);
+        }
+    };
+
+    struct lazy_read_fixed : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_read_fixed(
+            int fd, std::span<char> buf, uint64_t offset, uint16_t bufIndex
+        ) noexcept {
+            sqe.prepareReadFixed(fd, buf, offset, bufIndex);
+        }
+    };
+
+    struct lazy_write : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_write(
             int fd, std::span<const char> buf, uint64_t offset
         ) noexcept {
             sqe.prepareWrite(fd, buf, offset);
         }
     };
 
-    struct lazy_awaiter_accept : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_awaiter_accept(
+    struct lazy_writev : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_writev(
+            int fd, std::span<const iovec> iovecs, uint64_t offset
+        ) noexcept {
+            sqe.prepareWritev(fd, iovecs, offset);
+        }
+    };
+
+    struct lazy_write_fixed : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_write_fixed(
+            int fd,
+            std::span<const char> buf,
+            uint64_t offset,
+            uint16_t bufIndex
+        ) noexcept {
+            sqe.prepareWriteFixed(fd, buf, offset, bufIndex);
+        }
+    };
+
+    struct lazy_accept : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_accept(
             int fd, sockaddr *addr, socklen_t *addrlen, int flags
         ) noexcept {
             sqe.prepareAccept(fd, addr, addrlen, flags);
         }
     };
 
-    struct lazy_awaiter_recv : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_awaiter_recv(
+    struct lazy_accept_direct : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_accept_direct(
+            int fd,
+            sockaddr *addr,
+            socklen_t *addrlen,
+            int flags,
+            uint32_t fileIndex
+        ) noexcept {
+            sqe.prepareAcceptDirect(fd, addr, addrlen, flags, fileIndex);
+        }
+    };
+
+    struct lazy_recv : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_recv(
             int sockfd, std::span<char> buf, int flags
         ) noexcept {
             sqe.prepareRecv(sockfd, buf, flags);
         }
     };
 
-    struct lazy_awaiter_send : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_awaiter_send(
+    struct lazy_recvmsg : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_recvmsg(
+            int fd, msghdr *msg, unsigned int flags
+        ) noexcept {
+            sqe.prepareRecvmsg(fd, msg, flags);
+        }
+    };
+
+    struct lazy_send : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_send(
             int sockfd, std::span<const char> buf, int flags
         ) noexcept {
             sqe.prepareSend(sockfd, buf, flags);
         }
     };
 
-    struct lazy_awaiter_connect : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_awaiter_connect(
+    struct lazy_sendmsg : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_sendmsg(
+            int fd, const msghdr *msg, unsigned int flags
+        ) noexcept {
+            sqe.prepareSendmsg(fd, msg, flags);
+        }
+    };
+
+    struct lazy_connect : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_connect(
             int sockfd, const sockaddr *addr, socklen_t addrlen
         ) noexcept {
             sqe.prepareConnect(sockfd, addr, addrlen);
         }
     };
 
-    struct lazy_awaiter_close : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?"
-        )]] inline lazy_awaiter_close(int fd) noexcept {
+    struct lazy_close : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_close(int fd
+        ) noexcept {
             sqe.prepareClose(fd);
         }
     };
 
-    struct lazy_awaiter_shutdown : lazy_awaiter {
+    struct lazy_shutdown : lazy_awaiter {
         [[nodiscard("Did you forget to co_await?"
-        )]] inline lazy_awaiter_shutdown(int fd, int how) noexcept {
+        )]] inline lazy_shutdown(int fd, int how) noexcept {
             sqe.prepareShutdown(fd, how);
         }
     };
 
-    struct lazy_awaiter_fsync : lazy_awaiter {
+    struct lazy_fsync : lazy_awaiter {
         [[nodiscard("Did you forget to co_await?"
-        )]] inline lazy_awaiter_fsync(int fd, uint32_t fsync_flags) noexcept {
+        )]] inline lazy_fsync(int fd, uint32_t fsync_flags) noexcept {
             sqe.prepareFsync(fd, fsync_flags);
         }
     };
 
-    struct lazy_awaiter_sync_file_range : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_awaiter_sync_file_range(
+    struct lazy_sync_file_range : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_sync_file_range(
             int fd, uint32_t len, uint64_t offset, int flags
         ) noexcept {
             sqe.prepareSyncFileRange(fd, len, offset, flags);
         }
     };
 
-    struct lazy_awaiter_timeout_timespec : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_awaiter_timeout_timespec(
+    struct lazy_uring_nop : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?"
+        )]] inline lazy_uring_nop() noexcept {
+            sqe.prepareNop();
+        }
+    };
+
+    struct lazy_files_update : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?"
+        )]] inline lazy_files_update(std::span<int> fds, int offset) noexcept {
+            sqe.prepareFilesUpdate(fds, offset);
+        }
+    };
+
+    struct lazy_fallocate : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_fallocate(
+            int fd, int mode, off_t offset, off_t len
+        ) noexcept {
+            sqe.prepareFallocate(fd, mode, offset, len);
+        }
+    };
+
+    struct lazy_openat : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_openat(
+            int dfd, const char *path, int flags, mode_t mode
+        ) noexcept {
+            sqe.prepareOpenat(dfd, path, flags, mode);
+        }
+    };
+
+    /* open directly into the fixed file table */
+    struct lazy_openat_direct : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_openat_direct(
+            int dfd,
+            const char *path,
+            int flags,
+            mode_t mode,
+            unsigned file_index
+        ) noexcept {
+            sqe.prepareOpenatDirect(dfd, path, flags, mode, file_index);
+        }
+    };
+
+    struct lazy_openat2 : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_openat2(
+            int dfd, const char *path, open_how *how
+        ) noexcept {
+            sqe.prepareOpenat2(dfd, path, how);
+        }
+    };
+
+    /* open directly into the fixed file table */
+    struct lazy_openat2_direct : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_openat2_direct(
+            int dfd, const char *path, open_how *how, unsigned int file_index
+        ) noexcept {
+            sqe.prepareOpenat2Direct(dfd, path, how, file_index);
+        }
+    };
+
+    struct lazy_timeout_timespec : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_timeout_timespec(
             __kernel_timespec *ts, unsigned int count, unsigned int flags
         ) noexcept {
             sqe.prepareTimeout(ts, count, flags);
         }
     };
 
-    struct lazy_awaiter_timeout : lazy_awaiter {
+    struct lazy_statx : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_statx(
+            int dfd,
+            const char *path,
+            int flags,
+            unsigned int mask,
+            struct statx *statxbuf
+        ) noexcept {
+            sqe.prepareStatx(dfd, path, flags, mask, statxbuf);
+        }
+    };
+
+    struct lazy_unlinkat : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_unlinkat(
+            int dfd, const char *path, int flags
+        ) noexcept {
+            sqe.prepareUnlinkat(dfd, path, flags);
+        }
+    };
+
+    struct lazy_renameat : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_renameat(
+            int olddfd,
+            const char *oldpath,
+            int newdfd,
+            const char *newpath,
+            int flags
+        ) noexcept {
+            sqe.prepareRenameat(olddfd, oldpath, newdfd, newpath, flags);
+        }
+    };
+
+    struct lazy_mkdirat : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_mkdirat(
+            int dfd, const char *path, mode_t mode
+        ) noexcept {
+            sqe.prepareMkdirat(dfd, path, mode);
+        }
+    };
+
+    struct lazy_symlinkat : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_symlinkat(
+            const char *target, int newdirfd, const char *linkpath
+        ) noexcept {
+            sqe.prepareSymlinkat(target, newdirfd, linkpath);
+        }
+    };
+
+    struct lazy_linkat : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_linkat(
+            int olddfd,
+            const char *oldpath,
+            int newdfd,
+            const char *newpath,
+            int flags
+        ) noexcept {
+            sqe.prepareLinkat(olddfd, oldpath, newdfd, newpath, flags);
+        }
+    };
+
+    struct lazy_timeout : lazy_awaiter {
         __kernel_timespec ts;
 
         template<class Rep, class Period = std::ratio<1>>
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_awaiter_timeout(
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_timeout(
             std::chrono::duration<Rep, Period> duration, unsigned int flags
         ) noexcept {
             using namespace std;
@@ -145,7 +328,7 @@ namespace detail {
         }
     };
 
-    struct lazy_awaiter_yield {
+    struct lazy_yield {
         task_info io_info;
 
         constexpr bool await_ready() const noexcept { return false; }
@@ -158,10 +341,36 @@ namespace detail {
 
         constexpr void await_resume() const noexcept {}
 
-        constexpr lazy_awaiter_yield() noexcept
+        constexpr lazy_yield() noexcept
             : io_info(task_info::task_type::co_spawn) {
             io_info.tid_hint = detail::this_thread.tid;
             io_info.result = 0;
+        }
+    };
+
+    struct lazy_splice : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_splice(
+            int fd_in,
+            int64_t off_in,
+            int fd_out,
+            int64_t off_out,
+            unsigned int nbytes,
+            unsigned int splice_flags
+        ) noexcept {
+            sqe.prepareSplice(
+                fd_in, off_in, fd_out, off_out, nbytes, splice_flags
+            );
+        }
+    };
+
+    struct lazy_tee : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_tee(
+            int fd_in,
+            int fd_out,
+            unsigned int nbytes,
+            unsigned int splice_flags
+        ) noexcept {
+            sqe.prepareTee(fd_in, fd_out, nbytes, splice_flags);
         }
     };
 
@@ -169,55 +378,178 @@ namespace detail {
 
 inline namespace lazy {
 
-    using detail::lazy_awaiter;
-    using detail::lazy_awaiter_yield;
-
-    inline detail::lazy_awaiter_read
+    inline detail::lazy_read
     read(int fd, std::span<char> buf, uint64_t offset) noexcept {
-        return detail::lazy_awaiter_read{fd, buf, offset};
+        return detail::lazy_read{fd, buf, offset};
     }
 
-    inline detail::lazy_awaiter_write
+    inline detail::lazy_readv
+    readv(int fd, std::span<const iovec> iovecs, uint64_t offset) noexcept {
+        return detail::lazy_readv{fd, iovecs, offset};
+    }
+
+    inline detail::lazy_read_fixed read_fixed(
+        int fd, std::span<char> buf, uint64_t offset, uint16_t bufIndex
+    ) noexcept {
+        return detail::lazy_read_fixed{fd, buf, offset, bufIndex};
+    }
+
+    inline detail::lazy_write
     write(int fd, std::span<const char> buf, uint64_t offset) noexcept {
-        return detail::lazy_awaiter_write{fd, buf, offset};
+        return detail::lazy_write{fd, buf, offset};
     }
 
-    inline detail::lazy_awaiter_accept
+    inline detail::lazy_writev
+    writev(int fd, std::span<const iovec> iovecs, uint64_t offset) noexcept {
+        return detail::lazy_writev{fd, iovecs, offset};
+    }
+
+    inline detail::lazy_write_fixed write_fixed(
+        int fd, std::span<const char> buf, uint64_t offset, uint16_t bufIndex
+    ) noexcept {
+        return detail::lazy_write_fixed{fd, buf, offset, bufIndex};
+    }
+
+    inline detail::lazy_accept
     accept(int fd, sockaddr *addr, socklen_t *addrlen, int flags) noexcept {
-        return detail::lazy_awaiter_accept{fd, addr, addrlen, flags};
+        return detail::lazy_accept{fd, addr, addrlen, flags};
     }
 
-    inline detail::lazy_awaiter_recv
-    recv(int sockfd, std::span<char> buf, int flags) noexcept {
-        return detail::lazy_awaiter_recv{sockfd, buf, flags};
+    inline detail::lazy_accept_direct accept_direct(
+        int fd,
+        sockaddr *addr,
+        socklen_t *addrlen,
+        int flags,
+        uint32_t fileIndex
+    ) noexcept {
+        return detail::lazy_accept_direct{fd, addr, addrlen, flags, fileIndex};
     }
 
-    inline detail::lazy_awaiter_send
-    send(int sockfd, std::span<const char> buf, int flags) noexcept {
-        return detail::lazy_awaiter_send{sockfd, buf, flags};
+    inline detail::lazy_recv
+    recv(int sockfd, std::span<char> buf, int flags = 0) noexcept {
+        return detail::lazy_recv{sockfd, buf, flags};
     }
 
-    inline detail::lazy_awaiter_connect
+    inline detail::lazy_recvmsg
+    recvmsg(int fd, msghdr *msg, unsigned int flags) noexcept {
+        return detail::lazy_recvmsg{fd, msg, flags};
+    }
+
+    inline detail::lazy_send
+    send(int sockfd, std::span<const char> buf, int flags = 0) noexcept {
+        return detail::lazy_send{sockfd, buf, flags};
+    }
+
+    inline detail::lazy_sendmsg
+    sendmsg(int fd, const msghdr *msg, unsigned int flags) noexcept {
+        return detail::lazy_sendmsg{fd, msg, flags};
+    }
+
+    inline detail::lazy_connect
     connect(int sockfd, const sockaddr *addr, socklen_t addrlen) noexcept {
-        return detail::lazy_awaiter_connect{sockfd, addr, addrlen};
+        return detail::lazy_connect{sockfd, addr, addrlen};
     }
 
-    inline detail::lazy_awaiter_close close(int fd) noexcept {
-        return detail::lazy_awaiter_close{fd};
+    inline detail::lazy_close close(int fd) noexcept {
+        return detail::lazy_close{fd};
     }
 
-    inline detail::lazy_awaiter_shutdown shutdown(int fd, int how) noexcept {
-        return detail::lazy_awaiter_shutdown{fd, how};
+    inline detail::lazy_shutdown shutdown(int fd, int how) noexcept {
+        return detail::lazy_shutdown{fd, how};
     }
 
-    inline detail::lazy_awaiter_fsync
-    fsync(int fd, uint32_t fsync_flags) noexcept {
-        return detail::lazy_awaiter_fsync{fd, fsync_flags};
+    inline detail::lazy_fsync fsync(int fd, uint32_t fsync_flags) noexcept {
+        return detail::lazy_fsync{fd, fsync_flags};
     }
 
-    inline detail::lazy_awaiter_sync_file_range
+    inline detail::lazy_sync_file_range
     sync_file_range(int fd, uint32_t len, uint64_t offset, int flags) noexcept {
-        return detail::lazy_awaiter_sync_file_range{fd, len, offset, flags};
+        return detail::lazy_sync_file_range{fd, len, offset, flags};
+    }
+
+    inline detail::lazy_uring_nop uring_nop() noexcept {
+        return detail::lazy_uring_nop{};
+    }
+
+    inline detail::lazy_files_update
+    files_update(std::span<int> fds, int offset) noexcept {
+        return detail::lazy_files_update{fds, offset};
+    }
+
+    inline detail::lazy_fallocate
+    fallocate(int fd, int mode, off_t offset, off_t len) noexcept {
+        return detail::lazy_fallocate{fd, mode, offset, len};
+    }
+
+    inline detail::lazy_openat
+    openat(int dfd, const char *path, int flags, mode_t mode) noexcept {
+        return detail::lazy_openat{dfd, path, flags, mode};
+    }
+
+    inline detail::lazy_openat_direct openat_direct(
+        int dfd,
+        const char *path,
+        int flags,
+        mode_t mode,
+        unsigned int file_index
+    ) noexcept {
+        return detail::lazy_openat_direct{dfd, path, flags, mode, file_index};
+    }
+
+    inline detail::lazy_openat2
+    openat2(int dfd, const char *path, open_how *how) noexcept {
+        return detail::lazy_openat2{dfd, path, how};
+    }
+
+    inline detail::lazy_openat2_direct openat2_direct(
+        int dfd, const char *path, open_how *how, unsigned int file_index
+    ) noexcept {
+        return detail::lazy_openat2_direct{dfd, path, how, file_index};
+    }
+
+    inline detail::lazy_statx statx(
+        int dfd,
+        const char *path,
+        int flags,
+        unsigned int mask,
+        struct statx *statxbuf
+    ) noexcept {
+        return detail::lazy_statx{dfd, path, flags, mask, statxbuf};
+    }
+
+    inline detail::lazy_unlinkat
+    unlinkat(int dfd, const char *path, int flags) noexcept {
+        return detail::lazy_unlinkat{dfd, path, flags};
+    }
+
+    inline detail::lazy_renameat renameat(
+        int olddfd,
+        const char *oldpath,
+        int newdfd,
+        const char *newpath,
+        int flags
+    ) noexcept {
+        return detail::lazy_renameat{olddfd, oldpath, newdfd, newpath, flags};
+    }
+
+    inline detail::lazy_mkdirat
+    mkdirat(int dfd, const char *path, mode_t mode) noexcept {
+        return detail::lazy_mkdirat{dfd, path, mode};
+    }
+
+    inline detail::lazy_symlinkat
+    symlinkat(const char *target, int newdirfd, const char *linkpath) noexcept {
+        return detail::lazy_symlinkat{target, newdirfd, linkpath};
+    }
+
+    inline detail::lazy_linkat linkat(
+        int olddfd,
+        const char *oldpath,
+        int newdfd,
+        const char *newpath,
+        int flags
+    ) noexcept {
+        return detail::lazy_linkat{olddfd, oldpath, newdfd, newpath, flags};
     }
 
     /**
@@ -229,10 +561,10 @@ inline namespace lazy {
      * stamp. See man io_uring_enter(2).
      * @return lazy_awaiter
      */
-    inline detail::lazy_awaiter_timeout_timespec timeout(
+    inline detail::lazy_timeout_timespec timeout(
         __kernel_timespec *ts, unsigned int count, unsigned int flags
     ) noexcept {
-        return detail::lazy_awaiter_timeout_timespec{ts, count, flags};
+        return detail::lazy_timeout_timespec{ts, count, flags};
     }
 
     /**
@@ -242,16 +574,33 @@ inline namespace lazy {
      * @return lazy_awaiter
      */
     template<class Rep, class Period = std::ratio<1>>
-    inline detail::lazy_awaiter_timeout timeout(
+    inline detail::lazy_timeout timeout(
         std::chrono::duration<Rep, Period> duration, unsigned int flags = 0
     ) noexcept {
-        return detail::lazy_awaiter_timeout{duration, flags};
+        return detail::lazy_timeout{duration, flags};
     }
 
-    inline lazy_awaiter_yield yield() noexcept {
+    inline detail::lazy_yield yield() noexcept {
         return {};
     }
 
+    inline detail::lazy_splice splice(
+        int fd_in,
+        int64_t off_in,
+        int fd_out,
+        int64_t off_out,
+        unsigned int nbytes,
+        unsigned int splice_flags
+    ) noexcept {
+        return detail::lazy_splice{fd_in,   off_in, fd_out,
+                                   off_out, nbytes, splice_flags};
+    }
+
+    inline detail::lazy_tee
+    tee(int fd_in, int fd_out, unsigned int nbytes, unsigned int splice_flags
+    ) noexcept {
+        return detail::lazy_tee{fd_in, fd_out, nbytes, splice_flags};
+    }
 } // namespace lazy
 
 } // namespace co_context

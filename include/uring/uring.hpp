@@ -42,6 +42,8 @@
 #include "uring/barrier.h"
 #include "uring/syscall.hpp"
 
+struct statx;
+
 namespace liburingcxx {
 
 constexpr uint64_t LIBURING_UDATA_TIMEOUT = -1;
@@ -49,7 +51,7 @@ constexpr uint64_t LIBURING_UDATA_TIMEOUT = -1;
 template<unsigned URingFlags>
 class URing;
 
-class SQEntry : private io_uring_sqe {
+class SQEntry final : private io_uring_sqe {
   public:
     template<unsigned URingFlags>
     friend class ::liburingcxx::URing;
@@ -121,7 +123,7 @@ class SQEntry : private io_uring_sqe {
     }
 
     inline SQEntry &prepareWriteFixed(
-        int fd, std::span<char> buf, uint64_t offset, uint16_t bufIndex
+        int fd, std::span<const char> buf, uint64_t offset, uint16_t bufIndex
     ) noexcept {
         prepareRW(IORING_OP_WRITE_FIXED, fd, buf.data(), buf.size(), offset);
         this->buf_index = bufIndex;
@@ -246,12 +248,182 @@ class SQEntry : private io_uring_sqe {
         return *this;
     }
 
-    /* TODO: more prepare: splice, tee, cancel, epoll_ctl
+    inline SQEntry &
+    prepareFilesUpdate(std::span<int> fds, int offset) noexcept {
+        prepareRW(IORING_OP_FILES_UPDATE, -1, fds.data(), fds.size(), offset);
+        return *this;
+    }
+
+    inline SQEntry &
+    prepareFallocate(int fd, int mode, off_t offset, off_t len) noexcept {
+        prepareRW(
+            IORING_OP_FALLOCATE, fd, (const uintptr_t *)(unsigned long)len,
+            (uint32_t)mode, (uint64_t)offset
+        );
+        return *this;
+    }
+
+    inline SQEntry &
+    prepareOpenat(int dfd, const char *path, int flags, mode_t mode) noexcept {
+        prepareRW(IORING_OP_OPENAT, dfd, path, mode, 0);
+        this->open_flags = (uint32_t)flags;
+        return *this;
+    }
+
+    /* open directly into the fixed file table */
+    inline SQEntry &prepareOpenatDirect(
+        int dfd, const char *path, int flags, mode_t mode, unsigned file_index
+    ) noexcept {
+        return prepareOpenat(dfd, path, flags, mode)
+            .setTargetFixedFile(file_index);
+    }
+
+    inline SQEntry &
+    prepareOpenat2(int dfd, const char *path, struct open_how *how) noexcept {
+        prepareRW(
+            IORING_OP_OPENAT2, dfd, path, sizeof(*how), (uint64_t)(uintptr_t)how
+        );
+        return *this;
+    }
+
+    /* open directly into the fixed file table */
+    inline SQEntry &prepareOpenat2Direct(
+        int dfd, const char *path, struct open_how *how, unsigned file_index
+    ) noexcept {
+        return prepareOpenat2(dfd, path, how).setTargetFixedFile(file_index);
+    }
+
+    inline SQEntry &prepareStatx(
+        int dfd,
+        const char *path,
+        int flags,
+        unsigned mask,
+        struct statx *statxbuf
+    ) noexcept {
+        prepareRW(IORING_OP_STATX, dfd, path, mask, (uint64_t)statxbuf);
+        this->statx_flags = (uint32_t)flags;
+        return *this;
+    }
+
+    inline SQEntry &
+    prepareFadvise(int fd, uint64_t offset, off_t len, int advice) noexcept {
+        prepareRW(
+            IORING_OP_FADVISE, fd, nullptr, (uint32_t)len, (uint64_t)offset
+        );
+        this->fadvise_advice = (uint32_t)advice;
+        return *this;
+    }
+
+    inline SQEntry &
+    prepareMadvise(void *addr, off_t length, int advice) noexcept {
+        prepareRW(IORING_OP_MADVISE, -1, addr, (uint32_t)length, 0);
+        this->fadvise_advice = (uint32_t)advice;
+        return *this;
+    }
+
+    inline SQEntry &
+    prepareUnlinkat(int dfd, const char *path, int flags) noexcept {
+        prepareRW(IORING_OP_UNLINKAT, dfd, path, 0, 0);
+        this->unlink_flags = (uint32_t)flags;
+        return *this;
+    }
+
+    inline SQEntry &prepareRenameat(
+        int olddfd,
+        const char *oldpath,
+        int newdfd,
+        const char *newpath,
+        int flags
+    ) noexcept {
+        prepareRW(
+            IORING_OP_RENAMEAT, olddfd, oldpath, (uint32_t)newdfd,
+            (uint64_t)(uintptr_t)newpath
+        );
+        this->rename_flags = (uint32_t)flags;
+        return *this;
+    }
+
+    inline SQEntry &
+    prepareMkdirat(int dfd, const char *path, mode_t mode) noexcept {
+        prepareRW(IORING_OP_MKDIRAT, dfd, path, mode, 0);
+        return *this;
+    }
+
+    inline SQEntry &prepareSymlinkat(
+        const char *target, int newdirfd, const char *linkpath
+    ) noexcept {
+        prepareRW(
+            IORING_OP_SYMLINKAT, newdirfd, target, 0,
+            (uint64_t)(uintptr_t)linkpath
+        );
+        return *this;
+    }
+
+    inline SQEntry &prepareLinkat(
+        int olddfd,
+        const char *oldpath,
+        int newdfd,
+        const char *newpath,
+        int flags
+    ) noexcept {
+        prepareRW(
+            IORING_OP_LINKAT, olddfd, oldpath, (uint32_t)newdfd,
+            (uint64_t)(uintptr_t)newpath
+        );
+        this->hardlink_flags = (uint32_t)flags;
+        return *this;
+    }
+
+    /**
+     * @pre Either fd_in or fd_out must be a pipe.
+     * @param off_in If fd_in refers to a pipe, off_in must be (int64_t) -1;
+     *               If fd_in does not refer to a pipe and off_in is (int64_t)
+     * -1, then bytes are read from fd_in starting from the file offset and it
+     * is adjust appropriately; If fd_in does not refer to a pipe and off_in is
+     * not (int64_t) -1, then the starting offset of fd_in will be off_in.
+     * @param off_out The description of off_in also applied to off_out.
+     * @param splice_flags see man splice(2) for description of flags.
+     *
+     * This splice operation can be used to implement sendfile by splicing to an
+     * intermediate pipe first, then splice to the final destination. In fact,
+     * the implementation of sendfile in kernel uses splice internally.
+     *
+     * NOTE that even if fd_in or fd_out refers to a pipe, the splice operation
+     * can still failed with EINVAL if one of the fd doesn't explicitly support
+     * splice operation, e.g. reading from terminal is unsupported from
+     * kernel 5.7 to 5.11. Check issue #291 for more information.
+     */
+    inline SQEntry &prepareSplice(
+        int fd_in,
+        int64_t off_in,
+        int fd_out,
+        int64_t off_out,
+        unsigned int nbytes,
+        unsigned int splice_flags
+    ) noexcept {
+        prepareRW(IORING_OP_SPLICE, fd_out, nullptr, nbytes, (uint64_t)off_out);
+        this->splice_off_in = (uint64_t)off_in;
+        this->splice_flags = splice_flags;
+        this->splice_fd_in = fd_in;
+        return *this;
+    }
+
+    inline SQEntry &prepareTee(
+        int fd_in, int fd_out, unsigned int nbytes, unsigned int splice_flags
+    ) noexcept {
+        prepareRW(IORING_OP_TEE, fd_out, nullptr, nbytes, 0);
+        this->splice_off_in = 0;
+        this->splice_flags = splice_flags;
+        this->splice_fd_in = fd_in;
+        return *this;
+    }
+
+    /* TODO: more prepare: cancel, epoll_ctl
      * ......
      */
 };
 
-class CQEntry : private io_uring_cqe {
+class CQEntry final : private io_uring_cqe {
   public:
     template<unsigned URingFlags>
     friend class ::liburingcxx::URing;
@@ -263,7 +435,7 @@ class CQEntry : private io_uring_cqe {
 
 namespace detail {
 
-    struct URingParams : io_uring_params {
+    struct URingParams final : io_uring_params {
         /**
          * @brief Construct a new io_uring_params without initializing
          */
@@ -278,7 +450,7 @@ namespace detail {
         }
     };
 
-    class SubmissionQueue {
+    class SubmissionQueue final {
       private:
         unsigned *khead;
         unsigned *ktail;
@@ -358,7 +530,7 @@ namespace detail {
         ~SubmissionQueue() noexcept = default;
     };
 
-    class CompletionQueue {
+    class CompletionQueue final {
       private:
         unsigned *khead;
         unsigned *ktail;
