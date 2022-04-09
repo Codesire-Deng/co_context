@@ -36,7 +36,8 @@ class [[nodiscard("Did you forget to co_spawn?")]] main_task {
     };
 
     main_task(std::coroutine_handle<promise_type> handle) noexcept
-        : handle(handle) {}
+        : handle(handle) {
+    }
 
     main_task(const main_task &) noexcept = default;
 

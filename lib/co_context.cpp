@@ -60,7 +60,8 @@ namespace detail {
             auto coro = this->schedule();
             log::v(
                 "worker[%d] found coro %lx to run\n", thread_index,
-                coro.address());
+                coro.address()
+            );
             coro.resume();
             log::v("worker[%d] idle\n", thread_index);
         }
@@ -79,10 +80,12 @@ namespace detail {
                     task_info_ptr task = this->submit_overflow_buf.front();
                     this->submit_overflow_buf.pop();
                     submit_swap.store(
-                        submit_cur, task, std::memory_order_release);
+                        submit_cur, task, std::memory_order_release
+                    );
                     log::d(
                         "worker[%u] submit from OF_buf to [%u]\n", tid,
-                        submit_cur.off);
+                        submit_cur.off
+                    );
                     submit_cur.next();
                 }
             }
@@ -109,7 +112,8 @@ void io_context::forward_task(std::coroutine_handle<> handle) noexcept {
         reap_swap.store(r_cur, handle, std::memory_order_release);
         log::v(
             "ctx forward_task to [%u][%u]: %lx\n", r_cur.tid, r_cur.off,
-            handle.address());
+            handle.address()
+        );
         r_cur.next();
     } else {
         reap_overflow_buf.push(handle);
@@ -128,7 +132,8 @@ void io_context::handle_semaphore_release(task_info_ptr sem_release) noexcept {
     std::coroutine_handle<> handle;
     while (done < update && bool(handle = sem.try_release())) {
         log::d(
-            "ctx handle_semaphore_release: forwarding %lx\n", handle.address());
+            "ctx handle_semaphore_release: forwarding %lx\n", handle.address()
+        );
         forward_task(handle);
         ++done;
     }
@@ -137,8 +142,8 @@ void io_context::handle_semaphore_release(task_info_ptr sem_release) noexcept {
     sem.counter.fetch_add(update, std::memory_order_acq_rel);
 }
 
-void io_context::handle_condition_variable_notify(
-    task_info_ptr cv_notify) noexcept {
+void io_context::handle_condition_variable_notify(task_info_ptr cv_notify
+) noexcept {
     condition_variable &cv = *cv_notify->cv;
     const condition_variable::T notify_counter =
         as_atomic(cv_notify->notify_counter)
@@ -164,9 +169,8 @@ void io_context::handle_condition_variable_notify(
         cv.to_resume_head = cv.to_resume_head->next;
         ++done;
     }
-    
-    if (cv.to_resume_head == nullptr)
-        cv.to_resume_tail = nullptr;
+
+    if (cv.to_resume_head == nullptr) cv.to_resume_tail = nullptr;
 }
 
 bool io_context::try_submit(task_info_ptr task) noexcept {
@@ -324,11 +328,12 @@ void io_context::co_spawn(main_task entrance) {
     assert(detail::this_thread.worker == nullptr);
     if (reap_swap.try_find_empty(r_cur)) [[likely]] {
         reap_swap.store(
-            r_cur, entrance.get_io_info_ptr()->handle,
-            std::memory_order_release);
+            r_cur, entrance.get_io_info_ptr()->handle, std::memory_order_release
+        );
         log::d(
             "ctx co_spawn %lx at [%u][%u]\n",
-            entrance.get_io_info_ptr()->handle.address(), r_cur.tid, r_cur.off);
+            entrance.get_io_info_ptr()->handle.address(), r_cur.tid, r_cur.off
+        );
         r_cur.next();
     } else {
         reap_overflow_buf.push(entrance.get_io_info_ptr()->handle);

@@ -37,7 +37,8 @@ socket &socket::set_tcp_no_delay(bool on) {
     int optval = on ? 1 : 0;
     if (::setsockopt(
             sockfd, IPPROTO_TCP, TCP_NODELAY, &optval,
-            static_cast<socklen_t>(sizeof optval))
+            static_cast<socklen_t>(sizeof optval)
+        )
         < 0) {
         perror("socket::setTcpNoDelay");
     }

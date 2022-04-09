@@ -14,6 +14,7 @@ namespace detail {
 
     struct alignas(config::cache_line_size) worker_meta final {
         enum class worker_state : uint8_t { running, idle, blocked };
+
         /**
          * @brief sharing zone with main thread
          */
@@ -48,7 +49,8 @@ namespace detail {
     inline void worker_meta::co_spawn(main_task entrance) noexcept {
         log::v(
             "worker[%u] co_spawn coro %lx\n", this_thread.tid,
-            entrance.get_io_info_ptr()->handle.address());
+            entrance.get_io_info_ptr()->handle.address()
+        );
         this->submit(entrance.get_io_info_ptr());
     }
 

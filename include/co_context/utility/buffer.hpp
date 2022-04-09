@@ -19,5 +19,4 @@ inline constexpr auto as_buf(const T *ptr) {
         reinterpret_cast<const char *>(ptr), sizeof(T)};
 }
 
-
 } // namespace co_context

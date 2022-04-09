@@ -66,11 +66,11 @@ class socket {
         return lazy::connect(sockfd, addr.get_sockaddr(), addr.length());
     }
 
-    auto recv(std::span<char> buf, int flags=0) noexcept {
+    auto recv(std::span<char> buf, int flags = 0) noexcept {
         return lazy::recv(sockfd, buf, flags);
     }
 
-    auto send(std::span<const char> buf, int flags=0) noexcept {
+    auto send(std::span<const char> buf, int flags = 0) noexcept {
         return lazy::send(sockfd, buf, flags);
     }
 

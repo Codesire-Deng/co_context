@@ -12,8 +12,8 @@ namespace co_context {
 namespace detail {
 
     template<typename T>
-    concept swap_zone_content = std::is_trivially_copyable_v<T> && sizeof(T)
-                                == sizeof(std::uintptr_t);
+    concept swap_zone_content = std::is_trivially_copyable_v<T>
+                                && sizeof(T) == sizeof(std::uintptr_t);
 
     template<swap_zone_content T>
     inline std::uintptr_t &as_uint(T &value) noexcept {
@@ -41,6 +41,7 @@ namespace detail {
         T data[config::swap_capacity];
 
         worker_swap_zone() noexcept { memset(data, 0, sizeof(data)); }
+
         worker_swap_zone(const worker_swap_zone &) = delete;
         worker_swap_zone(worker_swap_zone &&) = delete;
 
@@ -76,15 +77,14 @@ namespace detail {
             return true;
         }
 
-        inline T load(
-            const worker_swap_cur cur, std::memory_order order) const noexcept {
+        inline T load(const worker_swap_cur cur, std::memory_order order)
+            const noexcept {
             return as_atomic((*this)[cur]).load(order);
         }
 
         inline void store(
-            const worker_swap_cur cur,
-            T value,
-            std::memory_order order) noexcept {
+            const worker_swap_cur cur, T value, std::memory_order order
+        ) noexcept {
             as_atomic((*this)[cur]).store(value, order);
         }
     };
@@ -162,9 +162,8 @@ namespace detail {
         }
 
         inline void store(
-            const context_swap_cur cur,
-            T value,
-            std::memory_order order) noexcept {
+            const context_swap_cur cur, T value, std::memory_order order
+        ) noexcept {
             as_atomic((*this)[cur]).store(value, order);
         }
     };

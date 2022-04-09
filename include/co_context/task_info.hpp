@@ -8,7 +8,6 @@ class SQEntry;
 class CQEntry;
 }
 
-
 namespace liburingcxx {
 class SQEntry;
 class CQEntry;
@@ -32,6 +31,7 @@ namespace detail {
             counting_semaphore *sem;
             condition_variable *cv;
         };
+
         union {
             std::coroutine_handle<> handle;
             config::semaphore_counting_type update;

@@ -13,7 +13,9 @@ namespace detail {
         liburingcxx::SQEntry sqe;
         task_info io_info;
 
-        constexpr bool await_ready() const noexcept { return false; }
+        constexpr bool await_ready() const noexcept {
+            return false;
+        }
 
         // std::coroutine_handle<>
         void await_suspend(std::coroutine_handle<> current) noexcept {
@@ -22,7 +24,9 @@ namespace detail {
             worker->submit(&io_info);
         }
 
-        int32_t await_resume() const noexcept { return io_info.result; }
+        int32_t await_resume() const noexcept {
+            return io_info.result;
+        }
 
         lazy_awaiter() noexcept : io_info(task_info::task_type::sqe) {
             sqe.setData(reinterpret_cast<uint64_t>(&io_info));
@@ -40,79 +44,85 @@ namespace detail {
 
     struct lazy_awaiter_read : lazy_awaiter {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_awaiter_read(
-            int fd, std::span<char> buf, uint64_t offset) noexcept {
+            int fd, std::span<char> buf, uint64_t offset
+        ) noexcept {
             sqe.prepareRead(fd, buf, offset);
         }
     };
 
     struct lazy_awaiter_write : lazy_awaiter {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_awaiter_write(
-            int fd, std::span<const char> buf, uint64_t offset) noexcept {
+            int fd, std::span<const char> buf, uint64_t offset
+        ) noexcept {
             sqe.prepareWrite(fd, buf, offset);
         }
     };
 
     struct lazy_awaiter_accept : lazy_awaiter {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_awaiter_accept(
-            int fd, sockaddr *addr, socklen_t *addrlen, int flags) noexcept {
+            int fd, sockaddr *addr, socklen_t *addrlen, int flags
+        ) noexcept {
             sqe.prepareAccept(fd, addr, addrlen, flags);
         }
     };
 
     struct lazy_awaiter_recv : lazy_awaiter {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_awaiter_recv(
-            int sockfd, std::span<char> buf, int flags) noexcept {
+            int sockfd, std::span<char> buf, int flags
+        ) noexcept {
             sqe.prepareRecv(sockfd, buf, flags);
         }
     };
 
     struct lazy_awaiter_send : lazy_awaiter {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_awaiter_send(
-            int sockfd, std::span<const char> buf, int flags) noexcept {
+            int sockfd, std::span<const char> buf, int flags
+        ) noexcept {
             sqe.prepareSend(sockfd, buf, flags);
         }
     };
 
     struct lazy_awaiter_connect : lazy_awaiter {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_awaiter_connect(
-            int sockfd, const sockaddr *addr, socklen_t addrlen) noexcept {
+            int sockfd, const sockaddr *addr, socklen_t addrlen
+        ) noexcept {
             sqe.prepareConnect(sockfd, addr, addrlen);
         }
     };
 
     struct lazy_awaiter_close : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_awaiter_close(
-            int fd) noexcept {
+        [[nodiscard("Did you forget to co_await?"
+        )]] inline lazy_awaiter_close(int fd) noexcept {
             sqe.prepareClose(fd);
         }
     };
 
     struct lazy_awaiter_shutdown : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_awaiter_shutdown(
-            int fd, int how) noexcept {
+        [[nodiscard("Did you forget to co_await?"
+        )]] inline lazy_awaiter_shutdown(int fd, int how) noexcept {
             sqe.prepareShutdown(fd, how);
         }
     };
 
     struct lazy_awaiter_fsync : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_awaiter_fsync(
-            int fd, uint32_t fsync_flags) noexcept {
+        [[nodiscard("Did you forget to co_await?"
+        )]] inline lazy_awaiter_fsync(int fd, uint32_t fsync_flags) noexcept {
             sqe.prepareFsync(fd, fsync_flags);
         }
     };
 
     struct lazy_awaiter_sync_file_range : lazy_awaiter {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_awaiter_sync_file_range(
-            int fd, uint32_t len, uint64_t offset, int flags) noexcept {
+            int fd, uint32_t len, uint64_t offset, int flags
+        ) noexcept {
             sqe.prepareSyncFileRange(fd, len, offset, flags);
         }
     };
 
     struct lazy_awaiter_timeout_timespec : lazy_awaiter {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_awaiter_timeout_timespec(
-            __kernel_timespec *ts,
-            unsigned int count,
-            unsigned int flags) noexcept {
+            __kernel_timespec *ts, unsigned int count, unsigned int flags
+        ) noexcept {
             sqe.prepareTimeout(ts, count, flags);
         }
     };
@@ -122,8 +132,8 @@ namespace detail {
 
         template<class Rep, class Period = std::ratio<1>>
         [[nodiscard("Did you forget to co_await?")]] inline lazy_awaiter_timeout(
-            std::chrono::duration<Rep, Period> duration,
-            unsigned int flags) noexcept {
+            std::chrono::duration<Rep, Period> duration, unsigned int flags
+        ) noexcept {
             using namespace std;
             using namespace std::literals;
             ts.tv_sec = duration / 1s;
@@ -220,9 +230,8 @@ inline namespace lazy {
      * @return lazy_awaiter
      */
     inline detail::lazy_awaiter_timeout_timespec timeout(
-        __kernel_timespec *ts,
-        unsigned int count,
-        unsigned int flags) noexcept {
+        __kernel_timespec *ts, unsigned int count, unsigned int flags
+    ) noexcept {
         return detail::lazy_awaiter_timeout_timespec{ts, count, flags};
     }
 
@@ -234,12 +243,14 @@ inline namespace lazy {
      */
     template<class Rep, class Period = std::ratio<1>>
     inline detail::lazy_awaiter_timeout timeout(
-        std::chrono::duration<Rep, Period> duration,
-        unsigned int flags = 0) noexcept {
+        std::chrono::duration<Rep, Period> duration, unsigned int flags = 0
+    ) noexcept {
         return detail::lazy_awaiter_timeout{duration, flags};
     }
 
-    inline lazy_awaiter_yield yield() noexcept { return {}; }
+    inline lazy_awaiter_yield yield() noexcept {
+        return {};
+    }
 
 } // namespace lazy
 

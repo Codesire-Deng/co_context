@@ -41,8 +41,7 @@ int main(int argc, char *argv[]) {
 
     io_context context{256};
 
-    for (int i = 0; i < concur; ++i)
-        context.co_spawn(gen_task());
+    for (int i = 0; i < concur; ++i) context.co_spawn(gen_task());
 
     context.run();
 

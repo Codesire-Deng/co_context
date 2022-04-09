@@ -97,13 +97,14 @@ bool inet_address::operator==(const inet_address &rhs) const noexcept {
         return addr6.sin6_port == rhs.addr6.sin6_port
                && memcmp(
                       &addr6.sin6_addr, &rhs.addr6.sin6_addr,
-                      sizeof(addr6.sin6_addr))
-                      == 0;
+                      sizeof(addr6.sin6_addr)
+                  ) == 0;
     }
 }
 
 bool inet_address::resolve(
-    std::string_view hostname, uint16_t port, inet_address &out) {
+    std::string_view hostname, uint16_t port, inet_address &out
+) {
     auto addrs = resolve_all(hostname, port, out);
 
     if (addrs.empty()) return false;
@@ -111,8 +112,8 @@ bool inet_address::resolve(
     return true;
 }
 
-std::vector<inet_address> inet_address::resolve_all(
-    std::string_view hostname, uint16_t port, inet_address &) {
+std::vector<inet_address> inet_address::
+    resolve_all(std::string_view hostname, uint16_t port, inet_address &) {
     std::vector<inet_address> ret;
     struct addrinfo *result = nullptr;
     int err = getaddrinfo(hostname.data(), nullptr, nullptr, &result);

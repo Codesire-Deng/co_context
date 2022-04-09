@@ -42,7 +42,6 @@ main_task run(size_t offset) {
         printf("All done\n");
         ::exit(0);
     }
-
 }
 
 int main(int argc, char *argv[]) {
@@ -69,7 +68,7 @@ int main(int argc, char *argv[]) {
             co_spawn(run(offset));
         }
         co_await eager::nop();
-    }()); 
+    }());
 
     context.run();
 

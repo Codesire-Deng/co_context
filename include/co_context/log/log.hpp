@@ -30,21 +30,25 @@ namespace log {
         if constexpr (config::log_level <= config::level::v)
             detail::log(fmt, args...);
     }
+
     template<typename... T>
     void i(const char *__restrict__ fmt, const T &...args) {
         if constexpr (config::log_level <= config::level::i)
             detail::log(fmt, args...);
     }
+
     template<typename... T>
     void d(const char *__restrict__ fmt, const T &...args) {
         if constexpr (config::log_level <= config::level::d)
             detail::log(fmt, args...);
     }
+
     template<typename... T>
     void w(const char *__restrict__ fmt, const T &...args) {
         if constexpr (config::log_level <= config::level::w)
             detail::log(fmt, args...);
     }
+
     template<typename... T>
     void e(const char *__restrict__ fmt, const T &...args) {
         if constexpr (config::log_level <= config::level::e)

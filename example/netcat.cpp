@@ -16,12 +16,13 @@
 
 int write_n(int fd, const void *buf, int length) {
     int written = 0;
-    // while (written < length) 
+    // while (written < length)
     {
         int nw = ::write(
-            fd, static_cast<const char *>(buf) + written, length - written);
+            fd, static_cast<const char *>(buf) + written, length - written
+        );
         // if (nw > 0) {
-            // written += nw;
+        // written += nw;
         // } else if (nw == 0) {
         //     break; // EOF
         // } else if (errno != EINTR) {
@@ -53,9 +54,9 @@ co_context::main_task run(co_context::socket peer) {
     // while ((nr = ::recv(peer.fd(), buf, 8192, 0)) > 0) {}
     while ((nr = co_await peer.recv(buf, 0)) > 0) {
         // co_await lazy::write(STDOUT_FILENO, {buf, (size_t)nr}, 0);
-        
-        // int nw = write_n(STDOUT_FILENO, buf, nr); // 将收到的字节全部打印到 stdout
-        // if (nw < nr) break;
+
+        // int nw = write_n(STDOUT_FILENO, buf, nr); // 将收到的字节全部打印到
+        // stdout if (nw < nr) break;
     }
     ::exit(0);
 }

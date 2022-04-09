@@ -15,7 +15,8 @@ bool counting_semaphore::try_acquire() noexcept {
     return old_counter > 0
            && counter.compare_exchange_strong(
                old_counter, old_counter - 1, std::memory_order_acquire,
-               std::memory_order_relaxed);
+               std::memory_order_relaxed
+           );
 }
 
 inline static void send_task(detail::task_info_ptr awaken_task) noexcept {
@@ -23,7 +24,8 @@ inline static void send_task(detail::task_info_ptr awaken_task) noexcept {
     auto *worker = this_thread.worker;
     assert(
         worker != nullptr
-        && "semaphore::release() must run inside an io_context");
+        && "semaphore::release() must run inside an io_context"
+    );
     worker->submit(awaken_task);
 }
 
@@ -54,7 +56,8 @@ std::coroutine_handle<> counting_semaphore::try_release() noexcept {
 }
 
 void counting_semaphore::acquire_awaiter::await_suspend(
-    std::coroutine_handle<> current) noexcept {
+    std::coroutine_handle<> current
+) noexcept {
     this->handle = current;
     log::d("suspending coro: %lx\n", this->handle.address());
     // acquire failed
@@ -62,7 +65,8 @@ void counting_semaphore::acquire_awaiter::await_suspend(
     do {
         this->next = old_head;
     } while (!sem.awaiting.compare_exchange_weak(
-        old_head, this, std::memory_order_release, std::memory_order_relaxed));
+        old_head, this, std::memory_order_release, std::memory_order_relaxed
+    ));
 }
 
 } // namespace co_context

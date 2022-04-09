@@ -22,7 +22,7 @@ alignas(512) char buf[threads][BLOCK_LEN];
 std::mt19937_64 rng(time(nullptr));
 
 void run(const uint32_t idx) {
-restart: 
+restart:
     const size_t off = (rng() % file_size) & ~(BLOCK_LEN - 1);
     (void)buf_idx.fetch_add(1);
     int nr = ::pread(file_fd, buf[idx], BLOCK_LEN, off);
@@ -66,6 +66,6 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < concur; ++i) { ths.emplace_back(run, i); }
 
     for (int i = 0; i < concur; ++i) { ths[i].join(); }
-  
+
     return 0;
 }

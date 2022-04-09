@@ -14,7 +14,8 @@ class counting_semaphore final {
 
     class [[nodiscard("Did you forget to co_await?")]] acquire_awaiter final {
       public:
-        explicit acquire_awaiter(counting_semaphore & sem) noexcept : sem(sem) {}
+        explicit acquire_awaiter(counting_semaphore & sem) noexcept : sem(sem) {
+        }
 
         bool await_ready() noexcept {
             T old_counter =
@@ -23,7 +24,8 @@ class counting_semaphore final {
         }
 
         void await_suspend(std::coroutine_handle<> current) noexcept;
-        void await_resume() const noexcept {}
+        void await_resume() const noexcept {
+        }
 
       private:
         counting_semaphore &sem;

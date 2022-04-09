@@ -14,14 +14,16 @@ bool mutex::try_lock() noexcept {
     auto desire = not_locked;
     return awaiting.compare_exchange_strong(
         desire, locked_no_awaiting, std::memory_order_acquire,
-        std::memory_order_relaxed);
+        std::memory_order_relaxed
+    );
 }
 
 inline static void send_task(detail::task_info_ptr awaken_task) noexcept {
     using namespace co_context::detail;
     auto *worker = this_thread.worker;
     assert(
-        worker != nullptr && "mutex::unlock() must run inside an io_context");
+        worker != nullptr && "mutex::unlock() must run inside an io_context"
+    );
     worker->submit(awaken_task);
 }
 
@@ -32,7 +34,8 @@ void mutex::unlock() noexcept {
         auto desire = locked_no_awaiting;
         if (awaiting.compare_exchange_strong(
                 desire, not_locked, std::memory_order_release,
-                std::memory_order_relaxed))
+                std::memory_order_relaxed
+            ))
             return; // no awaiting -> not locked & return
 
         // There must be something awaiting now.
@@ -62,7 +65,8 @@ bool mutex::lock_awaiter::register_awaiting() noexcept {
         if (old_state == mutex::not_locked) {
             if (mtx.awaiting.compare_exchange_weak(
                     old_state, mutex::locked_no_awaiting,
-                    std::memory_order_acquire, std::memory_order_relaxed)) {
+                    std::memory_order_acquire, std::memory_order_relaxed
+                )) {
                 return false; // lock succ, don't suspend.
             }
         } else {
@@ -70,7 +74,8 @@ bool mutex::lock_awaiter::register_awaiting() noexcept {
             this->next = reinterpret_cast<lock_awaiter *>(old_state);
             if (mtx.awaiting.compare_exchange_weak(
                     old_state, reinterpret_cast<uintptr_t>(this),
-                    std::memory_order_release, std::memory_order_relaxed)) {
+                    std::memory_order_release, std::memory_order_relaxed
+                )) {
                 return true; // wait for the mutex
             }
         }

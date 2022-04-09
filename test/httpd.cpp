@@ -94,7 +94,8 @@ int check_kernel_version() {
     }
     printf(
         "Minimum kernel version required is: %d.%d\n", MIN_KERNEL_VERSION,
-        MIN_MAJOR_VERSION);
+        MIN_MAJOR_VERSION
+    );
     if (ver[0] >= MIN_KERNEL_VERSION && ver[1] >= MIN_MAJOR_VERSION) {
         printf("Your kernel version is: %ld.%ld\n", ver[0], ver[1]);
         return 0;
@@ -109,7 +110,8 @@ void check_for_index_file() {
     if (ret < 0) {
         fprintf(
             stderr, "ZeroHTTPd needs the \"public\" directory to be "
-                    "present in the current directory.\n");
+                    "present in the current directory.\n"
+        );
         fatal_error("stat: public/index.html");
     }
 }
@@ -121,6 +123,7 @@ void check_for_index_file() {
 void strtolower(char *str) {
     for (; *str; ++str) *str = (char)tolower(*str);
 }
+
 /*
  * Helper function for cleaner looking code.
  * */
@@ -169,11 +172,13 @@ int setup_listening_socket(int port) {
 int add_accept_request(
     int server_socket,
     struct sockaddr_in *client_addr,
-    socklen_t *client_addr_len) {
+    socklen_t *client_addr_len
+) {
     auto &sqe = *ring.getSQEntry();
     sqe.prepareAccept(
         server_socket, reinterpret_cast<sockaddr *>(client_addr),
-        client_addr_len, 0);
+        client_addr_len, 0
+    );
 
     struct request *req = (request *)malloc(sizeof(*req));
     req->event_type = EVENT_TYPE_ACCEPT;
@@ -371,7 +376,8 @@ void handle_get_method(char *path, int client_socket) {
          * something else */
         if (S_ISREG(path_stat.st_mode)) {
             struct request *req = reinterpret_cast<request *>(
-                zh_malloc(sizeof(*req) + (sizeof(struct iovec) * 6)));
+                zh_malloc(sizeof(*req) + (sizeof(struct iovec) * 6))
+            );
             req->iovec_count = 6;
             req->client_socket = client_socket;
             send_headers(final_path, path_stat.st_size, req->iov);
@@ -422,7 +428,8 @@ int handle_client_request(struct request *req) {
     /* Get the first line, which will be the request */
     if (get_line(
             (const char *)req->iov[0].iov_base, http_request,
-            sizeof(http_request))) {
+            sizeof(http_request)
+        )) {
         fprintf(stderr, "Malformed request\n");
         exit(1);
     }
@@ -444,14 +451,16 @@ void server_loop(int server_socket) {
         if (cqe->getRes() < 0) {
             fprintf(
                 stderr, "Async request failed: %s for event: %d\n",
-                strerror(-cqe->getRes()), req->event_type);
+                strerror(-cqe->getRes()), req->event_type
+            );
             exit(1);
         }
 
         switch (req->event_type) {
             case EVENT_TYPE_ACCEPT:
                 add_accept_request(
-                    server_socket, &client_addr, &client_addr_len);
+                    server_socket, &client_addr, &client_addr_len
+                );
                 add_read_request(cqe->getRes());
                 free(req);
                 break;

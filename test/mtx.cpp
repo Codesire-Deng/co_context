@@ -11,17 +11,15 @@ int cnt = 0;
 
 main_task add() {
     co_await mtx.lock();
-    for (int i=0; i<1000000; ++i)
-        ++cnt;
+    for (int i = 0; i < 1000000; ++i) ++cnt;
     std::cout << cnt << std::endl;
     mtx.unlock();
-    
+
     co_await eager::nop();
 }
 
 int main() {
     io_context ctx{32};
-    for (int i=0; i<1000; ++i)
-        ctx.co_spawn(add());
+    for (int i = 0; i < 1000; ++i) ctx.co_spawn(add());
     ctx.run();
 }

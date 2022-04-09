@@ -5,16 +5,16 @@ namespace co_context {
 
 namespace detail {
 
-    void
-    cv_wait_awaiter::await_suspend(std::coroutine_handle<> current) noexcept {
+    void cv_wait_awaiter::await_suspend(std::coroutine_handle<> current
+    ) noexcept {
         this->lock_awaken_handle.register_coroutine(current);
 
         cv_wait_awaiter *old_head = cv.awaiting.load(std::memory_order_relaxed);
         do {
             this->next = old_head;
         } while (!cv.awaiting.compare_exchange_weak(
-            old_head, this, std::memory_order_release,
-            std::memory_order_relaxed));
+            old_head, this, std::memory_order_release, std::memory_order_relaxed
+        ));
 
         this->lock_awaken_handle.unlock_ahead();
     }
@@ -31,7 +31,7 @@ void condition_variable::to_resume_fetch_all() noexcept {
         awaiting.exchange(nullptr, std::memory_order_acquire);
 
     cv_wait_awaiter *fetch_head = nullptr;
-    cv_wait_awaiter * const fetch_tail = node;
+    cv_wait_awaiter *const fetch_tail = node;
 
     do {
         cv_wait_awaiter *tmp = node->next;

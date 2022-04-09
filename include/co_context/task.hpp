@@ -69,10 +69,8 @@ namespace detail {
         task_promise() noexcept : state(value_state::mono){};
 
         ~task_promise() {
-            // clang-format off
             switch (state) {
-                [[likely]]
-                case value_state::value:
+                [[likely]] case value_state::value:
                     value.~T();
                     break;
                 case value_state::exception:
@@ -81,7 +79,6 @@ namespace detail {
                 default:
                     break;
             }
-            // clang-format on
         };
 
         task<T> get_return_object() noexcept;
@@ -93,10 +90,11 @@ namespace detail {
 
         template<typename Value>
             requires std::convertible_to<Value &&, T>
-        void return_value(Value &&result) noexcept(
-            std::is_nothrow_constructible_v<T, Value &&>) {
+        void return_value(Value &&result
+        ) noexcept(std::is_nothrow_constructible_v<T, Value &&>) {
             std::construct_at(
-                std::addressof(value), std::forward<Value>(result));
+                std::addressof(value), std::forward<Value>(result)
+            );
         }
 
         // get the lvalue ref
@@ -201,9 +199,12 @@ class [[nodiscard("Did you forget to co_await?")]] task {
     task() noexcept = default;
 
     explicit task(std::coroutine_handle<promise_type> current) noexcept
-        : handle(current) {}
+        : handle(current) {
+    }
 
-    task(task && other) noexcept : handle(other) { other.handle = nullptr; }
+    task(task && other) noexcept : handle(other) {
+        other.handle = nullptr;
+    }
 
     // Ban copy
     task(const task &) = delete;
@@ -223,7 +224,9 @@ class [[nodiscard("Did you forget to co_await?")]] task {
         if (handle) handle.destroy();
     }
 
-    inline bool is_ready() const noexcept { return !handle || handle.done(); }
+    inline bool is_ready() const noexcept {
+        return !handle || handle.done();
+    }
 
     /**
      * @brief wait for the task to complete, and get the ref of the result
@@ -266,6 +269,7 @@ class [[nodiscard("Did you forget to co_await?")]] task {
     auto when_ready() const noexcept {
         struct awaiter : awaiter_base {
             using awaiter_base::awaiter_base;
+
             constexpr void await_resume() const noexcept {}
         };
 

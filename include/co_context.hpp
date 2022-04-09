@@ -34,6 +34,7 @@ namespace co_context {
 using config::cache_line_size;
 
 class io_context;
+
 // class eager_io;
 // class lazy_io;
 
@@ -54,8 +55,8 @@ class [[nodiscard]] io_context final {
   private:
     alignas(cache_line_size) uring ring;
     alignas(cache_line_size) detail::swap_zone<task_info_ptr> submit_swap;
-    alignas(
-        cache_line_size) detail::swap_zone<std::coroutine_handle<>> reap_swap;
+    alignas(cache_line_size
+    ) detail::swap_zone<std::coroutine_handle<>> reap_swap;
 
     // place main thread's high frequency data here
     detail::context_swap_cur s_cur;
@@ -81,7 +82,7 @@ class [[nodiscard]] io_context final {
     void forward_task(std::coroutine_handle<> handle) noexcept;
 
     void handle_semaphore_release(task_info_ptr sem_release) noexcept;
-    
+
     void handle_condition_variable_notify(task_info_ptr cv_notify) noexcept;
 
     bool try_submit(task_info_ptr task) noexcept;

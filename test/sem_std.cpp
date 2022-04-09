@@ -40,9 +40,11 @@ class alignas(128 /*std::hardware_destructive_interference_size*/) Guide {
         wait_on_sema = static_cast<unsigned>(
             std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::high_resolution_clock::now() - started_at
-                - delay * time_tick)
+                - delay * time_tick
+            )
                 .count()
-            / time_tick.count());
+            / time_tick.count()
+        );
         std::this_thread::sleep_for(occupy * time_tick);
     }
 

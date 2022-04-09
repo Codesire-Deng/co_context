@@ -78,11 +78,8 @@ class SQEntry : private io_uring_sqe {
     inline void *getPadding() noexcept { return __pad2; }
 
     inline SQEntry &prepareRW(
-        uint8_t op,
-        int fd,
-        const void *addr,
-        uint32_t len,
-        uint64_t offset) noexcept {
+        uint8_t op, int fd, const void *addr, uint32_t len, uint64_t offset
+    ) noexcept {
         this->opcode = op;
         this->flags = 0;
         this->ioprio = 0;
@@ -100,32 +97,32 @@ class SQEntry : private io_uring_sqe {
     }
 
     inline SQEntry &prepareReadv(
-        int fd, std::span<const iovec> iovecs, uint64_t offset) noexcept {
+        int fd, std::span<const iovec> iovecs, uint64_t offset
+    ) noexcept {
         return prepareRW(
-            IORING_OP_READV, fd, iovecs.data(), iovecs.size(), offset);
+            IORING_OP_READV, fd, iovecs.data(), iovecs.size(), offset
+        );
     }
 
     inline SQEntry &prepareReadFixed(
-        int fd,
-        std::span<char> buf,
-        uint64_t offset,
-        uint16_t bufIndex) noexcept {
+        int fd, std::span<char> buf, uint64_t offset, uint16_t bufIndex
+    ) noexcept {
         prepareRW(IORING_OP_READ_FIXED, fd, buf.data(), buf.size(), offset);
         this->buf_index = bufIndex;
         return *this;
     }
 
     inline SQEntry &prepareWritev(
-        int fd, std::span<const iovec> iovecs, uint64_t offset) noexcept {
+        int fd, std::span<const iovec> iovecs, uint64_t offset
+    ) noexcept {
         return prepareRW(
-            IORING_OP_WRITEV, fd, iovecs.data(), iovecs.size(), offset);
+            IORING_OP_WRITEV, fd, iovecs.data(), iovecs.size(), offset
+        );
     }
 
     inline SQEntry &prepareWriteFixed(
-        int fd,
-        std::span<char> buf,
-        uint64_t offset,
-        uint16_t bufIndex) noexcept {
+        int fd, std::span<char> buf, uint64_t offset, uint16_t bufIndex
+    ) noexcept {
         prepareRW(IORING_OP_WRITE_FIXED, fd, buf.data(), buf.size(), offset);
         this->buf_index = bufIndex;
         return *this;
@@ -160,7 +157,8 @@ class SQEntry : private io_uring_sqe {
     }
 
     inline SQEntry &prepareTimeout(
-        __kernel_timespec *ts, unsigned count, unsigned flags) noexcept {
+        __kernel_timespec *ts, unsigned count, unsigned flags
+    ) noexcept {
         prepareRW(IORING_OP_TIMEOUT, -1, ts, 1, count);
         this->timeout_flags = flags;
         return *this;
@@ -170,22 +168,26 @@ class SQEntry : private io_uring_sqe {
     prepareTimeoutRemove(uint64_t user_data, unsigned flags) noexcept {
         prepareRW(
             IORING_OP_TIMEOUT_REMOVE, -1, reinterpret_cast<void *>(user_data),
-            0, 0);
+            0, 0
+        );
         this->timeout_flags = flags;
         return *this;
     }
 
     inline SQEntry &prepareTimeoutUpdate(
-        __kernel_timespec *ts, uint64_t user_data, unsigned flags) noexcept {
+        __kernel_timespec *ts, uint64_t user_data, unsigned flags
+    ) noexcept {
         prepareRW(
             IORING_OP_TIMEOUT_REMOVE, -1, reinterpret_cast<void *>(user_data),
-            0, (uintptr_t)ts);
+            0, (uintptr_t)ts
+        );
         this->timeout_flags = flags | IORING_TIMEOUT_UPDATE;
         return *this;
     }
 
     inline SQEntry &prepareAccept(
-        int fd, sockaddr *addr, socklen_t *addrlen, int flags) noexcept {
+        int fd, sockaddr *addr, socklen_t *addrlen, int flags
+    ) noexcept {
         prepareRW(IORING_OP_ACCEPT, fd, addr, 0, (uint64_t)addrlen);
         this->accept_flags = (uint32_t)flags;
         return *this;
@@ -196,7 +198,8 @@ class SQEntry : private io_uring_sqe {
         sockaddr *addr,
         socklen_t *addrlen,
         int flags,
-        uint32_t fileIndex) noexcept {
+        uint32_t fileIndex
+    ) noexcept {
         prepareAccept(fd, addr, addrlen, flags);
         setTargetFixedFile(fileIndex);
         return *this;
@@ -236,7 +239,8 @@ class SQEntry : private io_uring_sqe {
     }
 
     inline SQEntry &prepareSyncFileRange(
-        int fd, uint32_t len, uint64_t offset, int flags) noexcept {
+        int fd, uint32_t len, uint64_t offset, int flags
+    ) noexcept {
         prepareRW(IORING_OP_SYNC_FILE_RANGE, fd, nullptr, len, offset);
         this->sync_range_flags = (uint32_t)flags;
         return *this;
@@ -251,7 +255,9 @@ class CQEntry : private io_uring_cqe {
   public:
     template<unsigned URingFlags>
     friend class ::liburingcxx::URing;
+
     inline uint64_t getData() const noexcept { return this->user_data; }
+
     inline int32_t getRes() const noexcept { return this->res; }
 };
 
@@ -427,7 +433,8 @@ class [[nodiscard]] URing final {
                 enterFlags |= IORING_ENTER_GETEVENTS;
 
             const int consumedNum = detail::__sys_io_uring_enter(
-                ring_fd, submitted, 0, enterFlags, NULL);
+                ring_fd, submitted, 0, enterFlags, NULL
+            );
 
             if (consumedNum < 0) [[unlikely]]
                 throw std::system_error{
@@ -451,7 +458,8 @@ class [[nodiscard]] URing final {
                 enterFlags |= IORING_ENTER_GETEVENTS;
 
             const int consumedNum = detail::__sys_io_uring_enter(
-                ring_fd, submitted, waitNum, enterFlags, NULL);
+                ring_fd, submitted, waitNum, enterFlags, NULL
+            );
 
             if (consumedNum < 0) [[unlikely]]
                 throw std::system_error{
@@ -502,7 +510,8 @@ class [[nodiscard]] URing final {
         SQEntry *sqe = nullptr;
         if (next - head <= *sq.kring_entries) {
             sqe = reinterpret_cast<SQEntry *>(
-                sq.sqes + (sq.sqe_tail & *sq.kring_mask));
+                sq.sqes + (sq.sqe_tail & *sq.kring_mask)
+            );
             sq.sqe_tail = next;
         }
         return sqe;
@@ -523,7 +532,8 @@ class [[nodiscard]] URing final {
         if constexpr (!(URingFlags & IORING_SETUP_SQPOLL)) return 0;
         if (SQSpaceLeft()) return 0;
         const int result = detail::__sys_io_uring_enter(
-            ring_fd, 0, 0, IORING_ENTER_SQ_WAIT, nullptr);
+            ring_fd, 0, 0, IORING_ENTER_SQ_WAIT, nullptr
+        );
         if (result < 0)
             throw std::system_error{
                 errno, std::system_category(),
@@ -599,7 +609,8 @@ class [[nodiscard]] URing final {
 
         sq.ring_ptr = mmap(
             nullptr, sq.ring_sz, PROT_READ | PROT_WRITE,
-            MAP_SHARED | MAP_POPULATE, fd, IORING_OFF_SQ_RING);
+            MAP_SHARED | MAP_POPULATE, fd, IORING_OFF_SQ_RING
+        );
         if (sq.ring_ptr == MAP_FAILED) [[unlikely]]
             throw std::system_error{
                 errno, std::system_category(), "sq.ring MAP_FAILED"};
@@ -609,7 +620,8 @@ class [[nodiscard]] URing final {
         } else {
             cq.ring_ptr = mmap(
                 nullptr, cq.ring_sz, PROT_READ | PROT_WRITE,
-                MAP_SHARED | MAP_POPULATE, fd, IORING_OFF_CQ_RING);
+                MAP_SHARED | MAP_POPULATE, fd, IORING_OFF_CQ_RING
+            );
             if (cq.ring_ptr == MAP_FAILED) [[unlikely]] {
                 // don't forget to clean up sq
                 cq.ring_ptr = nullptr;
@@ -624,7 +636,8 @@ class [[nodiscard]] URing final {
         const size_t sqes_size = p.sq_entries * sizeof(io_uring_sqe);
         sq.sqes = reinterpret_cast<io_uring_sqe *>(mmap(
             0, sqes_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE, fd,
-            IORING_OFF_SQES));
+            IORING_OFF_SQES
+        ));
         if (sq.sqes == MAP_FAILED) [[unlikely]] {
             unmapRings();
             throw std::system_error{
@@ -666,6 +679,7 @@ class [[nodiscard]] URing final {
             CQEntry *cqe;
             unsigned availableNum;
         } ret;
+
         const unsigned mask = *cq.kring_mask;
 
         while (true) {
@@ -721,7 +735,8 @@ class [[nodiscard]] URing final {
 
             const int result = detail::__sys_io_uring_enter2(
                 ring_fd, data.submit, data.waitNum, flags, (sigset_t *)data.arg,
-                data.size);
+                data.size
+            );
 
             if (result < 0)
                 // TODO Reconsider whether to use exceptions

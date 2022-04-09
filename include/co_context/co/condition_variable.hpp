@@ -18,9 +18,12 @@ namespace detail {
         using mutex = co_context::mutex;
 
         explicit cv_wait_awaiter(condition_variable & cv, mutex & mtx) noexcept
-            : lock_awaken_handle(mtx.lock()), cv(cv), next(nullptr) {}
+            : lock_awaken_handle(mtx.lock()), cv(cv), next(nullptr) {
+        }
 
-        constexpr bool await_ready() const noexcept { return false; }
+        constexpr bool await_ready() const noexcept {
+            return false;
+        }
 
         void await_suspend(std::coroutine_handle<> current) noexcept;
 
@@ -28,7 +31,8 @@ namespace detail {
          * @detail the lock must be held, when io_context resume me.
          * @detail io_context will call mutex::lock_awaiter::register_awaiting
          **/
-        constexpr void await_resume() const noexcept {}
+        constexpr void await_resume() const noexcept {
+        }
 
       private:
         mutex::lock_awaiter lock_awaken_handle;
@@ -102,7 +106,8 @@ inline void condition_variable::send_task() noexcept {
     auto *worker = this_thread.worker;
     assert(
         worker != nullptr
-        && "condition_variable::send_task() must run inside an io_context");
+        && "condition_variable::send_task() must run inside an io_context"
+    );
     log::d("condition_variable %lx notified\n", this);
     worker->submit(&notify_task);
 }
