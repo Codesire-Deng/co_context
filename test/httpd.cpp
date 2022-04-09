@@ -9,7 +9,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/utsname.h>
-#include "uring.hpp"
+#include "uring/uring.hpp"
 
 #define SERVER_STRING       "Server: zerohttpd/0.1\r\n"
 #define DEFAULT_SERVER_PORT 8000
