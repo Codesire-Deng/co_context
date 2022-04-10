@@ -1,4 +1,4 @@
-// #include <mimalloc-2.0/mimalloc-new-delete.h>
+#include <mimalloc-2.0/mimalloc-new-delete.h>
 #include "co_context/io_context.hpp"
 #include "co_context/utility/set_cpu_affinity.hpp"
 #include "co_context/co/semaphore.hpp"
