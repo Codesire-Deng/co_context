@@ -24,7 +24,7 @@
 #include <queue>
 #include "uring/uring.hpp"
 #include "co_context/config.hpp"
-#include "co_context/task_info.hpp"
+#include "co_context/detail/task_info.hpp"
 #include "co_context/main_task.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/detail/worker_meta.hpp"

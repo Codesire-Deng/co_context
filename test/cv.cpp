@@ -48,6 +48,7 @@ main_task main_thread() {
     cv.notify_one(); // fake notify
 
     char s[4];
+    printf("input a char to continue:");
     scanf("%s", s);
     m.unlock();
     cv.notify_one(); // real notify

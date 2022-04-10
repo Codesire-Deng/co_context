@@ -3,7 +3,7 @@
 #include <coroutine>
 #include <exception>
 #include <atomic>
-#include "task_info.hpp"
+#include "co_context/detail/task_info.hpp"
 #include "co_context/log/log.hpp"
 
 namespace co_context {

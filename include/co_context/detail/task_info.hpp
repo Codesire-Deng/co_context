@@ -1,6 +1,7 @@
 #pragma once
 #include <coroutine>
 #include "co_context/config.hpp"
+
 #include "co_context/log/log.hpp"
 
 namespace liburingcxx {
@@ -25,25 +26,29 @@ namespace detail {
 
     struct [[nodiscard]] task_info {
         union {
-            SQEntry *sqe;
-            CQEntry *cqe;
-            int32_t result;
-            counting_semaphore *sem;
-            condition_variable *cv;
+            std::coroutine_handle<> handle;
+            config::semaphore_counting_t update;
+            config::condition_variable_counting_t notify_counter;
         };
 
         union {
-            std::coroutine_handle<> handle;
-            config::semaphore_counting_type update;
-            config::condition_variable_counting_type notify_counter;
+            // SQEntry *sqe;
+            // CQEntry *cqe;
+            int32_t result;
+            // counting_semaphore *sem;
+            // condition_variable *cv;
         };
 
-        config::tid_t tid_hint;
+        union {
+            config::tid_t tid_hint;
+            config::eager_io_state_t eager_io_state; // for eager_io
+        };
 
         enum class task_type : uint8_t {
-            sqe,
-            cqe,
-            result,
+            lazy_sqe,
+            eager_sqe,
+            // cqe,
+            // result,
             co_spawn,
             semaphore_release,
             condition_variable_notify,
@@ -54,6 +59,10 @@ namespace detail {
 
         constexpr task_info(task_type type) noexcept : type(type) {
             log::v("task_info generated\n");
+        }
+
+        uint64_t as_user_data() const noexcept {
+            return static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
         }
     };
 

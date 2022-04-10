@@ -2,7 +2,7 @@
 
 #include <coroutine>
 #include <atomic>
-#include "co_context/task_info.hpp"
+#include "co_context/detail/task_info.hpp"
 #include <cassert>
 
 namespace co_context {

@@ -176,6 +176,26 @@ TODO: 改用原子变量，弃用检查队列
    2. 若协程为「初始状态」或者「IO 后状态」，不管它。
    3. 若协程为「待销毁」，销毁它，弹出检查队列。
 
+xxx <-> is_detached is_waiting is_ready
+
+manager:
+
+- ready: xx0 to xx1
+  - 1x1 : manager delete task_info, do not resume.
+  - 001 : worker will delete task_info, do not resume.
+  - 011 : worker will delete task_info, resume
+
+worker:
+
+- wait: x0x to x1x
+  - 11x : wait after detached, logic error
+  - 010 : suspend, worker will delete task_info
+  - 011 : do not suspend, worker will delete task_info
+- detach: 0xx to 1xx
+  - 1x1 : worker will delete task_info
+  - 100 : manager will delete task_info
+  - 110 : detach after waited, logic error
+
 此实现中可能的漏洞：
 
 1. 未反省协程发生异常时的内存模型

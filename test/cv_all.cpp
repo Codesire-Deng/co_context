@@ -8,6 +8,7 @@
 #include "co_context/co/condition_variable.hpp"
 #include "co_context/io_context.hpp"
 #include "co_context/task.hpp"
+#include "co_context/eager_io.hpp"
 
 co_context::condition_variable cv;
 co_context::mutex cv_m; // This mutex is used for three purposes:

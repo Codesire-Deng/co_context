@@ -8,6 +8,7 @@
 #include "co_context/co/semaphore.hpp"
 #include "co_context/io_context.hpp"
 #include "co_context/task.hpp"
+#include "co_context/lazy_io.hpp"
 
 using namespace co_context;
 using namespace std::literals;
@@ -36,9 +37,12 @@ class alignas(128 /*std::hardware_destructive_interference_size*/) Guide {
         started_at = std::chrono::high_resolution_clock::now();
     }
 
-    void initial_delay() { std::this_thread::sleep_for(delay * time_tick); }
+    task<void> initial_delay() {
+        co_await timeout(delay * time_tick);
+        // std::this_thread::sleep_for(delay * time_tick);
+    }
 
-    void occupy_sema() {
+    task<void> occupy_sema() {
         wait_on_sema = static_cast<unsigned>(
             std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::high_resolution_clock::now() - started_at
@@ -47,7 +51,8 @@ class alignas(128 /*std::hardware_destructive_interference_size*/) Guide {
                 .count()
             / time_tick.count()
         );
-        std::this_thread::sleep_for(occupy * time_tick);
+        co_await timeout(occupy * time_tick);
+        // std::this_thread::sleep_for(occupy * time_tick);
     }
 
     task<void> visualize(unsigned id, unsigned x_scale = 2) const {
@@ -75,9 +80,9 @@ class alignas(128 /*std::hardware_destructive_interference_size*/) Guide {
 std::array<Guide, max_threads> guides;
 
 main_task workerThread(unsigned id) {
-    guides[id].initial_delay(); // emulate some work before sema acquisition
+    co_await guides[id].initial_delay(); // emulate some work before sema acquisition
     co_await sem.acquire();     // wait until a free sema slot is available
-    guides[id].occupy_sema();   // emulate some work while sema is acquired
+    co_await guides[id].occupy_sema();   // emulate some work while sema is acquired
     sem.release();
     co_await guides[id].visualize(id);
 }

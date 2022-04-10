@@ -9,4 +9,4 @@ file(GLOB_RECURSE sources CONFIGURE_DEPENDS *.cpp)
 add_library(co_context OBJECT ${sources})
 # add_library(co_context STATIC  co_context.cpp lazy_io.cpp )
 
-target_link_libraries(co_context PUBLIC mimalloc)
+# target_link_libraries(co_context PUBLIC mimalloc)

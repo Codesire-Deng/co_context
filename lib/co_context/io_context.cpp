@@ -1,8 +1,9 @@
-#include <mimalloc-2.0/mimalloc-new-delete.h>
+// #include <mimalloc-2.0/mimalloc-new-delete.h>
 #include "co_context/io_context.hpp"
 #include "co_context/utility/set_cpu_affinity.hpp"
 #include "co_context/co/semaphore.hpp"
 #include "co_context/co/condition_variable.hpp"
+#include "co_context/detail/eager_io_state.hpp"
 #include <atomic>
 
 // fold level = 3 (ctrl+a, ctrl+k, ctrl+3 in vscode)
@@ -121,8 +122,16 @@ void io_context::forward_task(std::coroutine_handle<> handle) noexcept {
     }
 }
 
+} // namespace co_context
+
+#include "co_context/detail/sqe_task_meta.hpp"
+#include "co_context/detail/cv_task_meta.hpp"
+#include "co_context/detail/sem_task_meta.hpp"
+
+namespace co_context {
+
 void io_context::handle_semaphore_release(task_info_ptr sem_release) noexcept {
-    counting_semaphore &sem = *sem_release->sem;
+    counting_semaphore &sem = *detail::as_counting_semaphore(sem_release);
     const counting_semaphore::T update =
         as_atomic(sem_release->update).exchange(0, std::memory_order_relaxed);
     if (update == 0) [[unlikely]]
@@ -144,7 +153,7 @@ void io_context::handle_semaphore_release(task_info_ptr sem_release) noexcept {
 
 void io_context::handle_condition_variable_notify(task_info_ptr cv_notify
 ) noexcept {
-    condition_variable &cv = *cv_notify->cv;
+    condition_variable &cv = *detail::as_condition_variable(cv_notify);
     const condition_variable::T notify_counter =
         as_atomic(cv_notify->notify_counter)
             .exchange(0, std::memory_order_relaxed);
@@ -175,34 +184,39 @@ void io_context::handle_condition_variable_notify(task_info_ptr cv_notify
 
 bool io_context::try_submit(task_info_ptr task) noexcept {
     liburingcxx::SQEntry *sqe;
-    using kind = task_info::task_type;
+    using task_type = task_info::task_type;
 
     switch (task->type) {
-        case kind::co_spawn:
-            forward_task(task->handle);
-            return true;
-
-        case kind::semaphore_release:
-            handle_semaphore_release(task);
-            return true;
-
-        case kind::condition_variable_notify:
-            handle_condition_variable_notify(task);
-            return true;
-
         // submit to ring
-        default:
+        case task_type::lazy_sqe:
+        case task_type::eager_sqe:
             if (ring.SQSpaceLeft() == 0) [[unlikely]] {
                 log::d("ctx try_submit failed SQfull\n");
                 return false; // SQRing is full
             }
             sqe = ring.getSQEntry();
-            sqe->cloneFrom(*task->sqe);
+            assert(sqe != nullptr);
+            sqe->cloneFrom(detail::as_sqe_task_meta(task)->sqe);
             ring.submit();
-
             log::v("ctx submit to ring\n");
-
             return true;
+
+        case task_type::co_spawn:
+            forward_task(task->handle);
+            return true;
+
+        case task_type::semaphore_release:
+            handle_semaphore_release(task);
+            return true;
+
+        case task_type::condition_variable_notify:
+            handle_condition_variable_notify(task);
+            return true;
+
+        default:
+            log::e("task->type==%u\n", task->type);
+            assert(false && "try_submit(): unknown task_type");
+            return false;
     }
 }
 
@@ -258,6 +272,17 @@ bool io_context::try_reap(std::coroutine_handle<> handle) noexcept {
     return true;
 }
 
+static bool eager_io_need_awake(detail::task_info_ptr io_info) {
+    using io_state_t = eager::io_state_t;
+    const io_state_t old_state =
+        as_atomic(io_info->eager_io_state)
+            // .fetch_or(eager::io_ready, std::memory_order_seq_cst);
+            .fetch_or(eager::io_ready, std::memory_order_release);
+    if (old_state & eager::io_detached)
+        delete detail::as_sqe_task_meta(io_info);
+    return old_state & eager::io_wait;
+}
+
 /**
  * @brief poll the completion swap zone
  * @return if load exists and capacity of reap_swap might be healthy
@@ -273,6 +298,27 @@ bool io_context::poll_completion() noexcept {
         reinterpret_cast<task_info_ptr>(polling_cqe->getData());
     io_info->result = polling_cqe->getRes();
     ring.SeenCQEntry(polling_cqe);
+
+    using task_type = task_info::task_type;
+
+    switch (io_info->type) {
+        case task_type::lazy_sqe:
+            [[fallthrough]];
+        case task_type::co_spawn:
+            break;
+
+        case task_type::eager_sqe:
+            if (eager_io_need_awake(io_info)) [[likely]] {
+                break;
+            } else {
+                return true;
+            }
+
+        default:
+            log::e("io_info->type==%u\n", io_info->type);
+            assert(false && "poll_completion(): unknown task_type");
+            break;
+    }
 
     if (try_reap(io_info->handle)) [[likely]] {
         return true;
@@ -350,20 +396,22 @@ void io_context::co_spawn(main_task entrance) {
     log::v("ctx make_thread_pool end\n");
 
     while (!will_stop) [[likely]] {
-            // log::v("ctx polling\n");
+            log::v("ctx polling\n");
             if (try_clear_submit_overflow_buf()) {
                 for (uint8_t i = 0; i < config::submit_poll_rounds; ++i) {
+                    log::v("ctx poll_submission\n");
                     if (!poll_submission()) break;
                 }
             }
 
             if (try_clear_reap_overflow_buf()) {
                 for (uint8_t i = 0; i < config::reap_poll_rounds; ++i) {
+                    log::v("ctx poll_completion\n");
                     if (!poll_completion()) break;
                 }
             }
 
-            // std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            // std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
 
     this->stop();

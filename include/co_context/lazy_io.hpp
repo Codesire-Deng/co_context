@@ -1,6 +1,9 @@
 #pragma once
 
-#include "co_context/io_context.hpp"
+#include "uring/uring.hpp"
+#include "co_context/detail/thread_meta.hpp"
+#include "co_context/detail/worker_meta.hpp"
+#include "co_context/detail/sqe_task_meta.hpp"
 #include <cassert>
 #include <span>
 #include <chrono>
@@ -9,29 +12,29 @@ namespace co_context {
 
 namespace detail {
 
-    struct [[nodiscard("Did you forget to co_await?")]] lazy_awaiter {
-        liburingcxx::SQEntry sqe;
-        task_info io_info;
-
+    class [[nodiscard("Did you forget to co_await?")]] lazy_awaiter {
+      public:
         constexpr bool await_ready() const noexcept {
             return false;
         }
 
         // std::coroutine_handle<>
         void await_suspend(std::coroutine_handle<> current) noexcept {
-            io_info.handle = current;
-            worker_meta *worker = detail::this_thread.worker;
-            worker->submit(&io_info);
+            meta.io_info.handle = current;
+            worker_meta *const worker = detail::this_thread.worker;
+            worker->submit(&meta.io_info);
         }
 
         int32_t await_resume() const noexcept {
-            return io_info.result;
+            return meta.io_info.result;
         }
 
-        lazy_awaiter() noexcept : io_info(task_info::task_type::sqe) {
-            sqe.setData(reinterpret_cast<uint64_t>(&io_info));
-            io_info.tid_hint = detail::this_thread.tid;
-            io_info.sqe = &sqe;
+      protected:
+        sqe_task_meta meta;
+
+        lazy_awaiter() noexcept : meta(task_info::task_type::lazy_sqe) {
+            meta.io_info.tid_hint = detail::this_thread.tid;
+            // io_info.sqe = std::addressof(sqe);
         }
 
 #ifndef __INTELLISENSE__
@@ -46,7 +49,7 @@ namespace detail {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_read(
             int fd, std::span<char> buf, uint64_t offset
         ) noexcept {
-            sqe.prepareRead(fd, buf, offset);
+            meta.sqe.prepareRead(fd, buf, offset);
         }
     };
 
@@ -54,7 +57,7 @@ namespace detail {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_readv(
             int fd, std::span<const iovec> iovecs, uint64_t offset
         ) noexcept {
-            sqe.prepareReadv(fd, iovecs, offset);
+            meta.sqe.prepareReadv(fd, iovecs, offset);
         }
     };
 
@@ -62,7 +65,7 @@ namespace detail {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_read_fixed(
             int fd, std::span<char> buf, uint64_t offset, uint16_t bufIndex
         ) noexcept {
-            sqe.prepareReadFixed(fd, buf, offset, bufIndex);
+            meta.sqe.prepareReadFixed(fd, buf, offset, bufIndex);
         }
     };
 
@@ -70,7 +73,7 @@ namespace detail {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_write(
             int fd, std::span<const char> buf, uint64_t offset
         ) noexcept {
-            sqe.prepareWrite(fd, buf, offset);
+            meta.sqe.prepareWrite(fd, buf, offset);
         }
     };
 
@@ -78,7 +81,7 @@ namespace detail {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_writev(
             int fd, std::span<const iovec> iovecs, uint64_t offset
         ) noexcept {
-            sqe.prepareWritev(fd, iovecs, offset);
+            meta.sqe.prepareWritev(fd, iovecs, offset);
         }
     };
 
@@ -89,7 +92,7 @@ namespace detail {
             uint64_t offset,
             uint16_t bufIndex
         ) noexcept {
-            sqe.prepareWriteFixed(fd, buf, offset, bufIndex);
+            meta.sqe.prepareWriteFixed(fd, buf, offset, bufIndex);
         }
     };
 
@@ -97,7 +100,7 @@ namespace detail {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_accept(
             int fd, sockaddr *addr, socklen_t *addrlen, int flags
         ) noexcept {
-            sqe.prepareAccept(fd, addr, addrlen, flags);
+            meta.sqe.prepareAccept(fd, addr, addrlen, flags);
         }
     };
 
@@ -109,7 +112,7 @@ namespace detail {
             int flags,
             uint32_t fileIndex
         ) noexcept {
-            sqe.prepareAcceptDirect(fd, addr, addrlen, flags, fileIndex);
+            meta.sqe.prepareAcceptDirect(fd, addr, addrlen, flags, fileIndex);
         }
     };
 
@@ -117,7 +120,7 @@ namespace detail {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_recv(
             int sockfd, std::span<char> buf, int flags
         ) noexcept {
-            sqe.prepareRecv(sockfd, buf, flags);
+            meta.sqe.prepareRecv(sockfd, buf, flags);
         }
     };
 
@@ -125,7 +128,7 @@ namespace detail {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_recvmsg(
             int fd, msghdr *msg, unsigned int flags
         ) noexcept {
-            sqe.prepareRecvmsg(fd, msg, flags);
+            meta.sqe.prepareRecvmsg(fd, msg, flags);
         }
     };
 
@@ -133,7 +136,7 @@ namespace detail {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_send(
             int sockfd, std::span<const char> buf, int flags
         ) noexcept {
-            sqe.prepareSend(sockfd, buf, flags);
+            meta.sqe.prepareSend(sockfd, buf, flags);
         }
     };
 
@@ -141,7 +144,7 @@ namespace detail {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_sendmsg(
             int fd, const msghdr *msg, unsigned int flags
         ) noexcept {
-            sqe.prepareSendmsg(fd, msg, flags);
+            meta.sqe.prepareSendmsg(fd, msg, flags);
         }
     };
 
@@ -149,28 +152,28 @@ namespace detail {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_connect(
             int sockfd, const sockaddr *addr, socklen_t addrlen
         ) noexcept {
-            sqe.prepareConnect(sockfd, addr, addrlen);
+            meta.sqe.prepareConnect(sockfd, addr, addrlen);
         }
     };
 
     struct lazy_close : lazy_awaiter {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_close(int fd
         ) noexcept {
-            sqe.prepareClose(fd);
+            meta.sqe.prepareClose(fd);
         }
     };
 
     struct lazy_shutdown : lazy_awaiter {
         [[nodiscard("Did you forget to co_await?"
         )]] inline lazy_shutdown(int fd, int how) noexcept {
-            sqe.prepareShutdown(fd, how);
+            meta.sqe.prepareShutdown(fd, how);
         }
     };
 
     struct lazy_fsync : lazy_awaiter {
         [[nodiscard("Did you forget to co_await?"
         )]] inline lazy_fsync(int fd, uint32_t fsync_flags) noexcept {
-            sqe.prepareFsync(fd, fsync_flags);
+            meta.sqe.prepareFsync(fd, fsync_flags);
         }
     };
 
@@ -178,21 +181,21 @@ namespace detail {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_sync_file_range(
             int fd, uint32_t len, uint64_t offset, int flags
         ) noexcept {
-            sqe.prepareSyncFileRange(fd, len, offset, flags);
+            meta.sqe.prepareSyncFileRange(fd, len, offset, flags);
         }
     };
 
     struct lazy_uring_nop : lazy_awaiter {
         [[nodiscard("Did you forget to co_await?"
         )]] inline lazy_uring_nop() noexcept {
-            sqe.prepareNop();
+            meta.sqe.prepareNop();
         }
     };
 
     struct lazy_files_update : lazy_awaiter {
         [[nodiscard("Did you forget to co_await?"
         )]] inline lazy_files_update(std::span<int> fds, int offset) noexcept {
-            sqe.prepareFilesUpdate(fds, offset);
+            meta.sqe.prepareFilesUpdate(fds, offset);
         }
     };
 
@@ -200,7 +203,7 @@ namespace detail {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_fallocate(
             int fd, int mode, off_t offset, off_t len
         ) noexcept {
-            sqe.prepareFallocate(fd, mode, offset, len);
+            meta.sqe.prepareFallocate(fd, mode, offset, len);
         }
     };
 
@@ -208,7 +211,7 @@ namespace detail {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_openat(
             int dfd, const char *path, int flags, mode_t mode
         ) noexcept {
-            sqe.prepareOpenat(dfd, path, flags, mode);
+            meta.sqe.prepareOpenat(dfd, path, flags, mode);
         }
     };
 
@@ -221,7 +224,7 @@ namespace detail {
             mode_t mode,
             unsigned file_index
         ) noexcept {
-            sqe.prepareOpenatDirect(dfd, path, flags, mode, file_index);
+            meta.sqe.prepareOpenatDirect(dfd, path, flags, mode, file_index);
         }
     };
 
@@ -229,7 +232,7 @@ namespace detail {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_openat2(
             int dfd, const char *path, open_how *how
         ) noexcept {
-            sqe.prepareOpenat2(dfd, path, how);
+            meta.sqe.prepareOpenat2(dfd, path, how);
         }
     };
 
@@ -238,15 +241,7 @@ namespace detail {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_openat2_direct(
             int dfd, const char *path, open_how *how, unsigned int file_index
         ) noexcept {
-            sqe.prepareOpenat2Direct(dfd, path, how, file_index);
-        }
-    };
-
-    struct lazy_timeout_timespec : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_timeout_timespec(
-            __kernel_timespec *ts, unsigned int count, unsigned int flags
-        ) noexcept {
-            sqe.prepareTimeout(ts, count, flags);
+            meta.sqe.prepareOpenat2Direct(dfd, path, how, file_index);
         }
     };
 
@@ -258,7 +253,7 @@ namespace detail {
             unsigned int mask,
             struct statx *statxbuf
         ) noexcept {
-            sqe.prepareStatx(dfd, path, flags, mask, statxbuf);
+            meta.sqe.prepareStatx(dfd, path, flags, mask, statxbuf);
         }
     };
 
@@ -266,7 +261,7 @@ namespace detail {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_unlinkat(
             int dfd, const char *path, int flags
         ) noexcept {
-            sqe.prepareUnlinkat(dfd, path, flags);
+            meta.sqe.prepareUnlinkat(dfd, path, flags);
         }
     };
 
@@ -278,7 +273,7 @@ namespace detail {
             const char *newpath,
             int flags
         ) noexcept {
-            sqe.prepareRenameat(olddfd, oldpath, newdfd, newpath, flags);
+            meta.sqe.prepareRenameat(olddfd, oldpath, newdfd, newpath, flags);
         }
     };
 
@@ -286,7 +281,7 @@ namespace detail {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_mkdirat(
             int dfd, const char *path, mode_t mode
         ) noexcept {
-            sqe.prepareMkdirat(dfd, path, mode);
+            meta.sqe.prepareMkdirat(dfd, path, mode);
         }
     };
 
@@ -294,7 +289,7 @@ namespace detail {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_symlinkat(
             const char *target, int newdirfd, const char *linkpath
         ) noexcept {
-            sqe.prepareSymlinkat(target, newdirfd, linkpath);
+            meta.sqe.prepareSymlinkat(target, newdirfd, linkpath);
         }
     };
 
@@ -306,7 +301,15 @@ namespace detail {
             const char *newpath,
             int flags
         ) noexcept {
-            sqe.prepareLinkat(olddfd, oldpath, newdfd, newpath, flags);
+            meta.sqe.prepareLinkat(olddfd, oldpath, newdfd, newpath, flags);
+        }
+    };
+
+    struct lazy_timeout_timespec : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_timeout_timespec(
+            __kernel_timespec *ts, unsigned int count, unsigned int flags
+        ) noexcept {
+            meta.sqe.prepareTimeout(ts, count, flags);
         }
     };
 
@@ -324,7 +327,7 @@ namespace detail {
             ts.tv_nsec =
                 duration_cast<chrono::duration<long long, std::nano>>(duration)
                     .count();
-            sqe.prepareTimeout(&ts, 0, flags);
+            meta.sqe.prepareTimeout(&ts, 0, flags);
         }
     };
 
@@ -357,7 +360,7 @@ namespace detail {
             unsigned int nbytes,
             unsigned int splice_flags
         ) noexcept {
-            sqe.prepareSplice(
+            meta.sqe.prepareSplice(
                 fd_in, off_in, fd_out, off_out, nbytes, splice_flags
             );
         }
@@ -370,13 +373,17 @@ namespace detail {
             unsigned int nbytes,
             unsigned int splice_flags
         ) noexcept {
-            sqe.prepareTee(fd_in, fd_out, nbytes, splice_flags);
+            meta.sqe.prepareTee(fd_in, fd_out, nbytes, splice_flags);
         }
     };
 
 } // namespace detail
 
 inline namespace lazy {
+
+    inline detail::lazy_yield yield() noexcept {
+        return {};
+    }
 
     inline detail::lazy_read
     read(int fd, std::span<char> buf, uint64_t offset) noexcept {
@@ -578,10 +585,6 @@ inline namespace lazy {
         std::chrono::duration<Rep, Period> duration, unsigned int flags = 0
     ) noexcept {
         return detail::lazy_timeout{duration, flags};
-    }
-
-    inline detail::lazy_yield yield() noexcept {
-        return {};
     }
 
     /**

@@ -9,6 +9,15 @@ if (NOT CMAKE_BUILD_TYPE)
     message("Setting default build type to Release")
 endif()
 
+if (${CMAKE_BUILD_TYPE} MATCHES Debug)
+    message("Enable -fsanitize for gcc")
+    set(CMAKE_CXX_FLAGS "-fsanitize=undefined,address,leak -fno-omit-frame-pointer")
+else()
+    message(${CMAKE_BUILD_TYPE})
+    message("Disable -fsanitize for gcc")
+endif()
+
+
 project(co_context VERSION 0.2.0 LANGUAGES C CXX)
 
 include_directories(${PROJECT_SOURCE_DIR}/include)

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <type_traits>
-#include "co_context/task_info.hpp"
+#include "co_context/detail/task_info.hpp"
 #include "co_context/utility/as_atomic.hpp"
 
 namespace co_context {
@@ -9,7 +9,7 @@ namespace co_context {
 class counting_semaphore final {
   private:
     using task_info = detail::task_info;
-    using T = config::semaphore_counting_type;
+    using T = config::semaphore_counting_t;
     static_assert(std::is_integral_v<T>);
 
     class [[nodiscard("Did you forget to co_await?")]] acquire_awaiter final {
@@ -41,7 +41,7 @@ class counting_semaphore final {
         , awaiting(nullptr)
         , to_resume(nullptr)
         , awaken_task(task_info::task_type::semaphore_release) {
-        awaken_task.sem = this;
+        // awaken_task.sem = this; // deprecated
         as_atomic(awaken_task.update).store(0, std::memory_order_relaxed);
     }
 
@@ -68,6 +68,11 @@ class counting_semaphore final {
     std::atomic<T> counter;
 
     task_info awaken_task;
+
+  public:
+    static consteval auto __task_offset() noexcept {
+        return offsetof(counting_semaphore, awaken_task);
+    }
 };
 
 } // namespace co_context
