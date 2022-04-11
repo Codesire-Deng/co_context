@@ -27,7 +27,6 @@ namespace detail {
             shared_meta->io_info.handle = current;
             const io_state_t old_state =
                 as_atomic(shared_meta->io_info.eager_io_state)
-                    // .fetch_or(io_wait, std::memory_order_seq_cst);
                     .fetch_or(io_wait, std::memory_order_acq_rel);
             assert(
                 !(old_state & io_detached) && "logic error: wait after detached"
@@ -49,7 +48,6 @@ namespace detail {
             using namespace ::co_context::eager;
             const io_state_t old_state =
                 as_atomic(shared_meta->io_info.eager_io_state)
-                    // .fetch_or(io_detached, std::memory_order_seq_cst);
                     .fetch_or(io_detached, std::memory_order_relaxed);
             assert(
                 !(old_state & io_wait) && "logic error: detach after waited"
@@ -64,7 +62,6 @@ namespace detail {
         eager_awaiter()
             : shared_meta(new sqe_task_meta{task_info::task_type::eager_sqe}) {
             as_atomic(shared_meta->io_info.eager_io_state)
-                // .store(0, std::memory_order_seq_cst);
                 .store(0, std::memory_order_relaxed);
         }
 
