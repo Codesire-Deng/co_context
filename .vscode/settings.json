@@ -84,5 +84,6 @@
         "*.ipp": "cpp",
         "filesystem": "cpp"
     },
-    "C_Cpp.dimInactiveRegions": true
+    "C_Cpp.dimInactiveRegions": true,
+    "cmake.buildTask": true
 }
