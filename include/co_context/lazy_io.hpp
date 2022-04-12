@@ -21,8 +21,7 @@ namespace detail {
         // std::coroutine_handle<>
         void await_suspend(std::coroutine_handle<> current) noexcept {
             meta.io_info.handle = current;
-            worker_meta *const worker = detail::this_thread.worker;
-            worker->submit(&meta.io_info);
+            submit();
         }
 
         int32_t await_resume() const noexcept {
@@ -31,6 +30,11 @@ namespace detail {
 
       protected:
         sqe_task_meta meta;
+
+        inline void submit() noexcept {
+            worker_meta *const worker = detail::this_thread.worker;
+            worker->submit(&meta.io_info);
+        }
 
         lazy_awaiter() noexcept : meta(task_info::task_type::lazy_sqe) {
             meta.io_info.tid_hint = detail::this_thread.tid;

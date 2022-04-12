@@ -18,6 +18,10 @@ namespace detail {
             : io_info(type) {
             sqe.setData(io_info.as_user_data());
         }
+
+        inline uint64_t get_user_data() const noexcept {
+            return io_info.as_user_data();
+        }
     };
 
     static_assert(std::is_standard_layout_v<sqe_task_meta>);

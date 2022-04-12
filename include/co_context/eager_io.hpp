@@ -68,14 +68,28 @@ namespace detail {
         inline void submit() const noexcept {
             worker_meta *const worker = detail::this_thread.worker;
             worker->submit(&shared_meta->io_info);
+            worker->try_clear_submit_overflow_buf();
         }
 
-#ifndef __INTELLISENSE__
-        eager_awaiter(const eager_awaiter &) = delete;
+        eager_awaiter(const eager_awaiter &other) noexcept
+            : shared_meta(other.shared_meta) {}
+
         eager_awaiter(eager_awaiter &&) = delete;
-        eager_awaiter &operator=(const eager_awaiter &) = delete;
+
+        eager_awaiter &operator=(const eager_awaiter &other) noexcept {
+            shared_meta = other.shared_meta;
+            return *this;
+        }
+
         eager_awaiter &operator=(eager_awaiter &&) = delete;
-#endif
+
+        ~eager_awaiter() noexcept {
+            using namespace ::co_context::eager;
+            assert(
+                (shared_meta->io_info.eager_io_state & (io_detached | io_wait))
+                && "eager_io has neither been detached nor waited!"
+            );
+        };
     };
 
     struct eager_read : eager_awaiter {

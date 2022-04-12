@@ -30,6 +30,8 @@ class [[nodiscard("Did you forget to co_spawn?")]] main_task {
             return main_task{handle};
         }
 
+        constexpr void return_void() noexcept {}
+
         inline void unhandled_exception() const {
             std::rethrow_exception(std::current_exception());
         }

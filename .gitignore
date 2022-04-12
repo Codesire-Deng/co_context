@@ -68,3 +68,4 @@ perf.data*
 *.data
 
 .log
+.tmp

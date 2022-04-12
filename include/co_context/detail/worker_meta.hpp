@@ -37,6 +37,8 @@ namespace detail {
 
         void submit(task_info_ptr io_info) noexcept;
 
+        void try_clear_submit_overflow_buf() noexcept;
+
         std::coroutine_handle<> schedule() noexcept;
 
         void init(const int thread_index, io_context *const context);

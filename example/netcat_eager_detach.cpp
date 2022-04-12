@@ -46,12 +46,27 @@ send_all(co_context::socket &sock, std::span<const char> buf) {
     co_return written;
 }
 
+char buf[8192];
+
+// co_context::main_task run(co_context::socket peer) {
+//     using namespace co_context;
+//     int nr = 0;
+
+//     peer.eager_recv(buf, 0).detach();
+
+//     co_spawn(run(std::move(peer)));
+//     co_await eager::nop();
+// }
+
 co_context::main_task run(co_context::socket peer) {
     using namespace co_context;
-    char buf[8192];
+    // char buf[8192];
     int nr = 0;
 
-    while (true) { peer.eager_recv(buf, 0).detach(); }
+    while (true) {
+        for (int i = 0; i < 10; ++i) peer.eager_recv(buf, 0).detach();
+        std::this_thread::sleep_for(std::chrono::microseconds(1));
+    }
 
     peer.eager_close().detach();
     ::exit(0);

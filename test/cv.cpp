@@ -49,7 +49,7 @@ main_task main_thread() {
 
     char s[4];
     printf("input a char to continue:");
-    scanf("%s", s);
+    [[maybe_unused]] int _ = scanf("%s", s);
     m.unlock();
     cv.notify_one(); // real notify
 

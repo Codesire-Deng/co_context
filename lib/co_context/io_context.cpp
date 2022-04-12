@@ -42,13 +42,51 @@ namespace detail {
         auto &swap = *this->submit_swap_ptr;
         auto &cur = this->submit_cur;
         // std::cerr << cur.slot << " " << tid << cur.off << std::endl;
-        if (swap.try_find_empty(cur)) [[likely]] {
+        if (submit_overflow_buf.empty() && swap.try_find_empty(cur))
+            [[likely]] {
             swap.store(cur, io_info, std::memory_order_release);
             log::v("worker[%u] submit at [%u]\n", tid, cur.off);
             cur.next();
         } else {
             this->submit_overflow_buf.push(io_info);
             log::d("worker[%u] submit to OF\n", tid);
+        }
+    }
+
+    void worker_meta::try_clear_submit_overflow_buf() noexcept {
+        auto &submit_swap = *this->submit_swap_ptr;
+        while (!this->submit_overflow_buf.empty()
+               && submit_swap.try_find_empty(submit_cur)) {
+            task_info_ptr task = this->submit_overflow_buf.front();
+            this->submit_overflow_buf.pop();
+            submit_swap.store(submit_cur, task, std::memory_order_release);
+            log::d(
+                "worker[%u] submit from OF_buf to [%u]\n", tid, submit_cur.off
+            );
+            submit_cur.next();
+        }
+    }
+
+    inline std::coroutine_handle<> worker_meta::schedule() noexcept {
+        auto &reap_swap = *this->reap_swap_ptr;
+
+        log::v("worker[%u] scheduling\n", tid);
+
+        while (true) {
+            // handle overflowed submission
+            try_clear_submit_overflow_buf();
+
+            if (reap_swap.try_find_exist(reap_cur)) {
+                // TODO judge this memory order
+                const std::coroutine_handle<> handle =
+                    reap_swap.load(reap_cur, std::memory_order_consume);
+                reap_swap[reap_cur] = nullptr;
+                log::d("worker[%u] found [%u]\n", tid, reap_cur.off);
+                reap_cur.next();
+                // printf("get task!\n");
+                return handle;
+            }
+            // TODO consider tid_hint here
         }
     }
 
@@ -65,43 +103,6 @@ namespace detail {
             );
             coro.resume();
             log::v("worker[%d] idle\n", thread_index);
-        }
-    }
-
-    inline std::coroutine_handle<> worker_meta::schedule() noexcept {
-        auto &submit_swap = *this->submit_swap_ptr;
-        auto &reap_swap = *this->reap_swap_ptr;
-
-        log::v("worker[%u] scheduling\n", tid);
-
-        while (true) {
-            // handle overflowed submission
-            if (!this->submit_overflow_buf.empty()) {
-                if (submit_swap.try_find_empty(submit_cur)) {
-                    task_info_ptr task = this->submit_overflow_buf.front();
-                    this->submit_overflow_buf.pop();
-                    submit_swap.store(
-                        submit_cur, task, std::memory_order_release
-                    );
-                    log::d(
-                        "worker[%u] submit from OF_buf to [%u]\n", tid,
-                        submit_cur.off
-                    );
-                    submit_cur.next();
-                }
-            }
-
-            if (reap_swap.try_find_exist(reap_cur)) {
-                // TODO judge this memory order
-                const std::coroutine_handle<> handle =
-                    reap_swap.load(reap_cur, std::memory_order_consume);
-                reap_swap[reap_cur] = nullptr;
-                log::d("worker[%u] found [%u]\n", tid, reap_cur.off);
-                reap_cur.next();
-                // printf("get task!\n");
-                return handle;
-            }
-            // TODO consider tid_hint here
         }
     }
 
@@ -195,10 +196,12 @@ bool io_context::try_submit(task_info_ptr task) noexcept {
                 return false; // SQRing is full
             }
             sqe = ring.getSQEntry();
+            log::v("ctx get SQEntry, clone sqe...\n");
             assert(sqe != nullptr);
             sqe->cloneFrom(detail::as_sqe_task_meta(task)->sqe);
+            log::v("ctx ring.submit()...\n");
             ring.submit();
-            log::v("ctx submit to ring\n");
+            log::v("ctx ring.submit()...OK\n");
             return true;
 
         case task_type::co_spawn:
