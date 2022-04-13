@@ -45,7 +45,7 @@ namespace detail {
 
         void co_spawn(main_task entrance) noexcept;
 
-        void run(const int thread_index, io_context *const context);
+        void worker_run(const int thread_index, io_context *const context);
     };
 
     inline void worker_meta::co_spawn(main_task entrance) noexcept {

@@ -26,7 +26,9 @@ namespace config {
 #endif
 
     // About io_context
-    inline constexpr unsigned io_uring_flags = 0;
+    // inline constexpr unsigned io_uring_flags = 0;
+
+    inline constexpr unsigned io_uring_flags = IORING_SETUP_SQPOLL;
 
     inline constexpr bool is_SQPOLL = io_uring_flags & IORING_SETUP_SQPOLL;
 
@@ -39,9 +41,9 @@ namespace config {
 
     // inline constexpr unsigned total_threads_number = 5;
 
-    inline constexpr unsigned total_threads_number = 5;
+    // inline constexpr unsigned total_threads_number = 4;
 
-    // inline constexpr unsigned total_threads_number = 2;
+    inline constexpr unsigned total_threads_number = 3;
 
     // inline constexpr unsigned total_threads_number = 2;
 
@@ -73,15 +75,15 @@ namespace config {
 
     // inline constexpr uint16_t swap_capacity = 64;
 
-    inline constexpr uint16_t swap_capacity = 32;
+    // inline constexpr uint16_t swap_capacity = 32;
 
-    // inline constexpr uint16_t swap_capacity = 16;
+    inline constexpr uint16_t swap_capacity = 16;
 
     // inline constexpr uint16_t swap_capacity = 8;
 
-    inline constexpr uint8_t submit_poll_rounds = 4;
+    inline constexpr uint8_t submit_poll_rounds = 1;
 
-    inline constexpr uint8_t reap_poll_rounds = 4;
+    inline constexpr uint8_t reap_poll_rounds = 1;
 
     // net configuration
     inline constexpr bool loopback_only = true;
@@ -107,11 +109,11 @@ namespace config {
     };
 
     // inline constexpr level log_level = level::v;
-    // inline constexpr level log_level = level::d;
+    inline constexpr level log_level = level::d;
     // inline constexpr level log_level = level::i;
     // inline constexpr level log_level = level::w;
     // inline constexpr level log_level = level::e;
-    inline constexpr level log_level = level::no_log;
+    // inline constexpr level log_level = level::no_log;
 
 } // namespace config
 

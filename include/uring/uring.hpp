@@ -356,7 +356,7 @@ class [[nodiscard]] URing final {
 
             ret.cqe = reinterpret_cast<CQEntry *>(cq.cqes + (head & mask));
             if (!(this->features & IORING_FEAT_EXT_ARG)
-                && ret.cqe->user_data == LIBURING_UDATA_TIMEOUT) {
+                && ret.cqe->user_data == LIBURING_UDATA_TIMEOUT) [[unlikely]] {
                 CQAdvance(1);
                 if (ret.cqe->res < 0) [[unlikely]] {
                     // TODO Reconsider whether to use exceptions

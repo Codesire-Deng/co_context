@@ -49,7 +49,7 @@ namespace detail {
             cur.next();
         } else {
             this->submit_overflow_buf.push(io_info);
-            log::d("worker[%u] submit to OF\n", tid);
+            log::d("worker[%u] submit to OF (io_context is too slow)\n", tid);
         }
     }
 
@@ -84,7 +84,7 @@ namespace detail {
                 const std::coroutine_handle<> handle =
                     reap_swap.load(reap_cur, std::memory_order_consume);
                 reap_swap[reap_cur] = nullptr;
-                log::d("worker[%u] found [%u]\n", tid, reap_cur.off);
+                log::v("worker[%u] found [%u]\n", tid, reap_cur.off);
                 reap_cur.next();
                 // printf("get task!\n");
                 return handle;
@@ -94,7 +94,7 @@ namespace detail {
     }
 
     inline void
-    worker_meta::run(const int thread_index, io_context *const context) {
+    worker_meta::worker_run(const int thread_index, io_context *const context) {
         init(thread_index, context);
         log::v("worker[%d] run...\n", thread_index);
 
@@ -333,7 +333,7 @@ bool io_context::poll_completion() noexcept {
         return true;
     } else {
         reap_overflow_buf.push(io_info->handle);
-        log::d("ctx poll_completion failed reap_OF\n");
+        log::d("ctx poll_completion failed reap_OF (workers are too slow)\n");
         return false;
     }
 }
@@ -376,7 +376,7 @@ void io_context::probe() const {
 inline void io_context::make_thread_pool() {
     for (int i = 0; i < config::worker_threads_number; ++i)
         worker[i].sharing.host_thread =
-            std::thread{&worker_meta::run, worker + i, i, this};
+            std::thread{&worker_meta::worker_run, worker + i, i, this};
 }
 
 void io_context::co_spawn(main_task entrance) {
@@ -400,6 +400,7 @@ void io_context::co_spawn(main_task entrance) {
 #ifdef USE_CPU_AFFINITY
     detail::set_cpu_affinity(detail::this_thread.tid);
 #endif
+    log::i("io_context runs on %d\n", gettid());
     log::v("ctx making thread pool\n");
     make_thread_pool();
     log::v("ctx make_thread_pool end\n");

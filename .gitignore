@@ -67,5 +67,8 @@ draft/
 perf.data*
 *.data
 
-.log
-.tmp
+# log for perf
+log
+tmp
+dump.rdb
+output.svg
