@@ -73,7 +73,10 @@ namespace detail {
         log::v("worker[%u] scheduling\n", tid);
 
         while (true) {
-            // handle overflowed submission
+            /**
+             * handle overflowed submission.
+             * This implies the io_context is too slow.
+             */
             try_clear_submit_overflow_buf();
 
             if (reap_swap.try_find_exist(reap_cur)) {
@@ -118,8 +121,11 @@ void io_context::forward_task(std::coroutine_handle<> handle) noexcept {
         );
         r_cur.next();
     } else {
+        /**
+         * This means workers are too slow.
+         */
         reap_overflow_buf.push(handle);
-        log::d("ctx forward_task to reap_OF\n");
+        log::d("ctx forward_task to reap_OF (workers are too slow)\n");
     }
 }
 
@@ -242,7 +248,7 @@ bool io_context::poll_submission() noexcept {
         return true;
     } else {
         submit_overflow_buf.push(io_info);
-        log::d("ctx poll_submission failed submit_OF\n");
+        log::d("ctx poll_submission failed submit_OF (io_uring is too slow)\n");
         return false;
     }
 }
@@ -386,7 +392,7 @@ void io_context::co_spawn(main_task entrance) {
         r_cur.next();
     } else {
         reap_overflow_buf.push(entrance.get_io_info_ptr()->handle);
-        log::d("ctx co_spawn failed reap_OF\n");
+        log::d("ctx co_spawn failed reap_OF (workers are too slow)\n");
     }
 }
 
