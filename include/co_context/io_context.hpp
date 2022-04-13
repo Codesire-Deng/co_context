@@ -59,13 +59,18 @@ class [[nodiscard]] io_context final {
     ) detail::swap_zone<std::coroutine_handle<>> reap_swap;
 
     // place main thread's high frequency data here
-    detail::context_swap_cur s_cur;
-    detail::context_swap_cur r_cur;
+    config::tid_t s_cur = 0;
+    config::tid_t r_cur = 0;
     std::queue<task_info_ptr> submit_overflow_buf;
     std::queue<std::coroutine_handle<>> reap_overflow_buf;
 
     // TODO determine the size of this barrier
     alignas(cache_line_size) char __cacheline_barrier[64];
+
+    private:
+    inline static void cur_next(config::tid_t &context_cur) noexcept {
+        context_cur = (context_cur + 1) % config::worker_threads_number;
+    }
 
   public:
     using worker_meta = detail::worker_meta;
@@ -84,6 +89,10 @@ class [[nodiscard]] io_context final {
     void handle_semaphore_release(task_info_ptr sem_release) noexcept;
 
     void handle_condition_variable_notify(task_info_ptr cv_notify) noexcept;
+
+    bool try_find_submit_worker() noexcept;
+
+    bool try_find_reap_worker() noexcept;
 
     bool try_submit(task_info_ptr task) noexcept;
 

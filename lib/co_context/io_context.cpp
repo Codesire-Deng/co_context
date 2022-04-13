@@ -24,6 +24,7 @@ namespace detail {
         this->tid = thread_index;
         this->submit_swap_ptr = &context->submit_swap[thread_index];
         this->reap_swap_ptr = &context->reap_swap[thread_index];
+        log::i("worker[%u] runs on %u\n", this->tid, gettid());
 #ifdef USE_CPU_AFFINITY
         const unsigned logic_cores = std::thread::hardware_concurrency();
         if constexpr (config::using_hyper_threading) {
@@ -40,13 +41,11 @@ namespace detail {
 
     void worker_meta::submit(task_info_ptr io_info) noexcept {
         auto &swap = *this->submit_swap_ptr;
-        auto &cur = this->submit_cur;
+        auto &cur = this->sharing.submit_cur;
         // std::cerr << cur.slot << " " << tid << cur.off << std::endl;
-        if (submit_overflow_buf.empty() && swap.try_find_empty(cur))
-            [[likely]] {
-            swap.store(cur, io_info, std::memory_order_release);
-            log::v("worker[%u] submit at [%u]\n", tid, cur.off);
-            cur.next();
+        if (submit_overflow_buf.empty() && cur.is_available()) [[likely]] {
+            log::v("worker[%u] submit at [%u]\n", tid, cur.tail());
+            swap.push(cur, io_info);
         } else {
             this->submit_overflow_buf.push(io_info);
             log::d("worker[%u] submit to OF (io_context is too slow)\n", tid);
@@ -54,21 +53,19 @@ namespace detail {
     }
 
     void worker_meta::try_clear_submit_overflow_buf() noexcept {
-        auto &submit_swap = *this->submit_swap_ptr;
-        while (!this->submit_overflow_buf.empty()
-               && submit_swap.try_find_empty(submit_cur)) {
+        auto &swap = *this->submit_swap_ptr;
+        auto &cur = this->sharing.submit_cur;
+        while (!this->submit_overflow_buf.empty() && cur.is_available()) {
             task_info_ptr task = this->submit_overflow_buf.front();
             this->submit_overflow_buf.pop();
-            submit_swap.store(submit_cur, task, std::memory_order_release);
-            log::d(
-                "worker[%u] submit from OF_buf to [%u]\n", tid, submit_cur.off
-            );
-            submit_cur.next();
+            log::d("worker[%u] submit from OF_buf to [%u]\n", tid, cur.tail());
+            swap.push(cur, task);
         }
     }
 
     inline std::coroutine_handle<> worker_meta::schedule() noexcept {
         auto &reap_swap = *this->reap_swap_ptr;
+        auto &cur = this->sharing.reap_cur;
 
         log::v("worker[%u] scheduling\n", tid);
 
@@ -77,16 +74,14 @@ namespace detail {
              * handle overflowed submission.
              * This implies the io_context is too slow.
              */
-            try_clear_submit_overflow_buf();
+            // BUG
+            // try_clear_submit_overflow_buf();
 
-            if (reap_swap.try_find_exist(reap_cur)) {
+            if (!cur.is_empty()) {
                 // TODO judge this memory order
-                const std::coroutine_handle<> handle =
-                    reap_swap.load(reap_cur, std::memory_order_consume);
-                reap_swap[reap_cur] = nullptr;
-                log::v("worker[%u] found [%u]\n", tid, reap_cur.off);
-                reap_cur.next();
-                // printf("get task!\n");
+                const std::coroutine_handle<> handle = reap_swap.front(cur);
+                log::v("worker[%u] found [%u]\n", tid, cur.head());
+                cur.pop();
                 return handle;
             }
             // TODO consider tid_hint here
@@ -113,13 +108,14 @@ namespace detail {
 
 void io_context::forward_task(std::coroutine_handle<> handle) noexcept {
     // TODO optimize scheduling strategy
-    if (reap_swap.try_find_empty(r_cur)) [[likely]] {
-        reap_swap.store(r_cur, handle, std::memory_order_release);
+    if (try_find_reap_worker()) [[likely]] {
+        auto &cur = worker[r_cur].sharing.reap_cur;
         log::v(
-            "ctx forward_task to [%u][%u]: %lx\n", r_cur.tid, r_cur.off,
+            "ctx forward_task to [%u][%u]: %lx\n", r_cur, cur.tail(),
             handle.address()
         );
-        r_cur.next();
+        reap_swap[r_cur].push(cur, handle);
+        cur_next(r_cur);
     } else {
         /**
          * This means workers are too slow.
@@ -189,6 +185,22 @@ void io_context::handle_condition_variable_notify(task_info_ptr cv_notify
     if (cv.to_resume_head == nullptr) cv.to_resume_tail = nullptr;
 }
 
+bool io_context::try_find_submit_worker() noexcept {
+    for (config::tid_t i = 0; i < config::worker_threads_number; ++i) {
+        if (!this->worker[s_cur].sharing.submit_cur.is_empty()) return true;
+        cur_next(s_cur);
+    }
+    return false;
+}
+
+bool io_context::try_find_reap_worker() noexcept {
+    for (config::tid_t i = 0; i < config::worker_threads_number; ++i) {
+        if (this->worker[r_cur].sharing.reap_cur.is_available()) return true;
+        cur_next(r_cur);
+    }
+    return false;
+}
+
 bool io_context::try_submit(task_info_ptr task) noexcept {
     liburingcxx::SQEntry *sqe;
     using task_type = task_info::task_type;
@@ -235,14 +247,14 @@ bool io_context::try_submit(task_info_ptr task) noexcept {
  */
 bool io_context::poll_submission() noexcept {
     // submit round
-    if (!submit_swap.try_find_exist(s_cur)) { return false; }
+    if (!try_find_submit_worker()) { return false; }
+    auto &cur = worker[s_cur].sharing.submit_cur;
 
-    // TODO judge this memory order
-    task_info_ptr const io_info =
-        submit_swap.load(s_cur, std::memory_order_consume);
-    submit_swap[s_cur] = nullptr;
-    log::v("ctx poll_submission at [%u][%u]\n", s_cur.tid, s_cur.off);
-    s_cur.next();
+    assert(!cur.is_empty());
+    task_info_ptr const io_info = submit_swap[s_cur].front(cur);
+    log::v("ctx poll_submission at [%u][%u]\n", s_cur, cur.head());
+    cur.pop();
+    cur_next(s_cur);
 
     if (try_submit(io_info)) [[likely]] {
         return true;
@@ -270,14 +282,16 @@ bool io_context::try_clear_submit_overflow_buf() noexcept {
 }
 
 bool io_context::try_reap(std::coroutine_handle<> handle) noexcept {
-    if (!reap_swap.try_find_empty(r_cur)) [[unlikely]] {
+    if (!try_find_reap_worker()) [[unlikely]] {
         log::d("ctx try_reap failed reap_swap is full\n");
         return false;
     }
 
-    reap_swap.store(r_cur, handle, std::memory_order_release);
-    log::v("ctx try_reap at [%u][%u]\n", r_cur.tid, r_cur.off);
-    r_cur.next();
+    auto &cur = worker[r_cur].sharing.reap_cur;
+
+    log::v("ctx try_reap at [%u][%u]\n", r_cur, cur.tail());
+    reap_swap[r_cur].push(cur, handle);
+    cur_next(r_cur);
     return true;
 }
 
@@ -359,6 +373,8 @@ void io_context::init() noexcept {
     detail::this_thread.ctx = this;
     detail::this_thread.worker = nullptr;
     detail::this_thread.tid = std::thread::hardware_concurrency() - 1;
+    assert(submit_overflow_buf.empty());
+    assert(reap_overflow_buf.empty());
 }
 
 void io_context::probe() const {
@@ -374,26 +390,14 @@ void io_context::probe() const {
 }
 
 inline void io_context::make_thread_pool() {
-    for (int i = 0; i < config::worker_threads_number; ++i)
+    for (config::tid_t i = 0; i < config::worker_threads_number; ++i)
         worker[i].sharing.host_thread =
             std::thread{&worker_meta::worker_run, worker + i, i, this};
 }
 
 void io_context::co_spawn(main_task entrance) {
     assert(detail::this_thread.worker == nullptr);
-    if (reap_swap.try_find_empty(r_cur)) [[likely]] {
-        reap_swap.store(
-            r_cur, entrance.get_io_info_ptr()->handle, std::memory_order_release
-        );
-        log::d(
-            "ctx co_spawn %lx at [%u][%u]\n",
-            entrance.get_io_info_ptr()->handle.address(), r_cur.tid, r_cur.off
-        );
-        r_cur.next();
-    } else {
-        reap_overflow_buf.push(entrance.get_io_info_ptr()->handle);
-        log::d("ctx co_spawn failed reap_OF (workers are too slow)\n");
-    }
+    forward_task(entrance.get_io_info_ptr()->handle);
 }
 
 [[noreturn]] void io_context::run() {
@@ -407,19 +411,19 @@ void io_context::co_spawn(main_task entrance) {
 
     while (!will_stop) [[likely]] {
             log::v("ctx polling\n");
-            if (try_clear_submit_overflow_buf()) {
+            // if (try_clear_submit_overflow_buf()) {
                 for (uint8_t i = 0; i < config::submit_poll_rounds; ++i) {
                     log::v("ctx poll_submission\n");
                     if (!poll_submission()) break;
                 }
-            }
+            // }
 
-            if (try_clear_reap_overflow_buf()) {
+            // if (try_clear_reap_overflow_buf()) {
                 for (uint8_t i = 0; i < config::reap_poll_rounds; ++i) {
                     log::v("ctx poll_completion\n");
                     if (!poll_completion()) break;
                 }
-            }
+            // }
 
             // std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }

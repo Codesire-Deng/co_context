@@ -69,6 +69,6 @@ perf.data*
 
 # log for perf
 log
-tmp
+tmp/
 dump.rdb
-output.svg
+*.svg

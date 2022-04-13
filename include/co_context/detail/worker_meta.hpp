@@ -3,6 +3,7 @@
 #include "co_context/config.hpp"
 #include "co_context/detail/swap_zone.hpp"
 #include "co_context/main_task.hpp"
+#include "co_context/lockfree/spsc_cursor.hpp"
 #include <thread>
 #include <queue>
 
@@ -15,10 +16,14 @@ namespace detail {
     struct alignas(config::cache_line_size) worker_meta final {
         enum class worker_state : uint8_t { running, idle, blocked };
 
+        using cur_t = config::swap_capacity_width_t;
+
         /**
          * @brief sharing zone with main thread
          */
         struct sharing_zone {
+            spsc_cursor<cur_t, config::swap_capacity> submit_cur;
+            spsc_cursor<cur_t, config::swap_capacity> reap_cur;
             std::thread host_thread;
             // worker_state state; // TODO atomic?
             // int temp;
@@ -28,8 +33,6 @@ namespace detail {
 
         alignas(config::cache_line_size) sharing_zone sharing;
 
-        worker_swap_cur submit_cur;
-        worker_swap_cur reap_cur;
         worker_swap_zone<task_info_ptr> *submit_swap_ptr;
         worker_swap_zone<std::coroutine_handle<>> *reap_swap_ptr;
         tid_t tid;

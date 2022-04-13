@@ -56,7 +56,7 @@ co_context::main_task run(co_context::socket peer) {
     while ((nr = co_await peer.recv(buf, 0)) > 0) {
         // co_await lazy::write(STDOUT_FILENO, {buf, (size_t)nr}, 0);
 
-        // int nw = write_n(STDOUT_FILENO, buf, nr); // 将收到的字节全部打印到
+        int nw = write_n(STDOUT_FILENO, buf, nr); // 将收到的字节全部打印到
         // stdout if (nw < nr) break;
     }
     ::exit(0);
@@ -92,7 +92,7 @@ int main(int argc, const char *argv[]) {
     }
 
     using namespace co_context;
-    io_context context{4};
+    io_context context{8};
 
     int port = atoi(argv[2]);
     if (strcmp(argv[1], "-l") == 0) {
