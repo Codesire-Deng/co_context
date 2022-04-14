@@ -77,7 +77,7 @@ class [[nodiscard]] io_context final {
     alignas(cache_line_size) worker_meta worker[config::worker_threads_number];
 
   private:
-    alignas(cache_line_size) size_t requests_in_ring = 0;
+    // alignas(cache_line_size) size_t requests_to_reap = 0;
     const unsigned ring_entries;
     bool will_stop = false;
 

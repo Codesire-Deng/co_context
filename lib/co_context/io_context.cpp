@@ -24,7 +24,7 @@ namespace detail {
         this->tid = thread_index;
         this->submit_swap_ptr = &context->submit_swap[thread_index];
         this->reap_swap_ptr = &context->reap_swap[thread_index];
-        log::i("worker[%u] runs on %u\n", this->tid, gettid());
+        log::w("worker[%u] runs on %u\n", this->tid, gettid());
 #ifdef USE_CPU_AFFINITY
         const unsigned logic_cores = std::thread::hardware_concurrency();
         if constexpr (config::using_hyper_threading) {
@@ -222,7 +222,7 @@ bool io_context::try_submit(task_info_ptr task) noexcept {
                 &detail::as_sqe_task_meta(task)->sqe
             );
             ring.submit();
-            ++requests_in_ring;
+            // ++requests_to_reap;
             log::v("ctx ring.submit()...OK\n");
             return true;
 
@@ -325,7 +325,7 @@ bool io_context::poll_completion() noexcept {
         reinterpret_cast<task_info_ptr>(polling_cqe->getData());
     io_info->result = polling_cqe->getRes();
     ring.SeenCQEntry(polling_cqe);
-    --requests_in_ring;
+    // --requests_to_reap;
 
     using task_type = task_info::task_type;
 
@@ -411,7 +411,7 @@ void io_context::co_spawn(main_task entrance) {
 #ifdef USE_CPU_AFFINITY
     detail::set_cpu_affinity(detail::this_thread.tid);
 #endif
-    log::i("io_context runs on %d\n", gettid());
+    log::w("io_context runs on %d\n", gettid());
     log::v("ctx making thread pool\n");
     make_thread_pool();
     log::v("ctx make_thread_pool end\n");
@@ -427,7 +427,8 @@ void io_context::co_spawn(main_task entrance) {
 
             // if (try_clear_reap_overflow_buf()) {
             for (uint8_t i = 0;
-                 requests_in_ring > 0 && i < config::reap_poll_rounds; ++i) {
+                 i < config::reap_poll_rounds /*&& requests_to_reap > 0*/;
+                 ++i) {
                 log::v("ctx poll_completion\n");
                 if (!poll_completion()) break;
             }

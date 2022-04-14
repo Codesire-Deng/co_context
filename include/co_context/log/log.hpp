@@ -46,7 +46,7 @@ namespace log {
     template<typename... T>
     void w(const char *__restrict__ fmt, const T &...args) {
         if constexpr (config::log_level <= config::level::w)
-            detail::log(fmt, args...);
+            detail::err(fmt, args...);
     }
 
     template<typename... T>

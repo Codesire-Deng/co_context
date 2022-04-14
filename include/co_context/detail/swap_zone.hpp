@@ -6,7 +6,7 @@
 #include "co_context/config.hpp"
 #include "co_context/utility/as_atomic.hpp"
 #include "co_context/utility/bit.hpp"
-#include "co_context/lockfree/spsc_cursor.hpp"
+#include "co_context/lockfree/spsc_cursor.1.hpp"
 #include <cstring>
 
 namespace co_context {
