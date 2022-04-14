@@ -77,9 +77,9 @@ namespace detail {
             // BUG
             // try_clear_submit_overflow_buf();
 
-            if (!cur.is_empty()) {
+            if (!cur.is_empty_load_head()) {
                 // TODO judge this memory order
-                const std::coroutine_handle<> handle = reap_swap.front(cur);
+                const std::coroutine_handle<> handle = reap_swap[cur.head()];
                 log::v("worker[%u] found [%u]\n", tid, cur.head());
                 cur.pop();
                 return handle;
@@ -217,8 +217,12 @@ bool io_context::try_submit(task_info_ptr task) noexcept {
             log::v("ctx get SQEntry, clone sqe...\n");
             assert(sqe != nullptr);
             sqe->cloneFrom(detail::as_sqe_task_meta(task)->sqe);
-            log::v("ctx ring.submit()...\n");
+            log::v(
+                "ctx ring.submit() sqe at %lx...\n",
+                &detail::as_sqe_task_meta(task)->sqe
+            );
             ring.submit();
+            ++requests_in_ring;
             log::v("ctx ring.submit()...OK\n");
             return true;
 
@@ -321,6 +325,7 @@ bool io_context::poll_completion() noexcept {
         reinterpret_cast<task_info_ptr>(polling_cqe->getData());
     io_info->result = polling_cqe->getRes();
     ring.SeenCQEntry(polling_cqe);
+    --requests_in_ring;
 
     using task_type = task_info::task_type;
 
@@ -375,6 +380,7 @@ void io_context::init() noexcept {
     detail::this_thread.tid = std::thread::hardware_concurrency() - 1;
     assert(submit_overflow_buf.empty());
     assert(reap_overflow_buf.empty());
+    // probe();
 }
 
 void io_context::probe() const {
@@ -387,6 +393,7 @@ void io_context::probe() const {
     log::i("number of worker_threads: %u\n", worker_threads_number);
     log::i("swap_capacity per thread: %u\n", swap_capacity);
     log::i("size of single worker_meta: %u\n", sizeof(worker_meta));
+    log::i("size of worker.sharing: %u\n", sizeof(worker_meta::sharing_zone));
 }
 
 inline void io_context::make_thread_pool() {
@@ -412,17 +419,18 @@ void io_context::co_spawn(main_task entrance) {
     while (!will_stop) [[likely]] {
             log::v("ctx polling\n");
             // if (try_clear_submit_overflow_buf()) {
-                for (uint8_t i = 0; i < config::submit_poll_rounds; ++i) {
-                    log::v("ctx poll_submission\n");
-                    if (!poll_submission()) break;
-                }
+            for (uint8_t i = 0; i < config::submit_poll_rounds; ++i) {
+                log::v("ctx poll_submission\n");
+                if (!poll_submission()) break;
+            }
             // }
 
             // if (try_clear_reap_overflow_buf()) {
-                for (uint8_t i = 0; i < config::reap_poll_rounds; ++i) {
-                    log::v("ctx poll_completion\n");
-                    if (!poll_completion()) break;
-                }
+            for (uint8_t i = 0;
+                 requests_in_ring > 0 && i < config::reap_poll_rounds; ++i) {
+                log::v("ctx poll_completion\n");
+                if (!poll_completion()) break;
+            }
             // }
 
             // std::this_thread::sleep_for(std::chrono::milliseconds(10));

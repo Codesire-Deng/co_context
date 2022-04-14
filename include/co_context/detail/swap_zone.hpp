@@ -35,6 +35,8 @@ namespace detail {
         worker_swap_zone(const worker_swap_zone &) = delete;
         worker_swap_zone(worker_swap_zone &&) = delete;
 
+        T operator[](sz_t i) const noexcept { return data[i]; }
+
         inline void push(cur_t &cur, T value) noexcept {
             data[cur.tail()] = value;
             cur.push(1);

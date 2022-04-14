@@ -317,7 +317,7 @@ class [[nodiscard]] URing final {
             munmap(cq.ring_ptr, cq.ring_sz);
     }
 
-    inline bool isSQRingNeedEnter(unsigned &flags) const noexcept {
+    inline constexpr bool isSQRingNeedEnter(unsigned &flags) const noexcept {
         if constexpr (!(URingFlags & IORING_SETUP_SQPOLL)) return true;
 
         if (IO_URING_READ_ONCE(*sq.kflags) & IORING_SQ_NEED_WAKEUP)

@@ -59,15 +59,12 @@ class [[nodiscard]] io_context final {
     ) detail::swap_zone<std::coroutine_handle<>> reap_swap;
 
     // place main thread's high frequency data here
-    config::tid_t s_cur = 0;
+    alignas(cache_line_size) config::tid_t s_cur = 0;
     config::tid_t r_cur = 0;
     std::queue<task_info_ptr> submit_overflow_buf;
     std::queue<std::coroutine_handle<>> reap_overflow_buf;
 
-    // TODO determine the size of this barrier
-    alignas(cache_line_size) char __cacheline_barrier[64];
-
-    private:
+  private:
     inline static void cur_next(config::tid_t &context_cur) noexcept {
         context_cur = (context_cur + 1) % config::worker_threads_number;
     }
@@ -80,8 +77,9 @@ class [[nodiscard]] io_context final {
     alignas(cache_line_size) worker_meta worker[config::worker_threads_number];
 
   private:
-    bool will_stop = false;
+    alignas(cache_line_size) size_t requests_in_ring = 0;
     const unsigned ring_entries;
+    bool will_stop = false;
 
   private:
     void forward_task(std::coroutine_handle<> handle) noexcept;

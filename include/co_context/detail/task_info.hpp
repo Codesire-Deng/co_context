@@ -58,7 +58,7 @@ namespace detail {
         const task_type type;
 
         constexpr task_info(task_type type) noexcept : type(type) {
-            log::v("task_info generated\n");
+            log::v("task_info generated at %lx\n", this);
         }
 
         uint64_t as_user_data() const noexcept {

@@ -26,9 +26,9 @@ namespace config {
 #endif
 
     // About io_context
-    inline constexpr unsigned io_uring_flags = 0;
+    // inline constexpr unsigned io_uring_flags = 0;
 
-    // inline constexpr unsigned io_uring_flags = IORING_SETUP_SQPOLL;
+    inline constexpr unsigned io_uring_flags = IORING_SETUP_SQPOLL;
 
     inline constexpr bool is_SQPOLL = io_uring_flags & IORING_SETUP_SQPOLL;
 
@@ -43,9 +43,9 @@ namespace config {
 
     // inline constexpr unsigned total_threads_number = 4;
 
-    inline constexpr unsigned total_threads_number = 3;
+    // inline constexpr unsigned total_threads_number = 3;
 
-    // inline constexpr unsigned total_threads_number = 2;
+    inline constexpr unsigned total_threads_number = 3;
 
     inline constexpr unsigned worker_threads_number =
         total_threads_number - 1 - is_SQPOLL;
@@ -111,11 +111,11 @@ namespace config {
     };
 
     // inline constexpr level log_level = level::v;
-    // inline constexpr level log_level = level::d;
+    inline constexpr level log_level = level::d;
     // inline constexpr level log_level = level::i;
     // inline constexpr level log_level = level::w;
     // inline constexpr level log_level = level::e;
-    inline constexpr level log_level = level::no_log;
+    // inline constexpr level log_level = level::no_log;
 
 } // namespace config
 
