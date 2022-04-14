@@ -217,10 +217,8 @@ bool io_context::try_submit(task_info_ptr task) noexcept {
             log::v("ctx get SQEntry, clone sqe...\n");
             assert(sqe != nullptr);
             sqe->cloneFrom(detail::as_sqe_task_meta(task)->sqe);
-            log::v(
-                "ctx ring.submit() sqe at %lx...\n",
-                &detail::as_sqe_task_meta(task)->sqe
-            );
+            log::v("ctx ring.submit()...\n");
+            ++requests_to_reap;
             ring.submit();
             // ++requests_to_reap;
             log::v("ctx ring.submit()...OK\n");
@@ -319,6 +317,7 @@ bool io_context::poll_completion() noexcept {
     liburingcxx::CQEntry *polling_cqe = ring.peekCQEntry();
     if (polling_cqe == nullptr) return false;
 
+    --requests_to_reap;
     log::v("ctx poll_completion found\n");
 
     task_info_ptr io_info =
@@ -419,19 +418,19 @@ void io_context::co_spawn(main_task entrance) {
     while (!will_stop) [[likely]] {
             log::v("ctx polling\n");
             // if (try_clear_submit_overflow_buf()) {
-            for (uint8_t i = 0; i < config::submit_poll_rounds; ++i) {
-                log::v("ctx poll_submission\n");
-                if (!poll_submission()) break;
-            }
+                for (uint8_t i = 0; i < config::submit_poll_rounds; ++i) {
+                    log::v("ctx poll_submission\n");
+                    if (!poll_submission()) break;
+                }
             // }
 
             // if (try_clear_reap_overflow_buf()) {
-            for (uint8_t i = 0;
-                 i < config::reap_poll_rounds /*&& requests_to_reap > 0*/;
-                 ++i) {
-                log::v("ctx poll_completion\n");
-                if (!poll_completion()) break;
-            }
+                while (requests_to_reap != 0) {
+                    // for (uint8_t i = 0; i < config::reap_poll_rounds; ++i) {
+                    log::v("ctx poll_completion\n");
+                    if (!poll_completion()) break;
+                    // }
+                }
             // }
 
             // std::this_thread::sleep_for(std::chrono::milliseconds(10));

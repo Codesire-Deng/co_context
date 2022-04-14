@@ -111,11 +111,11 @@ namespace config {
     };
 
     // inline constexpr level log_level = level::v;
-    inline constexpr level log_level = level::d;
+    // inline constexpr level log_level = level::d;
     // inline constexpr level log_level = level::i;
     // inline constexpr level log_level = level::w;
     // inline constexpr level log_level = level::e;
-    // inline constexpr level log_level = level::no_log;
+    inline constexpr level log_level = level::no_log;
 
 } // namespace config
 
