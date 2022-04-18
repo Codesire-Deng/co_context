@@ -1,6 +1,6 @@
 #pragma once
 
-#include "uring/io_uring.h"
+#include "uring/SQEntry.hpp"
 
 namespace liburingcxx {
 
@@ -9,16 +9,20 @@ class URing;
 
 namespace detail {
 
+    using SQEntry = ::liburingcxx::SQEntry;
+
+    static_assert(sizeof(SQEntry) == sizeof(io_uring_sqe));
+
     class SubmissionQueue final {
       private:
         unsigned *khead;
         unsigned *ktail;
-        unsigned *kring_mask;
-        unsigned *kring_entries;
+        unsigned ring_mask;
+        unsigned ring_entries;
         unsigned *kflags;
         unsigned *kdropped;
         unsigned *array;
-        struct io_uring_sqe *sqes;
+        SQEntry *sqes;
 
         unsigned sqe_head; // memset to 0 during URing()
         unsigned sqe_tail; // memset to 0 during URing()
@@ -30,13 +34,14 @@ namespace detail {
 
       private:
         void setOffset(const io_sqring_offsets &off) noexcept {
-            khead = (unsigned *)((char *)ring_ptr + off.head);
-            ktail = (unsigned *)((char *)ring_ptr + off.tail);
-            kring_mask = (unsigned *)((char *)ring_ptr + off.ring_mask);
-            kring_entries = (unsigned *)((char *)ring_ptr + off.ring_entries);
-            kflags = (unsigned *)((char *)ring_ptr + off.flags);
-            kdropped = (unsigned *)((char *)ring_ptr + off.dropped);
-            array = (unsigned *)((char *)ring_ptr + off.array);
+            khead = (unsigned *)((uintptr_t)ring_ptr + off.head);
+            ktail = (unsigned *)((uintptr_t)ring_ptr + off.tail);
+            ring_mask = *(unsigned *)((uintptr_t)ring_ptr + off.ring_mask);
+            ring_entries =
+                *(unsigned *)((uintptr_t)ring_ptr + off.ring_entries);
+            kflags = (unsigned *)((uintptr_t)ring_ptr + off.flags);
+            kdropped = (unsigned *)((uintptr_t)ring_ptr + off.dropped);
+            array = (unsigned *)((uintptr_t)ring_ptr + off.array);
         }
 
         /**
@@ -46,7 +51,7 @@ namespace detail {
          * shared ring.
          */
         unsigned flush() noexcept {
-            const unsigned mask = *kring_mask;
+            const unsigned mask = ring_mask;
             unsigned tail = *ktail;
             unsigned to_submit = sqe_tail - sqe_head;
             if (to_submit == 0) return tail - *khead; // see below
@@ -80,6 +85,17 @@ namespace detail {
              * atomicity.
              */
             return tail - *khead;
+        }
+
+        inline SQEntry *getSQEntry() noexcept {
+            const unsigned int head = io_uring_smp_load_acquire(khead);
+            const unsigned int next = sqe_tail + 1;
+            SQEntry *sqe = nullptr;
+            if (next - head <= ring_entries) {
+                sqe = sqes + (sqe_tail & ring_mask);
+                sqe_tail = next;
+            }
+            return sqe;
         }
 
       public:

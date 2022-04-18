@@ -39,8 +39,6 @@
 #include "uring/io_uring.h"
 #include "uring/barrier.h"
 #include "uring/syscall.hpp"
-#include "uring/SQEntry.hpp"
-#include "uring/CQEntry.hpp"
 #include "uring/detail/SQ.hpp"
 #include "uring/detail/CQ.hpp"
 
@@ -145,9 +143,9 @@ class [[nodiscard]] URing final {
          */
         if constexpr (URingFlags & IORING_SETUP_SQPOLL)
             return sq.sqe_tail - io_uring_smp_load_acquire(sq.khead);
-
         /* always use real head, to avoid losing sync for short submit */
-        return sq.sqe_tail - *sq.khead;
+        else
+            return sq.sqe_tail - *sq.khead;
     }
 
     /**
@@ -156,7 +154,7 @@ class [[nodiscard]] URing final {
      * @return unsigned the available space in SQ ring
      */
     inline unsigned SQSpaceLeft() const noexcept {
-        return *sq.kring_entries - SQReady();
+        return sq.ring_entries - SQReady();
     }
 
     /**
@@ -169,16 +167,16 @@ class [[nodiscard]] URing final {
      * @return SQEntry* Returns a vacant sqe, or nullptr if we're full.
      */
     inline SQEntry *getSQEntry() noexcept {
-        const unsigned int head = io_uring_smp_load_acquire(sq.khead);
-        const unsigned int next = sq.sqe_tail + 1;
-        SQEntry *sqe = nullptr;
-        if (next - head <= *sq.kring_entries) {
-            sqe = reinterpret_cast<SQEntry *>(
-                sq.sqes + (sq.sqe_tail & *sq.kring_mask)
-            );
-            sq.sqe_tail = next;
-        }
-        return sqe;
+        // const unsigned int head = io_uring_smp_load_acquire(sq.khead);
+        // const unsigned int next = sq.sqe_tail + 1;
+        // SQEntry *sqe = nullptr;
+        // if (next - head <= sq.ring_entries) {
+        //     sqe = reinterpret_cast<SQEntry *>(
+        //         sq.sqes + (sq.sqe_tail & sq.ring_mask)
+        //     );
+        //     sq.sqe_tail = next;
+        // }
+        return reinterpret_cast<SQEntry *>(sq.getSQEntry());
     }
 
     /**
@@ -252,7 +250,7 @@ class [[nodiscard]] URing final {
     URing &operator=(URing &&) = delete;
 
     ~URing() noexcept {
-        munmap(sq.sqes, *sq.kring_entries * sizeof(io_uring_sqe));
+        munmap(sq.sqes, sq.ring_entries * sizeof(io_uring_sqe));
         unmapRings();
         close(ring_fd);
     }
@@ -298,7 +296,7 @@ class [[nodiscard]] URing final {
         sq.setOffset(p.sq_off);
 
         const size_t sqes_size = p.sq_entries * sizeof(io_uring_sqe);
-        sq.sqes = reinterpret_cast<io_uring_sqe *>(mmap(
+        sq.sqes = reinterpret_cast<SQEntry *>(mmap(
             0, sqes_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE, fd,
             IORING_OFF_SQES
         ));
@@ -344,7 +342,7 @@ class [[nodiscard]] URing final {
             unsigned availableNum;
         } ret;
 
-        const unsigned mask = *cq.kring_mask;
+        const unsigned mask = cq.ring_mask;
 
         while (true) {
             const unsigned tail = io_uring_smp_load_acquire(cq.ktail);
@@ -354,7 +352,7 @@ class [[nodiscard]] URing final {
             ret.availableNum = tail - head;
             if (ret.availableNum == 0) return ret;
 
-            ret.cqe = reinterpret_cast<CQEntry *>(cq.cqes + (head & mask));
+            ret.cqe = cq.cqes + (head & mask);
             if (!(this->features & IORING_FEAT_EXT_ARG)
                 && ret.cqe->user_data == LIBURING_UDATA_TIMEOUT) [[unlikely]] {
                 CQAdvance(1);
