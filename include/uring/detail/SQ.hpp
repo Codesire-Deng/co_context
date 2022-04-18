@@ -24,13 +24,14 @@ namespace detail {
         unsigned *array;
         SQEntry *sqes;
 
-        unsigned sqe_head; // memset to 0 during URing()
-        unsigned sqe_tail; // memset to 0 during URing()
+        unsigned sqe_head;      // memset to 0 during URing()
+        unsigned sqe_tail;      // memset to 0 during URing()
+        unsigned sqe_free_head; // memset to 0 during URing()
 
         size_t ring_sz;
         void *ring_ptr;
 
-        unsigned pad[4];
+        unsigned pad[2];
 
       private:
         void setOffset(const io_sqring_offsets &off) noexcept {
@@ -42,6 +43,11 @@ namespace detail {
             kflags = (unsigned *)((uintptr_t)ring_ptr + off.flags);
             kdropped = (unsigned *)((uintptr_t)ring_ptr + off.dropped);
             array = (unsigned *)((uintptr_t)ring_ptr + off.array);
+            initFreeQueue();
+        }
+
+        void initFreeQueue() noexcept {
+            for (unsigned int i = 0; i < ring_entries; ++i) { array[i] = i; }
         }
 
         /**
@@ -51,27 +57,18 @@ namespace detail {
          * shared ring.
          */
         unsigned flush() noexcept {
-            const unsigned mask = ring_mask;
-            unsigned tail = *ktail;
-            unsigned to_submit = sqe_tail - sqe_head;
-            if (to_submit == 0) return tail - *khead; // see below
-
-            /*
-             * Fill in sqes that we have queued up, adding them to the kernel
-             * ring
-             */
-            do {
-                array[tail & mask] = sqe_head & mask;
-                tail++;
-                sqe_head++;
-            } while (--to_submit);
-
-            /*
-             * Ensure that the kernel sees the SQE updates before it sees the
-             * tail update.
-             */
-            io_uring_smp_store_release(ktail, tail);
-
+            if (sqe_tail != sqe_head) [[likely]] {
+                /*
+                 * Fill in sqes that we have queued up, adding them to the
+                 * kernel ring
+                 */
+                sqe_head = sqe_tail;
+                /*
+                 * Ensure that the kernel sees the SQE updates before it sees
+                 * the tail update.
+                 */
+                io_uring_smp_store_release(ktail, sqe_tail);
+            }
             /*
              * This _may_ look problematic, as we're not supposed to be reading
              * SQ->head without acquire semantics. When we're in SQPOLL mode,
@@ -84,18 +81,24 @@ namespace detail {
              * able to deal with this situation regardless of any perceived
              * atomicity.
              */
-            return tail - *khead;
+            return sqe_tail - *khead;
         }
 
         inline SQEntry *getSQEntry() noexcept {
             const unsigned int head = io_uring_smp_load_acquire(khead);
-            const unsigned int next = sqe_tail + 1;
-            SQEntry *sqe = nullptr;
-            if (next - head <= ring_entries) {
-                sqe = sqes + (sqe_tail & ring_mask);
-                sqe_tail = next;
+            const unsigned int next = sqe_free_head + 1;
+            if (next - head <= ring_entries) [[likely]] {
+                SQEntry *sqe = &sqes[array[sqe_free_head & ring_mask]];
+                sqe_free_head = next;
+                return sqe;
+            } else {
+                return nullptr;
             }
-            return sqe;
+        }
+
+        inline void appendSQEntry(const SQEntry *const sqe) noexcept {
+            array[sqe_tail++ & ring_mask] = sqe - sqes;
+            assert(sqe_tail - *khead <= ring_entries);
         }
 
       public:
@@ -104,6 +107,8 @@ namespace detail {
         SubmissionQueue() noexcept = default;
         ~SubmissionQueue() noexcept = default;
     };
+
+    static_assert(sizeof(SubmissionQueue) == 96);
 
 } // namespace detail
 

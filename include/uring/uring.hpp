@@ -180,6 +180,15 @@ class [[nodiscard]] URing final {
     }
 
     /**
+     * @brief Append an SQE to SQ, but do not notify the io_uring.
+     *
+     * @param sqe
+     */
+    inline void appendSQEntry(const SQEntry *sqe) noexcept {
+        sq.appendSQEntry(sqe);
+    }
+
+    /**
      * @brief wait until the SQ ring is not full
      *
      * @details Only applicable when using SQPOLL - allows the caller to wait

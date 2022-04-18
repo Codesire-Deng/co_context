@@ -219,6 +219,7 @@ bool io_context::try_submit(task_info_ptr task) noexcept {
             sqe->cloneFrom(detail::as_sqe_task_meta(task)->sqe);
             log::v("ctx ring.submit()...\n");
             ++requests_to_reap;
+            ring.appendSQEntry(sqe);
             ring.submit();
             // ++requests_to_reap;
             log::v("ctx ring.submit()...OK\n");
