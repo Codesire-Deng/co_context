@@ -80,6 +80,18 @@ struct spsc_cursor {
     inline T tail() const noexcept {
         return m_tail.load(std::memory_order_relaxed) & mask;
     }
+
+    inline T raw_head() const noexcept {
+        return m_head.load(std::memory_order_relaxed);
+    }
+
+    inline T raw_tail() const noexcept {
+        return m_tail.load(std::memory_order_relaxed);
+    }
+
+    inline T load_raw_tail() const noexcept {
+        return m_tail.load(std::memory_order_acquire);
+    }
 };
 
 } // namespace co_context

@@ -11,13 +11,20 @@
 
 namespace co_context {
 
+unsigned
+compress_sqe(const io_context *self, const liburingcxx::SQEntry *sqe) noexcept {
+    return sqe - self->sqes_addr;
+}
+
 namespace detail {
 
     thread_local thread_meta this_thread;
 
     inline void
     worker_meta::init(const int thread_index, io_context *const context) {
+        /*
         assert(submit_overflow_buf.empty());
+        */
         detail::this_thread.ctx = context;
         detail::this_thread.worker = this;
         detail::this_thread.tid = thread_index;
@@ -39,29 +46,69 @@ namespace detail {
 #endif
     }
 
-    void worker_meta::submit(task_info_ptr io_info) noexcept {
+    liburingcxx::SQEntry *worker_meta::get_free_sqe() noexcept {
+        // may acquire the cur.head
+        const auto &swap = *this->submit_swap_ptr;
+        const auto &cur = this->sharing.submit_cur;
+        // TODO check this memory order
+        while (!cur.is_available_load_head()) [[unlikely]] {
+                log::d(
+                    "worker[%u] sleep because get_free_sqe overflow! "
+                    "(io_context is too slow)\n",
+                    tid
+                );
+                std::this_thread::sleep_for(std::chrono::microseconds(1));
+            }
+        assert(swap[cur.tail()].sqe != nullptr);
+        return swap[cur.tail()].sqe;
+    }
+
+    void worker_meta::submit_sqe(submit_info info) noexcept {
+        [[maybe_unused]] const auto &swap = *this->submit_swap_ptr;
+        auto &cur = this->sharing.submit_cur;
+        assert(swap[cur.tail()].sqe == info.sqe);
+        cur.push(1);
+    }
+
+    void worker_meta::submit_non_sqe(submit_info info) noexcept {
         auto &swap = *this->submit_swap_ptr;
         auto &cur = this->sharing.submit_cur;
         // std::cerr << cur.slot << " " << tid << cur.off << std::endl;
+        while (!cur.is_available_load_head()) [[unlikely]] {
+                log::d(
+                    "worker[%u] sleep because submit_non_sqe overflow! "
+                    "(io_context is too slow)\n",
+                    tid
+                );
+                std::this_thread::sleep_for(std::chrono::microseconds(1));
+            }
+        info.request->compressed_sqe =
+            compress_sqe(detail::this_thread.ctx, swap[cur.tail()].sqe);
+        swap.push(cur, info);
+
+        /*
         if (submit_overflow_buf.empty() && cur.is_available()) [[likely]] {
             log::v("worker[%u] submit at [%u]\n", tid, cur.tail());
-            swap.push(cur, io_info);
+            swap.push(cur, info);
         } else {
-            this->submit_overflow_buf.push(io_info);
+            this->submit_overflow_buf.push(info);
             log::d("worker[%u] submit to OF (io_context is too slow)\n", tid);
         }
+        */
     }
 
+    /*
     void worker_meta::try_clear_submit_overflow_buf() noexcept {
         auto &swap = *this->submit_swap_ptr;
         auto &cur = this->sharing.submit_cur;
         while (!this->submit_overflow_buf.empty() && cur.is_available()) {
-            task_info_ptr task = this->submit_overflow_buf.front();
+            submit_info info = this->submit_overflow_buf.front();
             this->submit_overflow_buf.pop();
             log::d("worker[%u] submit from OF_buf to [%u]\n", tid, cur.tail());
-            swap.push(cur, task);
+            swap.push(cur, info);
         }
     }
+    */
 
     inline std::coroutine_handle<> worker_meta::schedule() noexcept {
         auto &reap_swap = *this->reap_swap_ptr;
@@ -77,8 +124,7 @@ namespace detail {
             // BUG
             // try_clear_submit_overflow_buf();
 
-            if (!cur.is_empty_load_head()) {
-                // TODO judge this memory order
+            if (!cur.is_empty_load_tail()) {
                 const std::coroutine_handle<> handle = reap_swap[cur.head()];
                 log::v("worker[%u] found [%u]\n", tid, cur.head());
                 cur.pop();
@@ -106,9 +152,15 @@ namespace detail {
 
 } // namespace detail
 
+[[nodiscard]] bool io_context::is_sqe(const liburingcxx::SQEntry *suspect
+) const noexcept {
+    return static_cast<size_t>(suspect - this->sqes_addr)
+           < this->sqring_entries;
+}
+
 void io_context::forward_task(std::coroutine_handle<> handle) noexcept {
     // TODO optimize scheduling strategy
-    if (try_find_reap_worker()) [[likely]] {
+    if (try_find_reap_worker_acquire()) [[likely]] {
         auto &cur = worker[r_cur].sharing.reap_cur;
         log::v(
             "ctx forward_task to [%u][%u]: %lx\n", r_cur, cur.tail(),
@@ -127,13 +179,13 @@ void io_context::forward_task(std::coroutine_handle<> handle) noexcept {
 
 } // namespace co_context
 
-#include "co_context/detail/sqe_task_meta.hpp"
+// #include "co_context/detail/sqe_task_meta.hpp" // deprecated
 #include "co_context/detail/cv_task_meta.hpp"
 #include "co_context/detail/sem_task_meta.hpp"
 
 namespace co_context {
 
-void io_context::handle_semaphore_release(task_info_ptr sem_release) noexcept {
+void io_context::handle_semaphore_release(task_info *sem_release) noexcept {
     counting_semaphore &sem = *detail::as_counting_semaphore(sem_release);
     const counting_semaphore::T update =
         as_atomic(sem_release->update).exchange(0, std::memory_order_relaxed);
@@ -154,7 +206,7 @@ void io_context::handle_semaphore_release(task_info_ptr sem_release) noexcept {
     sem.counter.fetch_add(update, std::memory_order_acq_rel);
 }
 
-void io_context::handle_condition_variable_notify(task_info_ptr cv_notify
+void io_context::handle_condition_variable_notify(task_info *cv_notify
 ) noexcept {
     condition_variable &cv = *detail::as_condition_variable(cv_notify);
     const condition_variable::T notify_counter =
@@ -185,7 +237,7 @@ void io_context::handle_condition_variable_notify(task_info_ptr cv_notify
     if (cv.to_resume_head == nullptr) cv.to_resume_tail = nullptr;
 }
 
-bool io_context::try_find_submit_worker() noexcept {
+bool io_context::try_find_submit_worker_relaxed() noexcept {
     for (config::tid_t i = 0; i < config::worker_threads_number; ++i) {
         if (!this->worker[s_cur].sharing.submit_cur.is_empty()) return true;
         cur_next(s_cur);
@@ -193,54 +245,51 @@ bool io_context::try_find_submit_worker() noexcept {
     return false;
 }
 
-bool io_context::try_find_reap_worker() noexcept {
+bool io_context::try_find_reap_worker_acquire() noexcept {
     for (config::tid_t i = 0; i < config::worker_threads_number; ++i) {
-        if (this->worker[r_cur].sharing.reap_cur.is_available()) return true;
+        if (this->worker[r_cur].sharing.reap_cur.is_available_load_head())
+            return true;
         cur_next(r_cur);
     }
     return false;
 }
 
-bool io_context::try_submit(task_info_ptr task) noexcept {
-    liburingcxx::SQEntry *sqe;
-    using task_type = task_info::task_type;
-
-    switch (task->type) {
+void io_context::try_submit(detail::submit_info &info) noexcept {
+    // lazy_sqe or eager_sqe
+    if (is_sqe(info.sqe)) [[likely]] {
         // submit to ring
-        case task_type::lazy_sqe:
-        case task_type::eager_sqe:
-            if (ring.SQSpaceLeft() == 0) [[unlikely]] {
-                log::d("ctx try_submit failed SQfull\n");
-                return false; // SQRing is full
-            }
-            sqe = ring.getSQEntry();
-            log::v("ctx get SQEntry, clone sqe...\n");
-            assert(sqe != nullptr);
-            sqe->cloneFrom(detail::as_sqe_task_meta(task)->sqe);
-            log::v("ctx ring.submit()...\n");
-            ++requests_to_reap;
-            ring.appendSQEntry(sqe);
-            ring.submit();
-            // ++requests_to_reap;
-            log::v("ctx ring.submit()...OK\n");
-            return true;
+        log::v("ctx ring.submit()...\n");
+        ++requests_to_reap;
+        need_ring_submit = true;
+        ring.appendSQEntry(info.sqe);
+        auto *const victim_sqe = ring.getSQEntry();
+        assert(victim_sqe != nullptr && "ring.getSQEntry() returns nullptr!");
+        info.sqe = victim_sqe;
+        log::v("ctx ring.submit()...OK\n");
+        return;
+    } else {
+        using task_type = task_info::task_type;
+        task_info *const task = info.request;
+        info.sqe = decompress_sqe(task->compressed_sqe);
+        // PERF May call cur.pop() to make worker start sooner.
+        switch (task->type) {
+            case task_type::co_spawn:
+                forward_task(task->handle);
+                return;
 
-        case task_type::co_spawn:
-            forward_task(task->handle);
-            return true;
+            case task_type::semaphore_release:
+                handle_semaphore_release(task);
+                return;
 
-        case task_type::semaphore_release:
-            handle_semaphore_release(task);
-            return true;
+            case task_type::condition_variable_notify:
+                handle_condition_variable_notify(task);
+                return;
 
-        case task_type::condition_variable_notify:
-            handle_condition_variable_notify(task);
-            return true;
-
-        default:
-            log::e("task->type==%u\n", task->type);
-            assert(false && "try_submit(): unknown task_type");
-            return false;
+            default:
+                log::e("task->type==%u\n", task->type);
+                assert(false && "try_submit(): unknown task_type");
+                return;
+        }
     }
 }
 
@@ -250,28 +299,35 @@ bool io_context::try_submit(task_info_ptr task) noexcept {
  */
 bool io_context::poll_submission() noexcept {
     // submit round
-    if (!try_find_submit_worker()) { return false; }
+    if (!try_find_submit_worker_relaxed()) { return false; }
     auto &cur = worker[s_cur].sharing.submit_cur;
+    auto &swap = submit_swap[s_cur];
 
-    assert(!cur.is_empty());
-    task_info_ptr const io_info = submit_swap[s_cur].front(cur);
-    log::v("ctx poll_submission at [%u][%u]\n", s_cur, cur.head());
-    cur.pop();
+    auto head{cur.raw_head()};
+    auto tail{cur.load_raw_tail()};
+    const auto submit_count = tail - head;
+
+    need_ring_submit = false;
+
+    for (; head != tail; ++head) {
+        // log::v("ctx poll_submission at [%u][%u]\n", s_cur, head);
+        const auto i{head & cur.mask};
+        try_submit(swap[i]); // always success (currently).
+    }
+
+    cur.pop(submit_count);
     cur_next(s_cur);
 
-    if (try_submit(io_info)) [[likely]] {
-        return true;
-    } else {
-        submit_overflow_buf.push(io_info);
-        log::d("ctx poll_submission failed submit_OF (io_uring is too slow)\n");
-        return false;
-    }
+    if (need_ring_submit) ring.submit();
+
+    return true;
 }
 
+/*
 bool io_context::try_clear_submit_overflow_buf() noexcept {
     if (submit_overflow_buf.empty()) return true;
     do {
-        task_info_ptr const task = submit_overflow_buf.front();
+        task_info *const task = submit_overflow_buf.front();
         // OPTIMIZE impossible for task_type::co_spawn
         if (try_submit(task)) {
             submit_overflow_buf.pop();
@@ -283,9 +339,10 @@ bool io_context::try_clear_submit_overflow_buf() noexcept {
     log::d("ctx try_clear_submit succ\n");
     return true;
 }
+*/
 
 bool io_context::try_reap(std::coroutine_handle<> handle) noexcept {
-    if (!try_find_reap_worker()) [[unlikely]] {
+    if (!try_find_reap_worker_acquire()) [[unlikely]] {
         log::d("ctx try_reap failed reap_swap is full\n");
         return false;
     }
@@ -298,14 +355,13 @@ bool io_context::try_reap(std::coroutine_handle<> handle) noexcept {
     return true;
 }
 
-static bool eager_io_need_awake(detail::task_info_ptr io_info) {
+static bool eager_io_need_awake(detail::task_info *io_info) {
     using io_state_t = eager::io_state_t;
     const io_state_t old_state =
         as_atomic(io_info->eager_io_state)
             // .fetch_or(eager::io_ready, std::memory_order_seq_cst);
             .fetch_or(eager::io_ready, std::memory_order_release);
-    if (old_state & eager::io_detached)
-        delete detail::as_sqe_task_meta(io_info);
+    if (old_state & eager::io_detached) delete io_info;
     return old_state & eager::io_wait;
 }
 
@@ -321,8 +377,7 @@ bool io_context::poll_completion() noexcept {
     --requests_to_reap;
     log::v("ctx poll_completion found\n");
 
-    task_info_ptr io_info =
-        reinterpret_cast<task_info_ptr>(polling_cqe->getData());
+    task_info *io_info = reinterpret_cast<task_info *>(polling_cqe->getData());
     io_info->result = polling_cqe->getRes();
     ring.SeenCQEntry(polling_cqe);
     // --requests_to_reap;
@@ -378,8 +433,20 @@ void io_context::init() noexcept {
     detail::this_thread.ctx = this;
     detail::this_thread.worker = nullptr;
     detail::this_thread.tid = std::thread::hardware_concurrency() - 1;
-    assert(submit_overflow_buf.empty());
+    // assert(submit_overflow_buf.empty());
     assert(reap_overflow_buf.empty());
+    assert(this->sqring_entries == ring.getSQRingEntries());
+    if (this->sqring_entries
+        < config::worker_threads_number * config::swap_capacity * 2) {
+        log::e("io_context::init(): Entries inside the ring are not enough!\n");
+        exit(1);
+    }
+    this->sqes_addr = ring.__getSqes();
+    for (unsigned i = 0; i < config::worker_threads_number; ++i) {
+        for (unsigned j = 0; j < config::swap_capacity; ++j) {
+            submit_swap[i][j] = detail::submit_info{.sqe = ring.getSQEntry()};
+        }
+    }
     // probe();
 }
 
@@ -417,21 +484,24 @@ void io_context::co_spawn(main_task entrance) {
     log::v("ctx make_thread_pool end\n");
 
     while (!will_stop) [[likely]] {
-            log::v("ctx polling\n");
+            // log::v("ctx polling\n");
             // if (try_clear_submit_overflow_buf()) {
+            if constexpr (config::submit_poll_rounds > 1)
                 for (uint8_t i = 0; i < config::submit_poll_rounds; ++i) {
-                    log::v("ctx poll_submission\n");
+                    // log::v("ctx poll_submission\n");
                     if (!poll_submission()) break;
                 }
+            else
+                poll_submission();
             // }
 
             // if (try_clear_reap_overflow_buf()) {
-                while (requests_to_reap != 0) {
-                    // for (uint8_t i = 0; i < config::reap_poll_rounds; ++i) {
-                    log::v("ctx poll_completion\n");
-                    if (!poll_completion()) break;
-                    // }
-                }
+            while (requests_to_reap != 0) {
+                // for (uint8_t i = 0; i < config::reap_poll_rounds; ++i) {
+                // log::v("ctx poll_completion\n");
+                if (!poll_completion()) break;
+                // }
+            }
             // }
 
             // std::this_thread::sleep_for(std::chrono::milliseconds(10));

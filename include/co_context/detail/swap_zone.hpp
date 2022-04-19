@@ -6,7 +6,7 @@
 #include "co_context/config.hpp"
 #include "co_context/utility/as_atomic.hpp"
 #include "co_context/utility/bit.hpp"
-#include "co_context/lockfree/spsc_cursor.1.hpp"
+#include "co_context/lockfree/spsc_cursor.hpp"
 #include <cstring>
 
 namespace co_context {
@@ -30,12 +30,14 @@ namespace detail {
 
         T data[config::swap_capacity];
 
-        worker_swap_zone() noexcept { memset(data, 0, sizeof(data)); }
+        worker_swap_zone() noexcept = default;
 
         worker_swap_zone(const worker_swap_zone &) = delete;
         worker_swap_zone(worker_swap_zone &&) = delete;
 
         T operator[](sz_t i) const noexcept { return data[i]; }
+
+        T &operator[](sz_t i) noexcept { return data[i]; }
 
         inline void push(cur_t &cur, T value) noexcept {
             data[cur.tail()] = value;

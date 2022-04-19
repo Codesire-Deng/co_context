@@ -6,10 +6,8 @@ namespace co_context {
 
 namespace detail {
 
-    using task_info = ::co_context::detail::task_info;
-
     inline constexpr counting_semaphore *
-    as_counting_semaphore(detail::task_info *task_ptr) noexcept {
+    as_counting_semaphore(task_info *task_ptr) noexcept {
         using sem = counting_semaphore;
         return reinterpret_cast<sem *>(
             reinterpret_cast<uintptr_t>(task_ptr) - sem::__task_offset()

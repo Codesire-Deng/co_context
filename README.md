@@ -1,6 +1,6 @@
 # co_context
 
-A coroutine framework aimed at high-concurrency or(and) low-latency io, based on [liburingcxx](https://github.com/Codesire-Deng/liburingcxx).
+A coroutine framework aimed at high-concurrency io with reasonable latency, based on [liburingcxx](https://github.com/Codesire-Deng/liburingcxx).
 
 **co_context** 是一个**协程**异步多线程并发框架，以提供可靠的性能为使命，也致力于减轻用户的心智负担，让 C++ 初学者也能轻松写出高并发程序。
 

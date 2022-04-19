@@ -5,7 +5,7 @@
 #include "co_context/detail/worker_meta.hpp"
 #include "co_context/utility/as_atomic.hpp"
 #include "co_context/detail/eager_io_state.hpp"
-#include "co_context/detail/sqe_task_meta.hpp"
+// #include "co_context/detail/sqe_task_meta.hpp" // deprecated
 #include <span>
 #include <memory>
 
@@ -16,7 +16,9 @@ namespace detail {
     class eager_awaiter {
       public:
         inline bool is_ready() const noexcept {
-            return shared_meta->io_info.eager_io_state & eager::io_ready;
+            return as_atomic(shared_io_info->eager_io_state)
+                       .load(std::memory_order_acquire)
+                   & eager::io_ready;
         }
 
         bool await_ready() const noexcept { return is_ready(); }
@@ -24,9 +26,9 @@ namespace detail {
         // std::coroutine_handle<>
         bool await_suspend(std::coroutine_handle<> current) noexcept {
             using namespace ::co_context::eager;
-            shared_meta->io_info.handle = current;
+            shared_io_info->handle = current;
             const io_state_t old_state =
-                as_atomic(shared_meta->io_info.eager_io_state)
+                as_atomic(shared_io_info->eager_io_state)
                     .fetch_or(io_wait, std::memory_order_acq_rel);
             assert(
                 !(old_state & io_detached) && "logic error: wait after detached"
@@ -39,45 +41,50 @@ namespace detail {
         }
 
         int32_t await_resume() noexcept {
-            int32_t result = shared_meta->io_info.result;
-            delete shared_meta;
+            int32_t result = shared_io_info->result;
+            delete shared_io_info;
             return result;
         }
 
         void detach() noexcept {
             using namespace ::co_context::eager;
             const io_state_t old_state =
-                as_atomic(shared_meta->io_info.eager_io_state)
+                as_atomic(shared_io_info->eager_io_state)
                     .fetch_or(io_detached, std::memory_order_relaxed);
             assert(
                 !(old_state & io_wait) && "logic error: detach after waited"
             );
-            if (old_state & io_ready) { delete shared_meta; }
+            if (old_state & io_ready) { delete shared_io_info; }
         }
 
       protected:
-        sqe_task_meta *shared_meta;
+        liburingcxx::SQEntry *sqe;
+        task_info *shared_io_info;
 
         // PERF memory allocation
         eager_awaiter()
-            : shared_meta(new sqe_task_meta{task_info::task_type::eager_sqe}) {
-            as_atomic(shared_meta->io_info.eager_io_state)
-                .store(0, std::memory_order_relaxed);
+            : shared_io_info(new task_info{task_info::task_type::eager_sqe}) {
+            shared_io_info->eager_io_state = 0; // instead of tid_hint
+            sqe = this_thread.worker->get_free_sqe();
+            sqe->setData(shared_io_info->as_user_data());
         }
 
         inline void submit() const noexcept {
             worker_meta *const worker = detail::this_thread.worker;
-            worker->submit(&shared_meta->io_info);
+            worker->submit_sqe(submit_info{.sqe = sqe});
+            /*
             worker->try_clear_submit_overflow_buf();
+            */
         }
 
         eager_awaiter(const eager_awaiter &other) noexcept
-            : shared_meta(other.shared_meta) {}
+            : sqe(other.sqe), shared_io_info(other.shared_io_info) {}
 
         eager_awaiter(eager_awaiter &&) = delete;
 
         eager_awaiter &operator=(const eager_awaiter &other) noexcept {
-            shared_meta = other.shared_meta;
+            sqe = other.sqe;
+            shared_io_info = other.shared_io_info;
             return *this;
         }
 
@@ -86,7 +93,7 @@ namespace detail {
         ~eager_awaiter() noexcept {
             using namespace ::co_context::eager;
             assert(
-                (shared_meta->io_info.eager_io_state & (io_detached | io_wait))
+                (shared_io_info->eager_io_state & (io_detached | io_wait))
                 && "eager_io has neither been detached nor waited!"
             );
         };
@@ -96,7 +103,7 @@ namespace detail {
         inline eager_read(
             int fd, std::span<char> buf, uint64_t offset
         ) noexcept {
-            shared_meta->sqe.prepareRead(fd, buf, offset);
+            sqe->prepareRead(fd, buf, offset);
             submit();
         }
     };
@@ -105,7 +112,7 @@ namespace detail {
         inline eager_readv(
             int fd, std::span<const iovec> iovecs, uint64_t offset
         ) noexcept {
-            shared_meta->sqe.prepareReadv(fd, iovecs, offset);
+            sqe->prepareReadv(fd, iovecs, offset);
             submit();
         }
     };
@@ -114,7 +121,7 @@ namespace detail {
         inline eager_read_fixed(
             int fd, std::span<char> buf, uint64_t offset, uint16_t bufIndex
         ) noexcept {
-            shared_meta->sqe.prepareReadFixed(fd, buf, offset, bufIndex);
+            sqe->prepareReadFixed(fd, buf, offset, bufIndex);
             submit();
         }
     };
@@ -123,7 +130,7 @@ namespace detail {
         inline eager_write(
             int fd, std::span<const char> buf, uint64_t offset
         ) noexcept {
-            shared_meta->sqe.prepareWrite(fd, buf, offset);
+            sqe->prepareWrite(fd, buf, offset);
             submit();
         }
     };
@@ -132,7 +139,7 @@ namespace detail {
         inline eager_writev(
             int fd, std::span<const iovec> iovecs, uint64_t offset
         ) noexcept {
-            shared_meta->sqe.prepareWritev(fd, iovecs, offset);
+            sqe->prepareWritev(fd, iovecs, offset);
             submit();
         }
     };
@@ -144,7 +151,7 @@ namespace detail {
             uint64_t offset,
             uint16_t bufIndex
         ) noexcept {
-            shared_meta->sqe.prepareWriteFixed(fd, buf, offset, bufIndex);
+            sqe->prepareWriteFixed(fd, buf, offset, bufIndex);
             submit();
         }
     };
@@ -153,7 +160,7 @@ namespace detail {
         inline eager_accept(
             int fd, sockaddr *addr, socklen_t *addrlen, int flags
         ) noexcept {
-            shared_meta->sqe.prepareAccept(fd, addr, addrlen, flags);
+            sqe->prepareAccept(fd, addr, addrlen, flags);
             submit();
         }
     };
@@ -166,23 +173,21 @@ namespace detail {
             int flags,
             uint32_t fileIndex
         ) noexcept {
-            shared_meta->sqe.prepareAcceptDirect(
-                fd, addr, addrlen, flags, fileIndex
-            );
+            sqe->prepareAcceptDirect(fd, addr, addrlen, flags, fileIndex);
             submit();
         }
     };
 
     struct eager_recv : eager_awaiter {
         inline eager_recv(int sockfd, std::span<char> buf, int flags) noexcept {
-            shared_meta->sqe.prepareRecv(sockfd, buf, flags);
+            sqe->prepareRecv(sockfd, buf, flags);
             submit();
         }
     };
 
     struct eager_recvmsg : eager_awaiter {
         inline eager_recvmsg(int fd, msghdr *msg, unsigned int flags) noexcept {
-            shared_meta->sqe.prepareRecvmsg(fd, msg, flags);
+            sqe->prepareRecvmsg(fd, msg, flags);
             submit();
         }
     };
@@ -191,7 +196,7 @@ namespace detail {
         inline eager_send(
             int sockfd, std::span<const char> buf, int flags
         ) noexcept {
-            shared_meta->sqe.prepareSend(sockfd, buf, flags);
+            sqe->prepareSend(sockfd, buf, flags);
             submit();
         }
     };
@@ -200,7 +205,7 @@ namespace detail {
         inline eager_sendmsg(
             int fd, const msghdr *msg, unsigned int flags
         ) noexcept {
-            shared_meta->sqe.prepareSendmsg(fd, msg, flags);
+            sqe->prepareSendmsg(fd, msg, flags);
             submit();
         }
     };
@@ -209,14 +214,14 @@ namespace detail {
         inline eager_connect(
             int sockfd, const sockaddr *addr, socklen_t addrlen
         ) noexcept {
-            shared_meta->sqe.prepareConnect(sockfd, addr, addrlen);
+            sqe->prepareConnect(sockfd, addr, addrlen);
             submit();
         }
     };
 
     struct eager_close : eager_awaiter {
         inline eager_close(int fd) noexcept {
-            shared_meta->sqe.prepareClose(fd);
+            sqe->prepareClose(fd);
             submit();
         }
     };
@@ -224,7 +229,7 @@ namespace detail {
     struct eager_shutdown : eager_awaiter {
         [[nodiscard("Did you forget to co_await?"
         )]] inline eager_shutdown(int fd, int how) noexcept {
-            shared_meta->sqe.prepareShutdown(fd, how);
+            sqe->prepareShutdown(fd, how);
             submit();
         }
     };
@@ -232,7 +237,7 @@ namespace detail {
     struct eager_fsync : eager_awaiter {
         [[nodiscard("Did you forget to co_await?"
         )]] inline eager_fsync(int fd, uint32_t fsync_flags) noexcept {
-            shared_meta->sqe.prepareFsync(fd, fsync_flags);
+            sqe->prepareFsync(fd, fsync_flags);
             submit();
         }
     };
@@ -241,7 +246,7 @@ namespace detail {
         inline eager_sync_file_range(
             int fd, uint32_t len, uint64_t offset, int flags
         ) noexcept {
-            shared_meta->sqe.prepareSyncFileRange(fd, len, offset, flags);
+            sqe->prepareSyncFileRange(fd, len, offset, flags);
             submit();
         }
     };
@@ -249,7 +254,7 @@ namespace detail {
     struct eager_uring_nop : eager_awaiter {
         [[nodiscard("Did you forget to co_await?"
         )]] inline eager_uring_nop() noexcept {
-            shared_meta->sqe.prepareNop();
+            sqe->prepareNop();
             submit();
         }
     };
@@ -257,7 +262,7 @@ namespace detail {
     struct eager_files_update : eager_awaiter {
         [[nodiscard("Did you forget to co_await?"
         )]] inline eager_files_update(std::span<int> fds, int offset) noexcept {
-            shared_meta->sqe.prepareFilesUpdate(fds, offset);
+            sqe->prepareFilesUpdate(fds, offset);
             submit();
         }
     };
@@ -266,7 +271,7 @@ namespace detail {
         inline eager_fallocate(
             int fd, int mode, off_t offset, off_t len
         ) noexcept {
-            shared_meta->sqe.prepareFallocate(fd, mode, offset, len);
+            sqe->prepareFallocate(fd, mode, offset, len);
             submit();
         }
     };
@@ -275,7 +280,7 @@ namespace detail {
         inline eager_openat(
             int dfd, const char *path, int flags, mode_t mode
         ) noexcept {
-            shared_meta->sqe.prepareOpenat(dfd, path, flags, mode);
+            sqe->prepareOpenat(dfd, path, flags, mode);
             submit();
         }
     };
@@ -289,9 +294,7 @@ namespace detail {
             mode_t mode,
             unsigned file_index
         ) noexcept {
-            shared_meta->sqe.prepareOpenatDirect(
-                dfd, path, flags, mode, file_index
-            );
+            sqe->prepareOpenatDirect(dfd, path, flags, mode, file_index);
             submit();
         }
     };
@@ -300,7 +303,7 @@ namespace detail {
         inline eager_openat2(
             int dfd, const char *path, open_how *how
         ) noexcept {
-            shared_meta->sqe.prepareOpenat2(dfd, path, how);
+            sqe->prepareOpenat2(dfd, path, how);
             submit();
         }
     };
@@ -310,7 +313,7 @@ namespace detail {
         inline eager_openat2_direct(
             int dfd, const char *path, open_how *how, unsigned int file_index
         ) noexcept {
-            shared_meta->sqe.prepareOpenat2Direct(dfd, path, how, file_index);
+            sqe->prepareOpenat2Direct(dfd, path, how, file_index);
             submit();
         }
     };
@@ -323,14 +326,14 @@ namespace detail {
             unsigned int mask,
             struct statx *statxbuf
         ) noexcept {
-            shared_meta->sqe.prepareStatx(dfd, path, flags, mask, statxbuf);
+            sqe->prepareStatx(dfd, path, flags, mask, statxbuf);
             submit();
         }
     };
 
     struct eager_unlinkat : eager_awaiter {
         inline eager_unlinkat(int dfd, const char *path, int flags) noexcept {
-            shared_meta->sqe.prepareUnlinkat(dfd, path, flags);
+            sqe->prepareUnlinkat(dfd, path, flags);
             submit();
         }
     };
@@ -343,16 +346,14 @@ namespace detail {
             const char *newpath,
             int flags
         ) noexcept {
-            shared_meta->sqe.prepareRenameat(
-                olddfd, oldpath, newdfd, newpath, flags
-            );
+            sqe->prepareRenameat(olddfd, oldpath, newdfd, newpath, flags);
             submit();
         }
     };
 
     struct eager_mkdirat : eager_awaiter {
         inline eager_mkdirat(int dfd, const char *path, mode_t mode) noexcept {
-            shared_meta->sqe.prepareMkdirat(dfd, path, mode);
+            sqe->prepareMkdirat(dfd, path, mode);
             submit();
         }
     };
@@ -361,7 +362,7 @@ namespace detail {
         inline eager_symlinkat(
             const char *target, int newdirfd, const char *linkpath
         ) noexcept {
-            shared_meta->sqe.prepareSymlinkat(target, newdirfd, linkpath);
+            sqe->prepareSymlinkat(target, newdirfd, linkpath);
             submit();
         }
     };
@@ -374,9 +375,7 @@ namespace detail {
             const char *newpath,
             int flags
         ) noexcept {
-            shared_meta->sqe.prepareLinkat(
-                olddfd, oldpath, newdfd, newpath, flags
-            );
+            sqe->prepareLinkat(olddfd, oldpath, newdfd, newpath, flags);
             submit();
         }
     };
@@ -385,7 +384,7 @@ namespace detail {
         inline eager_timeout_timespec(
             __kernel_timespec *ts, unsigned int count, unsigned int flags
         ) noexcept {
-            shared_meta->sqe.prepareTimeout(ts, count, flags);
+            sqe->prepareTimeout(ts, count, flags);
             submit();
         }
     };
@@ -404,7 +403,7 @@ namespace detail {
             ts.tv_nsec =
                 duration_cast<chrono::duration<long long, std::nano>>(duration)
                     .count();
-            shared_meta->sqe.prepareTimeout(&ts, 0, flags);
+            sqe->prepareTimeout(&ts, 0, flags);
             submit();
         }
     };
@@ -418,7 +417,7 @@ namespace detail {
             unsigned int nbytes,
             unsigned int splice_flags
         ) noexcept {
-            shared_meta->sqe.prepareSplice(
+            sqe->prepareSplice(
                 fd_in, off_in, fd_out, off_out, nbytes, splice_flags
             );
             submit();
@@ -432,7 +431,7 @@ namespace detail {
             unsigned int nbytes,
             unsigned int splice_flags
         ) noexcept {
-            shared_meta->sqe.prepareTee(fd_in, fd_out, nbytes, splice_flags);
+            sqe->prepareTee(fd_in, fd_out, nbytes, splice_flags);
             submit();
         }
     };

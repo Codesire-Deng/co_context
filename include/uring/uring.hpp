@@ -157,6 +157,12 @@ class [[nodiscard]] URing final {
         return sq.ring_entries - SQReady();
     }
 
+    inline unsigned getSQRingEntries() const noexcept {
+        return sq.ring_entries;
+    }
+
+    inline const SQEntry *__getSqes() const noexcept { return sq.sqes; }
+
     /**
      * @brief Return an sqe to fill. User must later call submit().
      *
@@ -176,7 +182,7 @@ class [[nodiscard]] URing final {
         //     );
         //     sq.sqe_tail = next;
         // }
-        return reinterpret_cast<SQEntry *>(sq.getSQEntry());
+        return sq.getSQEntry();
     }
 
     /**
@@ -324,12 +330,13 @@ class [[nodiscard]] URing final {
             munmap(cq.ring_ptr, cq.ring_sz);
     }
 
-    inline constexpr bool isSQRingNeedEnter(unsigned &flags) const noexcept {
+    inline constexpr bool isSQRingNeedEnter(unsigned &enterFlags
+    ) const noexcept {
         if constexpr (!(URingFlags & IORING_SETUP_SQPOLL)) return true;
 
         if (IO_URING_READ_ONCE(*sq.kflags) & IORING_SQ_NEED_WAKEUP)
             [[unlikely]] {
-            flags |= IORING_ENTER_SQ_WAKEUP;
+            enterFlags |= IORING_ENTER_SQ_WAKEUP;
             return true;
         }
 

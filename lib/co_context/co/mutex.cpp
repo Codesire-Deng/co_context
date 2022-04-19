@@ -18,13 +18,13 @@ bool mutex::try_lock() noexcept {
     );
 }
 
-inline static void send_task(detail::task_info_ptr awaken_task) noexcept {
+inline static void send_task(detail::task_info * awaken_task) noexcept {
     using namespace co_context::detail;
     auto *worker = this_thread.worker;
     assert(
         worker != nullptr && "mutex::unlock() must run inside an io_context"
     );
-    worker->submit(awaken_task);
+    worker->submit_non_sqe(submit_info{.request = awaken_task});
 }
 
 void mutex::unlock() noexcept {

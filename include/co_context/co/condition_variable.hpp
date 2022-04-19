@@ -114,7 +114,7 @@ inline void condition_variable::send_task() noexcept {
         && "condition_variable::send_task() must run inside an io_context"
     );
     log::d("condition_variable %lx notified\n", this);
-    worker->submit(&notify_task);
+    worker->submit_non_sqe(submit_info{.request = &notify_task});
 }
 
 } // namespace co_context

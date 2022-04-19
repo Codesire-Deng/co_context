@@ -8,8 +8,6 @@ namespace co_context {
 
 namespace detail {
 
-    using task_info = ::co_context::detail::task_info;
-
     struct sqe_task_meta {
         liburingcxx::SQEntry sqe;
         task_info io_info;

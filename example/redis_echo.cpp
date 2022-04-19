@@ -7,7 +7,7 @@ using namespace co_context;
 constexpr uint16_t port = 6379;
 
 main_task reply(co_context::socket sock) {
-    char recv_buf[512];
+    char recv_buf[32];
     while (true) {
         int n = co_await sock.recv(recv_buf);
         if (n <= 0) co_return;
@@ -23,7 +23,7 @@ main_task server() {
 }
 
 int main() {
-    io_context ctx{64};
+    io_context ctx{32768};
     ctx.co_spawn(server());
     ctx.run();
     return 0;

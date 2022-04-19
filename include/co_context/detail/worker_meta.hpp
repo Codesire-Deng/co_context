@@ -2,6 +2,7 @@
 
 #include "co_context/config.hpp"
 #include "co_context/detail/swap_zone.hpp"
+#include "co_context/detail/submit_info.hpp"
 #include "co_context/main_task.hpp"
 #include <thread>
 #include <queue>
@@ -35,14 +36,23 @@ namespace detail {
 
         alignas(config::cache_line_size) sharing_zone sharing;
 
-        worker_swap_zone<task_info_ptr> *submit_swap_ptr;
+        alignas(config::cache_line_size
+        ) worker_swap_zone<submit_info> *submit_swap_ptr;
         worker_swap_zone<std::coroutine_handle<>> *reap_swap_ptr;
         tid_t tid;
-        std::queue<task_info *> submit_overflow_buf;
+        /*
+        std::queue<submit_info> submit_overflow_buf;
+        */
 
-        void submit(task_info_ptr io_info) noexcept;
+        liburingcxx::SQEntry *get_free_sqe() noexcept;
 
+        void submit_sqe(submit_info info) noexcept;
+
+        void submit_non_sqe(submit_info io_info) noexcept;
+
+        /*
         void try_clear_submit_overflow_buf() noexcept;
+        */
 
         std::coroutine_handle<> schedule() noexcept;
 
@@ -58,7 +68,8 @@ namespace detail {
             "worker[%u] co_spawn coro %lx\n", this_thread.tid,
             entrance.get_io_info_ptr()->handle.address()
         );
-        this->submit(entrance.get_io_info_ptr());
+        this->submit_non_sqe(submit_info{.request = entrance.get_io_info_ptr()}
+        );
     }
 
 } // namespace detail

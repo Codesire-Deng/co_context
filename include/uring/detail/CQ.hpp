@@ -26,8 +26,6 @@ namespace detail {
         size_t ring_sz;
         void *ring_ptr;
 
-        unsigned pad[4];
-
       private:
         void setOffset(const io_cqring_offsets &off) noexcept {
             khead = (unsigned *)((uintptr_t)ring_ptr + off.head);

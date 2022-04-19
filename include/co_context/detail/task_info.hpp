@@ -32,7 +32,7 @@ namespace detail {
         };
 
         union {
-            // SQEntry *sqe;
+            unsigned compressed_sqe;
             // CQEntry *cqe;
             int32_t result;
             // counting_semaphore *sem;
@@ -66,7 +66,6 @@ namespace detail {
         }
     };
 
-    using task_info_ptr = task_info *;
 
 } // namespace detail
 

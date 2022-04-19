@@ -15,6 +15,10 @@ namespace detail {
 
     class SubmissionQueue final {
       private:
+        unsigned sqe_head;      // memset to 0 during URing()
+        unsigned sqe_tail;      // memset to 0 during URing()
+        unsigned sqe_free_head; // memset to 0 during URing()
+
         unsigned *khead;
         unsigned *ktail;
         unsigned ring_mask;
@@ -23,15 +27,9 @@ namespace detail {
         unsigned *kdropped;
         unsigned *array;
         SQEntry *sqes;
-
-        unsigned sqe_head;      // memset to 0 during URing()
-        unsigned sqe_tail;      // memset to 0 during URing()
-        unsigned sqe_free_head; // memset to 0 during URing()
-
         size_t ring_sz;
         void *ring_ptr;
 
-        unsigned pad[2];
 
       private:
         void setOffset(const io_sqring_offsets &off) noexcept {
@@ -84,13 +82,10 @@ namespace detail {
             return sqe_tail - *khead;
         }
 
-        inline SQEntry *getSQEntry() noexcept {
+        [[nodiscard]] inline SQEntry *getSQEntry() noexcept {
             const unsigned int head = io_uring_smp_load_acquire(khead);
-            const unsigned int next = sqe_free_head + 1;
-            if (next - head <= ring_entries) [[likely]] {
-                SQEntry *sqe = &sqes[array[sqe_free_head & ring_mask]];
-                sqe_free_head = next;
-                return sqe;
+            if (sqe_free_head - head < ring_entries) [[likely]] {
+                return &sqes[array[sqe_free_head++ & ring_mask]];
             } else {
                 return nullptr;
             }
@@ -108,7 +103,9 @@ namespace detail {
         ~SubmissionQueue() noexcept = default;
     };
 
-    static_assert(sizeof(SubmissionQueue) == 96);
+    // char (*____)[sizeof(SubmissionQueue)] = 1;
+
+    static_assert(sizeof(SubmissionQueue) == 88);
 
 } // namespace detail
 

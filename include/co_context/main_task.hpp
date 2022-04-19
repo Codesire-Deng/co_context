@@ -22,7 +22,7 @@ class [[nodiscard("Did you forget to co_spawn?")]] main_task {
         }
 
         inline main_task get_return_object() noexcept {
-            // printf("main_task started\n");
+            // log::v("main_task started\n")
             auto handle =
                 std::coroutine_handle<promise_type>::from_promise(*this);
             io_info.handle = handle;
