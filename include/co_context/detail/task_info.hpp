@@ -66,7 +66,6 @@ namespace detail {
         }
     };
 
-
 } // namespace detail
 
 } // namespace co_context

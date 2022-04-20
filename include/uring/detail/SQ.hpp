@@ -30,7 +30,6 @@ namespace detail {
         size_t ring_sz;
         void *ring_ptr;
 
-
       private:
         void setOffset(const io_sqring_offsets &off) noexcept {
             khead = (unsigned *)((uintptr_t)ring_ptr + off.head);

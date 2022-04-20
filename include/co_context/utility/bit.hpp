@@ -16,6 +16,6 @@ constexpr T lowbit(T x) noexcept {
 
 template<typename T>
 concept trival_ptr = std::is_trivially_copyable_v<T>
-                   && sizeof(T) == sizeof(std::uintptr_t);
+                     && sizeof(T) == sizeof(std::uintptr_t);
 
 } // namespace co_context

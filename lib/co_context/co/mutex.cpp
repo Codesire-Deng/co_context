@@ -18,7 +18,7 @@ bool mutex::try_lock() noexcept {
     );
 }
 
-inline static void send_task(detail::task_info * awaken_task) noexcept {
+inline static void send_task(detail::task_info *awaken_task) noexcept {
     using namespace co_context::detail;
     auto *worker = this_thread.worker;
     assert(

@@ -29,7 +29,7 @@ namespace detail {
         }
 
       protected:
-        liburingcxx::SQEntry* sqe;
+        liburingcxx::SQEntry *sqe;
         task_info io_info;
 
         inline void submit() noexcept {
