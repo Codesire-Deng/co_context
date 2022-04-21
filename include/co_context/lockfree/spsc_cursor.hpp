@@ -59,12 +59,30 @@ struct spsc_cursor {
         return bool(capacity - (m_tail - load_raw_head()));
     }
 
+    inline void wait_for_available() const noexcept {
+        as_c_atomic(m_head).wait(m_tail - capacity, std::memory_order_acquire);
+    }
+
+    inline void wait_for_not_empty() const noexcept {
+        as_c_atomic(m_tail).wait(m_head, std::memory_order_acquire);
+    }
+
     inline void push(T num = 1) noexcept {
         as_atomic(m_tail).store(m_tail + num, std::memory_order_release);
     }
 
     inline void pop(T num = 1) noexcept {
         as_atomic(m_head).store(m_head + num, std::memory_order_release);
+    }
+
+    inline void push_notify(T num = 1) noexcept {
+        as_atomic(m_tail).store(m_tail + num, std::memory_order_release);
+        as_c_atomic(m_tail).notify_one();
+    }
+
+    inline void pop_notify(T num = 1) noexcept {
+        as_atomic(m_head).store(m_head + num, std::memory_order_release);
+        as_c_atomic(m_head).notify_one();
     }
 };
 

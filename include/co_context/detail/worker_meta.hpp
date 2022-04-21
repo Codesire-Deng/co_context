@@ -27,7 +27,6 @@ namespace detail {
 
             alignas(config::cache_line_size
             ) spsc_cursor<cur_t, config::swap_capacity> reap_cur;
-            std::thread host_thread;
             // worker_state state; // TODO atomic?
             // int temp;
         };
@@ -40,6 +39,7 @@ namespace detail {
         ) worker_swap_zone<submit_info> *submit_swap_ptr;
         worker_swap_zone<std::coroutine_handle<>> *reap_swap_ptr;
         tid_t tid;
+        std::thread host_thread;
         /*
         std::queue<submit_info> submit_overflow_buf;
         */

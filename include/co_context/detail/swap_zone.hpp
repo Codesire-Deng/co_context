@@ -44,6 +44,11 @@ namespace detail {
             cur.push(1);
         }
 
+        inline void push_notify(cur_t &cur, T value) noexcept {
+            data[cur.tail()] = value;
+            cur.push_notify(1);
+        }
+
         inline T front(const cur_t &cur) const noexcept {
             return data[cur.load_head()];
         }

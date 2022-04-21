@@ -63,9 +63,9 @@ class [[nodiscard]] io_context final {
     alignas(cache_line_size) worker_meta worker[config::worker_threads_number];
 
     // local read/write, high frequency data.
-    alignas(cache_line_size) size_t requests_to_reap = 0;
-    config::tid_t s_cur = 0;
+    alignas(cache_line_size) config::tid_t s_cur = 0;
     config::tid_t r_cur = 0;
+    // size_t requests_to_reap = 0;
     bool need_ring_submit;
     bool will_stop = false;
     /*
@@ -123,7 +123,7 @@ class [[nodiscard]] io_context final {
      * @brief poll the completion swap zone
      * @return if load exists and capacity of reap_swap might be healthy
      */
-    bool poll_completion() noexcept;
+    void poll_completion() noexcept;
 
     bool try_clear_reap_overflow_buf() noexcept;
 
@@ -163,7 +163,7 @@ class [[nodiscard]] io_context final {
 
     ~io_context() noexcept {
         for (int i = 0; i < config::worker_threads_number; ++i) {
-            std::thread &t = worker[i].sharing.host_thread;
+            std::thread &t = worker[i].host_thread;
             if (t.joinable()) t.join();
         }
     }
