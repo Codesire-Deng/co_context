@@ -7,7 +7,7 @@ using namespace co_context;
 constexpr uint16_t port = 6379;
 
 main_task reply(co_context::socket sock) {
-    char recv_buf[32];
+    char recv_buf[100];
     while (true) {
         int n = co_await sock.recv(recv_buf);
         if (n <= 0) co_return;
