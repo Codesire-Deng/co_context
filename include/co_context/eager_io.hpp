@@ -71,7 +71,7 @@ namespace detail {
 
         inline void submit() const noexcept {
             worker_meta *const worker = detail::this_thread.worker;
-            worker->submit_sqe(submit_info{.sqe = sqe});
+            worker->submit_sqe();
             /*
             worker->try_clear_submit_overflow_buf();
             */

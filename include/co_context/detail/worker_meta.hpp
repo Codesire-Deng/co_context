@@ -38,6 +38,7 @@ namespace detail {
         alignas(config::cache_line_size
         ) worker_swap_zone<submit_info> *submit_swap_ptr;
         worker_swap_zone<std::coroutine_handle<>> *reap_swap_ptr;
+        cur_t local_submit_tail = 0;
         tid_t tid;
         std::thread host_thread;
         /*
@@ -46,7 +47,7 @@ namespace detail {
 
         liburingcxx::SQEntry *get_free_sqe() noexcept;
 
-        void submit_sqe(submit_info info) noexcept;
+        void submit_sqe() noexcept;
 
         void submit_non_sqe(submit_info io_info) noexcept;
 

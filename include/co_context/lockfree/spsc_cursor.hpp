@@ -37,6 +37,12 @@ struct spsc_cursor {
 
     inline T raw_tail() const noexcept { return m_tail; }
 
+    // inline void set_raw_tail(T tail) const noexcept { m_tail = tail; }
+
+    inline void store_raw_tail(T tail) noexcept {
+        as_atomic(m_tail).store(tail, std::memory_order_release);
+    }
+
     inline bool is_empty() const noexcept { return m_head == m_tail; }
 
     inline bool is_empty_load_head() const noexcept {
@@ -60,11 +66,16 @@ struct spsc_cursor {
     }
 
     inline void wait_for_available() const noexcept {
-        as_c_atomic(m_head).wait(m_tail - capacity, std::memory_order_acquire);
+        while (load_raw_head() == m_tail - capacity)
+            ;
+        // as_c_atomic(m_head).wait(m_tail - capacity,
+        // std::memory_order_acquire);
     }
 
     inline void wait_for_not_empty() const noexcept {
-        as_c_atomic(m_tail).wait(m_head, std::memory_order_acquire);
+        while (load_raw_tail() == m_head)
+            ;
+        // as_c_atomic(m_tail).wait(m_head, std::memory_order_acquire);
     }
 
     inline void push(T num = 1) noexcept {
@@ -77,12 +88,12 @@ struct spsc_cursor {
 
     inline void push_notify(T num = 1) noexcept {
         as_atomic(m_tail).store(m_tail + num, std::memory_order_release);
-        as_c_atomic(m_tail).notify_one();
+        // as_c_atomic(m_tail).notify_one();
     }
 
     inline void pop_notify(T num = 1) noexcept {
         as_atomic(m_head).store(m_head + num, std::memory_order_release);
-        as_c_atomic(m_head).notify_one();
+        // as_c_atomic(m_head).notify_one();
     }
 };
 

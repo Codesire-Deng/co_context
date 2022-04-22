@@ -62,15 +62,20 @@ namespace detail {
                 std::this_thread::sleep_for(std::chrono::microseconds(1));
             }
         */
-        assert(swap[cur.tail()].sqe != nullptr);
-        return swap[cur.tail()].sqe;
+        assert(swap[local_submit_tail & cur.mask].sqe != nullptr);
+        return swap[local_submit_tail++ & cur.mask].sqe;
     }
 
-    void worker_meta::submit_sqe(submit_info info) noexcept {
+    void worker_meta::submit_sqe(/*submit_info info*/) noexcept {
         [[maybe_unused]] const auto &swap = *this->submit_swap_ptr;
         auto &cur = this->sharing.submit_cur;
-        assert(swap[cur.tail()].sqe == info.sqe);
-        cur.push(1);
+        // assert(swap[cur.tail()].sqe == info.sqe);
+        // cur.push(1);
+        cur.store_raw_tail(local_submit_tail);
+        log::v(
+            "worker[%u] submit_sqe until [%u]\n", this_thread.tid,
+            local_submit_tail & cur.mask
+        );
     }
 
     void worker_meta::submit_non_sqe(submit_info info) noexcept {
@@ -91,6 +96,12 @@ namespace detail {
         info.request->compressed_sqe =
             compress_sqe(detail::this_thread.ctx, swap[cur.tail()].sqe);
         swap.push(cur, info);
+        log::v(
+            "worker[%u] submit_non_sqe at [%u]\n", this_thread.tid,
+            local_submit_tail & cur.mask
+        );
+        ++local_submit_tail;
+        assert(local_submit_tail == cur.raw_tail());
 
         /*
         if (submit_overflow_buf.empty() && cur.is_available()) [[likely]] {
@@ -314,6 +325,8 @@ bool io_context::poll_submission() noexcept {
     auto &cur = worker[s_cur].sharing.submit_cur;
     auto &swap = submit_swap[s_cur];
 
+    log::v("ctx found submission start from [%u][%u]\n", s_cur, cur.head());
+
     auto head{cur.raw_head()};
     auto tail{cur.load_raw_tail()};
     const auto submit_count = tail - head;
@@ -329,7 +342,7 @@ bool io_context::poll_submission() noexcept {
     cur.pop_notify(submit_count);
     cur_next(s_cur);
 
-    if (need_ring_submit) ring.submit();
+    if (need_ring_submit) { ring.submit(); }
 
     return true;
 }
@@ -389,6 +402,7 @@ inline void io_context::poll_completion() noexcept {
     log::v("ctx poll_completion found\n");
 
     task_info *io_info = reinterpret_cast<task_info *>(polling_cqe->getData());
+    assert(io_info != nullptr);
     io_info->result = polling_cqe->getRes();
     ring.SeenCQEntry(polling_cqe);
 
@@ -396,9 +410,10 @@ inline void io_context::poll_completion() noexcept {
 
     switch (io_info->type) {
         case task_type::lazy_sqe:
-            [[fallthrough]];
-        case task_type::co_spawn:
             break;
+
+        case task_type::lazy_link_sqe:
+            return;
 
         case task_type::eager_sqe:
             if (eager_io_need_awake(io_info)) [[likely]] {
@@ -408,6 +423,8 @@ inline void io_context::poll_completion() noexcept {
                 return;
             }
 
+        case task_type::co_spawn:
+            assert(false && "poll_completion(): found task_type::co_spawn");
         default:
             log::e("io_info->type==%u\n", io_info->type);
             assert(false && "poll_completion(): unknown task_type");
@@ -449,10 +466,19 @@ void io_context::init() noexcept {
     // assert(submit_overflow_buf.empty());
     assert(reap_overflow_buf.empty());
     assert(this->sqring_entries == ring.getSQRingEntries());
-    if (this->sqring_entries
-        < config::worker_threads_number * config::swap_capacity * 2) {
-        log::e("io_context::init(): Entries inside the ring are not enough!\n");
-        exit(1);
+    {
+        const unsigned actual_sqring_size = this->sqring_entries;
+        const unsigned need_sqring_size =
+            config::worker_threads_number * config::swap_capacity * 2;
+        if (actual_sqring_size < need_sqring_size) {
+            log::e(
+                "io_context::init(): "
+                "Entries inside the ring are not enough!\n"
+                "Actual=%u, need=%u\n",
+                actual_sqring_size, need_sqring_size
+            );
+            exit(1);
+        }
     }
     this->sqes_addr = ring.__getSqes();
     for (unsigned i = 0; i < config::worker_threads_number; ++i) {
@@ -498,11 +524,10 @@ void io_context::co_spawn(main_task entrance) {
 
     if constexpr (config::use_standalone_completion_poller)
         std::thread{[this] {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
             log::w("completion_poller runs on %d\n", gettid());
             while (true) { poll_completion(); }
         }}.detach();
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     while (!will_stop) [[likely]] {
             // log::v("ctx polling\n");

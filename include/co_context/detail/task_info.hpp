@@ -46,6 +46,7 @@ namespace detail {
 
         enum class task_type : uint8_t {
             lazy_sqe,
+            lazy_link_sqe,
             eager_sqe,
             // cqe,
             // result,
@@ -55,7 +56,7 @@ namespace detail {
             nop
         };
 
-        const task_type type;
+        task_type type;
 
         constexpr task_info(task_type type) noexcept : type(type) {
             log::v("task_info generated at %lx\n", this);

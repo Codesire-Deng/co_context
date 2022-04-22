@@ -8,10 +8,9 @@ constexpr uint16_t port = 6379;
 
 main_task reply(co_context::socket sock) {
     char recv_buf[100];
-    while (true) {
-        int n = co_await sock.recv(recv_buf);
-        if (n <= 0) co_return;
-        co_await sock.send({"+OK\r\n", 5});
+    int n = co_await sock.recv(recv_buf);
+    while (n > 0) {
+        n = co_await (sock.send({"+OK\r\n", 5}) + sock.recv(recv_buf));
     }
 }
 

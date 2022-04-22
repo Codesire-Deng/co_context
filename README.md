@@ -8,10 +8,11 @@ A coroutine framework aimed at high-concurrency io with reasonable latency, base
 
 ## 已有功能
 
-1. Lazy IO: `read{,v,_fixed}`, `write{,v,_fixed}`, `accept`, `accept_direct`, `recv(msg)`, `send(msg)`, `connect`, `close`, `shutdown`, `fsync`, `sync_file_range`, `timeout`, `uring_nop`, `files_update`, `fallocate`, `openat`, `openat_direct`, `openat2`, `openat2_direct`,  `statx`, `unlinkat`, `renameat`, `mkdirat`, `symlinkat`, `linkat`, `splice`, `tee`.
-2. Eager IO: All functions of lazy IO.
-3. Concurrency support: `mutex`, `semaphore`, `condition_variable`
-4. Scheduling hint: `yield`
+1. Lazy IO: `read{,v,_fixed}`, `write{,v,_fixed}`, `accept`, `accept_direct`, `recv(msg)`, `send(msg)`, `connect`, `close`, `shutdown`, `fsync`, `sync_file_range`, `timeout`, `uring_nop`, `files_update`, `fallocate`, `openat`, `openat_direct`, `openat2`, `openat2_direct`,  `statx`, `unlinkat`, `renameat`, `mkdirat`, `symlinkat`, `linkat`, `splice`, `tee`, `provide_buffers`, `remove_buffers`. 35 in total.
+2. Linked lazy IO: About 2.5% more efficient, and safe.
+3. Eager IO: All functions of lazy IO.
+4. Concurrency support: `mutex`, `semaphore`, `condition_variable`
+5. Scheduling hint: `yield`
 
 ## Requirement
 

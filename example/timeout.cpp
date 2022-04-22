@@ -14,13 +14,13 @@ main_task delay_output() {
 main_task my_clock() {
     for (int cnt = 0;;) {
         printf("Time = %d\n", cnt++);
-        co_await timeout(1s);
+        co_await (timeout(1s) + lazy::write(STDOUT_FILENO, "Tick\n", 0));
     }
 }
 
 int main() {
     io_context ctx{32};
-    ctx.co_spawn(delay_output());
+    // ctx.co_spawn(delay_output());
     ctx.co_spawn(my_clock());
     ctx.run();
 

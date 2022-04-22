@@ -12,13 +12,24 @@ namespace co_context {
 
 namespace detail {
 
+    struct [[nodiscard("Did you forget to co_await?")]] lazy_link_io {
+        class lazy_awaiter *last_io;
+
+        constexpr bool await_ready() const noexcept {
+            return false;
+        }
+
+        void await_suspend(std::coroutine_handle<> current) noexcept;
+
+        int32_t await_resume() const noexcept;
+    };
+
     class [[nodiscard("Did you forget to co_await?")]] lazy_awaiter {
       public:
         constexpr bool await_ready() const noexcept {
             return false;
         }
 
-        // std::coroutine_handle<>
         void await_suspend(std::coroutine_handle<> current) noexcept {
             io_info.handle = current;
             submit();
@@ -29,20 +40,28 @@ namespace detail {
         }
 
       protected:
+        friend class lazy_link_io;
         liburingcxx::SQEntry *sqe;
         task_info io_info;
 
         inline void submit() noexcept {
             worker_meta *const worker = detail::this_thread.worker;
-            worker->submit_sqe(submit_info{.sqe = sqe});
+            worker->submit_sqe();
         }
+
+        friend lazy_link_io operator+(
+            lazy_awaiter &&lhs, lazy_awaiter &&rhs
+        ) noexcept;
+
+        friend lazy_link_io &&operator+(
+            lazy_link_io &&lhs, lazy_awaiter &&rhs
+        ) noexcept;
 
         lazy_awaiter() noexcept : io_info(task_info::task_type::lazy_sqe) {
             io_info.tid_hint = detail::this_thread.tid;
             sqe = this_thread.worker->get_free_sqe();
             assert(sqe != nullptr);
             sqe->setData(io_info.as_user_data());
-            // io_info.sqe = std::addressof(sqe);
         }
 
 #ifndef __INTELLISENSE__
@@ -52,6 +71,32 @@ namespace detail {
         lazy_awaiter &operator=(lazy_awaiter &&) = delete;
 #endif
     };
+
+    inline lazy_link_io
+    operator+(lazy_awaiter &&lhs, lazy_awaiter &&rhs) noexcept {
+        lhs.sqe->setLink();
+        lhs.io_info.type = task_info::task_type::lazy_link_sqe;
+        return lazy_link_io{.last_io = &rhs};
+    }
+
+    inline lazy_link_io &&
+    operator+(lazy_link_io &&lhs, lazy_awaiter &&rhs) noexcept {
+        lhs.last_io->sqe->setLink();
+        lhs.last_io->io_info.type = task_info::task_type::lazy_link_sqe;
+        lhs.last_io = &rhs;
+        return std::move(lhs);
+    }
+
+    inline void lazy_link_io::await_suspend(std::coroutine_handle<> current
+    ) noexcept {
+        this->last_io->io_info.handle = current;
+        worker_meta *const worker = detail::this_thread.worker;
+        worker->submit_sqe();
+    }
+
+    inline int32_t lazy_link_io::await_resume() const noexcept {
+        return this->last_io->io_info.result;
+    }
 
     struct lazy_read : lazy_awaiter {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_read(
@@ -347,7 +392,7 @@ namespace detail {
         void await_suspend(std::coroutine_handle<> current) noexcept {
             io_info.handle = current;
             auto &worker = *detail::this_thread.worker;
-            worker.submit_sqe(submit_info{.request = &io_info});
+            worker.submit_non_sqe(submit_info{.request = &io_info});
         }
 
         constexpr void await_resume() const noexcept {}

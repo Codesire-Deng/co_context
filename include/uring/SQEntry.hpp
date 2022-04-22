@@ -34,6 +34,11 @@ class SQEntry final : private io_uring_sqe {
         return *this;
     }
 
+    inline SQEntry &setLink() noexcept {
+        this->flags |= IOSQE_IO_LINK;
+        return *this;
+    }
+
     inline SQEntry &setTargetFixedFile(uint32_t fileIndex) noexcept {
         /* 0 means no fixed files, indexes should be encoded as "index + 1" */
         this->file_index = fileIndex + 1;
@@ -254,6 +259,22 @@ class SQEntry final : private io_uring_sqe {
         int dfd, const char *path, struct open_how *how, unsigned file_index
     ) noexcept {
         return prepareOpenat2(dfd, path, how).setTargetFixedFile(file_index);
+    }
+
+    inline SQEntry &prepareProvideBuffers(
+        const void *addr, int len, int nr, int bgid, int bid
+    ) noexcept {
+        prepareRW(
+            IORING_OP_PROVIDE_BUFFERS, nr, addr, (uint32_t)len, (uint64_t)bid
+        );
+        this->buf_group = (uint16_t)bgid;
+        return *this;
+    }
+
+    inline SQEntry &prepareProvideBuffers(int nr, int bgid) noexcept {
+        prepareRW(IORING_OP_REMOVE_BUFFERS, nr, nullptr, 0, 0);
+        this->buf_group = (uint16_t)bgid;
+        return *this;
     }
 
     inline SQEntry &prepareStatx(

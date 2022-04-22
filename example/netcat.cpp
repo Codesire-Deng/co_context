@@ -50,11 +50,13 @@ co_context::main_task run(co_context::socket peer) {
     printf("Running\n");
     using namespace co_context;
     char buf[8192];
-    int nr = 0;
+    int nr = co_await peer.recv(buf, 0);
     // 不断接收字节流
     // while ((nr = ::recv(peer.fd(), buf, 8192, 0)) > 0) {}
-    while ((nr = co_await peer.recv(buf, 0)) > 0) {
-        // co_await lazy::write(STDOUT_FILENO, {buf, (size_t)nr}, 0);
+    while (nr > 0) {
+        nr = co_await (
+            lazy::write(STDOUT_FILENO, {buf, (size_t)nr}, 0) + peer.recv(buf, 0)
+        );
         // eager::write(STDOUT_FILENO, {buf, (size_t)nr}, 0).detach();
 
         // int nw = write_n(STDOUT_FILENO, buf, nr); // 将收到的字节全部打印到
