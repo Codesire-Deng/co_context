@@ -11,7 +11,7 @@
 
 namespace co_context {
 
-unsigned
+[[deprecated]] unsigned
 compress_sqe(const io_context *self, const liburingcxx::SQEntry *sqe) noexcept {
     return sqe - self->sqes_addr;
 }
@@ -48,7 +48,7 @@ namespace detail {
 
     liburingcxx::SQEntry *worker_meta::get_free_sqe() noexcept {
         // may acquire the cur.head
-        const auto &swap = *this->submit_swap_ptr;
+        auto &swap = *this->submit_swap_ptr;
         const auto &cur = this->sharing.submit_cur;
         // TODO check this memory order
         cur.wait_for_available();
@@ -62,11 +62,12 @@ namespace detail {
                 std::this_thread::sleep_for(std::chrono::microseconds(1));
             }
         */
-        assert(swap[local_submit_tail & cur.mask].sqe != nullptr);
-        return swap[local_submit_tail++ & cur.mask].sqe;
+        assert(swap[local_submit_tail & cur.mask].available_sqe != nullptr);
+        swap[local_submit_tail & cur.mask].address = 0UL;
+        return swap[local_submit_tail++ & cur.mask].available_sqe;
     }
 
-    void worker_meta::submit_sqe(/*submit_info info*/) noexcept {
+    void worker_meta::submit_sqe() noexcept {
         [[maybe_unused]] const auto &swap = *this->submit_swap_ptr;
         auto &cur = this->sharing.submit_cur;
         // assert(swap[cur.tail()].sqe == info.sqe);
@@ -78,7 +79,7 @@ namespace detail {
         );
     }
 
-    void worker_meta::submit_non_sqe(submit_info info) noexcept {
+    void worker_meta::submit_non_sqe(uintptr_t typed_task) noexcept {
         auto &swap = *this->submit_swap_ptr;
         auto &cur = this->sharing.submit_cur;
         // std::cerr << cur.slot << " " << tid << cur.off << std::endl;
@@ -93,9 +94,9 @@ namespace detail {
                 std::this_thread::sleep_for(std::chrono::microseconds(1));
             }
         */
-        info.request->compressed_sqe =
-            compress_sqe(detail::this_thread.ctx, swap[cur.tail()].sqe);
-        swap.push(cur, info);
+
+        swap[cur.tail()].address = typed_task;
+        cur.push(1);
         log::v(
             "worker[%u] submit_non_sqe at [%u]\n", this_thread.tid,
             local_submit_tail & cur.mask
@@ -185,8 +186,8 @@ namespace detail {
 
 } // namespace detail
 
-[[nodiscard]] bool io_context::is_sqe(const liburingcxx::SQEntry *suspect
-) const noexcept {
+[[deprecated, nodiscard]] bool
+io_context::is_sqe(const liburingcxx::SQEntry *suspect) const noexcept {
     return static_cast<size_t>(suspect - this->sqes_addr)
            < this->sqring_entries;
 }
@@ -289,37 +290,35 @@ bool io_context::try_find_reap_worker_acquire() noexcept {
 
 void io_context::try_submit(detail::submit_info &info) noexcept {
     // lazy_sqe or eager_sqe
-    if (is_sqe(info.sqe)) [[likely]] {
+    if (info.address == 0UL) [[likely]] {
         // submit to ring
         log::v("ctx ring.submit()...\n");
         // ++requests_to_reap;
         need_ring_submit = true;
-        ring.appendSQEntry(info.sqe);
+        ring.appendSQEntry(info.submit_sqe);
         auto *const victim_sqe = ring.getSQEntry();
         assert(victim_sqe != nullptr && "ring.getSQEntry() returns nullptr!");
-        info.sqe = victim_sqe;
+        info.available_sqe = victim_sqe;
         log::v("ctx ring.submit()...OK\n");
         return;
     } else {
         using task_type = task_info::task_type;
-        task_info *const task = info.request;
-        info.sqe = decompress_sqe(task->compressed_sqe);
+        using submit_type = detail::submit_type;
+        task_info *const io_info = detail::raw_task_info_ptr(info.address);
+
         // PERF May call cur.pop() to make worker start sooner.
-        switch (task->type) {
-            case task_type::co_spawn:
-                forward_task(task->handle);
+        switch (uint32_t(info.address) & 0x7) {
+            case submit_type::co_spawn:
+                forward_task(std::coroutine_handle<>::from_address(info.ptr));
                 return;
-
-            case task_type::semaphore_release:
-                handle_semaphore_release(task);
+            case submit_type::sem_rel:
+                handle_semaphore_release(io_info);
                 return;
-
-            case task_type::condition_variable_notify:
-                handle_condition_variable_notify(task);
+            case submit_type::cv_notify:
+                handle_condition_variable_notify(io_info);
                 return;
-
             default:
-                log::e("task->type==%u\n", task->type);
+                log::e("submit_info.address==%lx\n", info.address);
                 assert(false && "try_submit(): unknown task_type");
                 return;
         }
@@ -362,7 +361,7 @@ bool io_context::poll_submission() noexcept {
 bool io_context::try_clear_submit_overflow_buf() noexcept {
     if (submit_overflow_buf.empty()) return true;
     do {
-        task_info *const task = submit_overflow_buf.front();
+        task_info *const task<> = submit_overflow_buf.front();
         // OPTIMIZE impossible for task_type::co_spawn
         if (try_submit(task)) {
             submit_overflow_buf.pop();
@@ -490,7 +489,8 @@ void io_context::init() noexcept {
     this->sqes_addr = ring.__getSqes();
     for (unsigned i = 0; i < config::worker_threads_number; ++i) {
         for (unsigned j = 0; j < config::swap_capacity; ++j) {
-            submit_swap[i][j] = detail::submit_info{.sqe = ring.getSQEntry()};
+            submit_swap[i][j] = detail::submit_info{
+                .address = 0UL, .available_sqe = ring.getSQEntry()};
         }
     }
     // probe();
@@ -515,9 +515,10 @@ inline void io_context::make_thread_pool() {
             std::thread{&worker_meta::worker_run, worker + i, i, this};
 }
 
-void io_context::co_spawn(main_task entrance) {
+void io_context::co_spawn(task<void> &&entrance) {
     assert(detail::this_thread.worker == nullptr);
-    forward_task(entrance.get_io_info_ptr()->handle);
+    forward_task(entrance.get_handle());
+    entrance.detach();
 }
 
 [[noreturn]] void io_context::run() {

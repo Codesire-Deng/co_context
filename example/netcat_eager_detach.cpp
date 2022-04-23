@@ -48,7 +48,7 @@ send_all(co_context::socket &sock, std::span<const char> buf) {
 
 char buf[8192];
 
-// co_context::main_task run(co_context::socket peer) {
+// co_context::task<> run(co_context::socket peer) {
 //     using namespace co_context;
 //     int nr = 0;
 
@@ -58,7 +58,7 @@ char buf[8192];
 //     co_await eager::nop();
 // }
 
-co_context::main_task run(co_context::socket peer) {
+co_context::task<> run(co_context::socket peer) {
     using namespace co_context;
     // char buf[8192];
     int nr = 0;
@@ -72,7 +72,7 @@ co_context::main_task run(co_context::socket peer) {
     ::exit(0);
 }
 
-co_context::main_task server(uint16_t port) {
+co_context::task<> server(uint16_t port) {
     using namespace co_context;
     acceptor ac{inet_address{port}};
     // 不断接受 client，每个连接生成一个 worker 协程
@@ -81,7 +81,7 @@ co_context::main_task server(uint16_t port) {
     }
 }
 
-co_context::main_task client(std::string_view hostname, uint16_t port) {
+co_context::task<> client(std::string_view hostname, uint16_t port) {
     using namespace co_context;
     inet_address addr;
     if (inet_address::resolve(hostname, port, addr)) {

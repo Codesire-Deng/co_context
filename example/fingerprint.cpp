@@ -15,7 +15,7 @@ constexpr size_t BLOCK_LEN = 4096;
 // constexpr size_t BLOCK_LEN = 4096;
 // constexpr size_t BLOCK_LEN = 64;
 
-main_task run(co_context::socket sock) {
+task<> run(co_context::socket sock) {
     uint32_t as_uint[BLOCK_LEN / 4];
     uint32_t offset;
 
@@ -58,7 +58,7 @@ main_task run(co_context::socket sock) {
     if (nr != 0) { fprintf(stderr, "short recv: %d\n", nr); }
 }
 
-main_task server(uint16_t port, std::filesystem::path path) {
+task<> server(uint16_t port, std::filesystem::path path) {
     file_fd = ::open(path.c_str(), O_RDONLY);
     if (file_fd < 0) {
         throw std::system_error{errno, std::system_category(), "open"};

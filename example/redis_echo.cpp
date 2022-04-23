@@ -6,7 +6,7 @@ using namespace co_context;
 
 constexpr uint16_t port = 6379;
 
-main_task reply(co_context::socket sock) {
+task<> reply(co_context::socket sock) {
     char recv_buf[100];
     int n = co_await sock.recv(recv_buf);
     while (n > 0) {
@@ -14,7 +14,7 @@ main_task reply(co_context::socket sock) {
     }
 }
 
-main_task server() {
+task<> server() {
     acceptor ac{inet_address{port}};
     for (int sockfd; (sockfd = co_await ac.accept()) >= 0;) {
         co_spawn(reply(co_context::socket{sockfd}));

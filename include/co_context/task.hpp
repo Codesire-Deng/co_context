@@ -7,9 +7,9 @@
 namespace co_context {
 
 /**
- * @brief A task is a lazy synchronous coroutine that only executes at co_await
+ * @brief A task<> is a lazy synchronous coroutine that only executes at co_await
  * <task> (or co_await <task>.when_ready()).
- * @note As long as a task has been awaited, it will execute immediately at
+ * @note As long as a task<> has been awaited, it will execute immediately at
  * current thread, and will not return until it's all finished.
  * @tparam T
  */
@@ -26,7 +26,7 @@ namespace detail {
         friend struct final_awaiter;
 
         /**
-         * @brief current task is finished therefore resume the father
+         * @brief current task<> is finished therefore resume the father
          */
         struct final_awaiter {
             constexpr bool await_ready() const noexcept { return false; }
@@ -55,11 +55,11 @@ namespace detail {
         }
 
       private:
-        std::coroutine_handle<> fa_coro;
+        std::coroutine_handle<> fa_coro{std::noop_coroutine()};
     };
 
     /**
-     * @brief Task with a return value
+     * @brief task<> with a return value
      *
      * @tparam T the type of the final result
      */
@@ -202,15 +202,15 @@ class [[nodiscard("Did you forget to co_await?")]] task {
         : handle(current) {
     }
 
-    task(task && other) noexcept : handle(other) {
+    task(task<> && other) noexcept : handle(other) {
         other.handle = nullptr;
     }
 
     // Ban copy
-    task(const task &) = delete;
-    task &operator=(const task &) = delete;
+    task(const task<> &) = delete;
+    task<> &operator=(const task<> &) = delete;
 
-    task &operator=(task &&other) noexcept {
+    task<> &operator=(task<> &&other) noexcept {
         if (this != std::addressof(other)) [[likely]] {
             if (handle) handle.destroy();
             handle = other.handle;
@@ -229,7 +229,7 @@ class [[nodiscard("Did you forget to co_await?")]] task {
     }
 
     /**
-     * @brief wait for the task to complete, and get the ref of the result
+     * @brief wait for the task<> to complete, and get the ref of the result
      */
     auto operator co_await() const &noexcept {
         struct awaiter : awaiter_base {
@@ -246,7 +246,7 @@ class [[nodiscard("Did you forget to co_await?")]] task {
     }
 
     /**
-     * @brief wait for the task to complete, and get the rvalue ref of the
+     * @brief wait for the task<> to complete, and get the rvalue ref of the
      * result
      */
     auto operator co_await() const &&noexcept {
@@ -264,7 +264,7 @@ class [[nodiscard("Did you forget to co_await?")]] task {
     }
 
     /**
-     * @brief wait for the task to complete, but do not get the result
+     * @brief wait for the task<> to complete, but do not get the result
      */
     auto when_ready() const noexcept {
         struct awaiter : awaiter_base {
@@ -274,6 +274,14 @@ class [[nodiscard("Did you forget to co_await?")]] task {
         };
 
         return awaiter{handle};
+    }
+
+    std::coroutine_handle<promise_type> get_handle() noexcept {
+        return handle;
+    }
+
+    void detach() noexcept {
+        handle = nullptr;
     }
 
   private:

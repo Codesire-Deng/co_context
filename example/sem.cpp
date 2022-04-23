@@ -79,7 +79,7 @@ class alignas(128 /*std::hardware_destructive_interference_size*/) Guide {
 
 std::array<Guide, max_threads> guides;
 
-main_task workerThread(unsigned id) {
+task<> workerThread(unsigned id) {
     // emulate some work before sema acquisition
     co_await guides[id].initial_delay();
     // wait until a free sema slot is available

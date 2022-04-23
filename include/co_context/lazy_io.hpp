@@ -3,7 +3,7 @@
 #include "uring/uring.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/detail/worker_meta.hpp"
-// #include "co_context/detail/sqe_task_meta.hpp" // deprecat ed
+#include "co_context/detail/task_info.hpp"
 #include <cassert>
 #include <span>
 #include <chrono>
@@ -388,23 +388,17 @@ namespace detail {
     };
 
     struct lazy_yield {
-        task_info io_info;
 
         constexpr bool await_ready() const noexcept { return false; }
 
         void await_suspend(std::coroutine_handle<> current) noexcept {
-            io_info.handle = current;
             auto &worker = *detail::this_thread.worker;
-            worker.submit_non_sqe(submit_info{.request = &io_info});
+            worker.co_spawn(current);
         }
 
         constexpr void await_resume() const noexcept {}
 
-        constexpr lazy_yield() noexcept
-            : io_info(task_info::task_type::co_spawn) {
-            io_info.tid_hint = detail::this_thread.tid;
-            io_info.result = 0;
-        }
+        constexpr lazy_yield() noexcept = default;
     };
 
     struct lazy_splice : lazy_awaiter {

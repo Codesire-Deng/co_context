@@ -32,7 +32,6 @@ namespace detail {
         };
 
         union {
-            unsigned compressed_sqe;
             // CQEntry *cqe;
             int32_t result;
             // counting_semaphore *sem;
@@ -71,7 +70,7 @@ namespace detail {
                    | uint64_t(task_type::eager_sqe);
         }
 
-        uint64_t as_linked_user_data() const noexcept {
+        [[deprecated]] uint64_t as_linked_user_data() const noexcept {
             return static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this))
                    | uint64_t(task_type::lazy_link_sqe);
         }

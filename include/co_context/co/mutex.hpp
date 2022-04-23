@@ -34,11 +34,11 @@ class mutex final {
 
       protected:
         void register_coroutine(std::coroutine_handle<> handle) noexcept {
-            awaken_task.handle = handle;
+            awaken_coro = handle;
         }
 
         std::coroutine_handle<> get_coroutine() noexcept {
-            return awaken_task.handle;
+            return awaken_coro;
         }
 
         /**
@@ -54,7 +54,7 @@ class mutex final {
       protected:
         mutex &mtx;
         lock_awaiter *next;
-        task_info awaken_task{task_info::task_type::co_spawn};
+        std::coroutine_handle<> awaken_coro;
         friend class mutex;
         friend class locked_mutex;
         friend class detail::cv_wait_awaiter;

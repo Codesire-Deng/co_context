@@ -4,7 +4,8 @@
 #include "co_context/detail/swap_zone.hpp"
 #include "co_context/detail/submit_info.hpp"
 #include "co_context/detail/reap_info.hpp"
-#include "co_context/main_task.hpp"
+#include "co_context/task.hpp"
+#include "co_context/log/log.hpp"
 #include <thread>
 #include <queue>
 
@@ -50,7 +51,7 @@ namespace detail {
 
         void submit_sqe() noexcept;
 
-        void submit_non_sqe(submit_info io_info) noexcept;
+        void submit_non_sqe(uintptr_t typed_task) noexcept;
 
         /*
         void try_clear_submit_overflow_buf() noexcept;
@@ -60,18 +61,27 @@ namespace detail {
 
         void init(const int thread_index, io_context *const context);
 
-        void co_spawn(main_task entrance) noexcept;
+        void co_spawn(task<void> &&entrance) noexcept;
+
+        void co_spawn(std::coroutine_handle<> entrance) noexcept;
 
         void worker_run(const int thread_index, io_context *const context);
     };
 
-    inline void worker_meta::co_spawn(main_task entrance) noexcept {
+    inline void worker_meta::co_spawn(std::coroutine_handle<> entrance
+    ) noexcept {
+        assert(entrance.address() != nullptr);
         log::v(
             "worker[%u] co_spawn coro %lx\n", this_thread.tid,
-            entrance.get_io_info_ptr()->handle.address()
+            entrance.address()
         );
-        this->submit_non_sqe(submit_info{.request = entrance.get_io_info_ptr()}
-        );
+        this->submit_non_sqe(reinterpret_cast<uintptr_t>(entrance.address()));
+    }
+
+    inline void worker_meta::co_spawn(task<void> &&entrance) noexcept {
+        assert(entrance.get_handle().address() != nullptr);
+        this->co_spawn(entrance.get_handle());
+        entrance.detach();
     }
 
 } // namespace detail

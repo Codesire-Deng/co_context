@@ -18,13 +18,13 @@ bool mutex::try_lock() noexcept {
     );
 }
 
-inline static void send_task(detail::task_info *awaken_task) noexcept {
+inline static void send_task(std::coroutine_handle<> awaken_coro) noexcept {
     using namespace co_context::detail;
     auto *worker = this_thread.worker;
     assert(
         worker != nullptr && "mutex::unlock() must run inside an io_context"
     );
-    worker->submit_non_sqe(submit_info{.request = awaken_task});
+    worker->co_spawn(awaken_coro);
 }
 
 void mutex::unlock() noexcept {
@@ -56,7 +56,7 @@ void mutex::unlock() noexcept {
     assert(resume_head != nullptr);
 
     to_resume = resume_head->next;
-    send_task(&resume_head->awaken_task);
+    send_task(resume_head->awaken_coro);
 }
 
 bool mutex::lock_awaiter::register_awaiting() noexcept {

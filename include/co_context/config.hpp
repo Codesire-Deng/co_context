@@ -86,11 +86,13 @@ namespace config {
 
     // inline constexpr uint16_t swap_capacity = 32;
 
-    inline constexpr uint16_t swap_capacity = 16;
+    // inline constexpr uint16_t swap_capacity = 16;
 
     // inline constexpr uint16_t swap_capacity = 8;
 
-    // static_assert(swap_capacity % 8 == 0);
+    inline constexpr uint16_t swap_capacity = 4;
+
+    static_assert(swap_capacity % 4 == 0);
 
     inline constexpr uint8_t submit_poll_rounds = 1;
 
@@ -125,8 +127,8 @@ namespace config {
         no_log
     };
 
-    // inline constexpr level log_level = level::v;
-    inline constexpr level log_level = level::d;
+    inline constexpr level log_level = level::v;
+    // inline constexpr level log_level = level::d;
     // inline constexpr level log_level = level::i;
     // inline constexpr level log_level = level::w;
     // inline constexpr level log_level = level::e;

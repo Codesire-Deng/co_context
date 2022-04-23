@@ -29,7 +29,7 @@ void gen(char (&buf)[BLOCK_LEN]) {
     buf[BLOCK_LEN - 1] = '\n';
 }
 
-main_task run() {
+task<>  run() {
     log::d("r4kw at ?? run()\n");
     const uint32_t tid = co_get_tid();
     const int32_t pid = ::gettid();
@@ -54,7 +54,7 @@ main_task run() {
         log::d("r4kw at [%u](%d) callback\n", tid, pid);
         auto t = run();
         log::d("r4kw at [%u](%d) spawn ready\n", tid, pid);
-        co_spawn(t);
+        co_spawn(std::move(t));
         log::d("r4kw at [%u](%d) spawn end\n", tid, pid);
     }
     log::d("r4kw at [%u](%d) end\n", tid, pid);

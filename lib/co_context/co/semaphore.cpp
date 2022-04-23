@@ -26,7 +26,9 @@ inline static void send_task(detail::task_info *awaken_task) noexcept {
         worker != nullptr
         && "semaphore::release() must run inside an io_context"
     );
-    worker->submit_non_sqe(submit_info{.request = awaken_task});
+    worker->submit_non_sqe(
+        reinterpret_cast<uintptr_t>(awaken_task) | submit_type::sem_rel
+    );
 }
 
 void counting_semaphore::release(T update) noexcept {

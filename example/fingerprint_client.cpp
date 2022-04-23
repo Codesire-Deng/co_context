@@ -19,7 +19,7 @@ constexpr int query = 1;
 int concurrency;
 std::atomic_int finish;
 
-main_task run(co_context::socket sock, const uint32_t offset) {
+task<> run(co_context::socket sock, const uint32_t offset) {
     uint32_t hashcode;
 
     auto log = [](std::string_view tag, uint32_t x) {
@@ -50,7 +50,7 @@ main_task run(co_context::socket sock, const uint32_t offset) {
     }
 }
 
-main_task client(std::string_view hostname, uint16_t port, int count) {
+task<> client(std::string_view hostname, uint16_t port, int count) {
     std::mt19937 rng{0};
     finish.store(0);
     inet_address addr;

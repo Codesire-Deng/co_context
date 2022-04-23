@@ -9,7 +9,7 @@ co_context::mutex mtx;
 
 int cnt = 0;
 
-main_task add() {
+task<> add() {
     co_await mtx.lock();
     for (int i = 0; i < 1000000; ++i) ++cnt;
     std::cout << cnt << std::endl;

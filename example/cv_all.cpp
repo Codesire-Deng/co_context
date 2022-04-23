@@ -19,14 +19,14 @@ int i = 0;
 
 using namespace co_context;
 
-main_task waits() {
+task<> waits() {
     auto lk = co_await cv_m.lock_guard();
     std::cerr << "Waiting... \n";
     co_await cv.wait(cv_m, [] { return i == 1; });
     std::cerr << "...finished waiting. i == 1\n";
 }
 
-main_task signals() {
+task<> signals() {
     std::this_thread::sleep_for(std::chrono::seconds(1));
     {
         auto lk = co_await cv_m.lock_guard();

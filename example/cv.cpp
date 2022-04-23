@@ -18,7 +18,7 @@ std::string data;
 bool ready = false;
 bool processed = false;
 
-main_task worker_thread() {
+task<void> worker_thread() {
     // Wait until main() sends data
     co_await m.lock();
     co_await cv.wait(m, [] { return ready; });
@@ -37,7 +37,7 @@ main_task worker_thread() {
     cv.notify_one();
 }
 
-main_task main_thread() {
+task<> main_thread() {
     data = "Example data";
     // send data to the worker thread
     {

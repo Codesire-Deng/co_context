@@ -27,7 +27,7 @@
 #include "co_context/detail/task_info.hpp"
 #include "co_context/detail/submit_info.hpp"
 #include "co_context/detail/reap_info.hpp"
-#include "co_context/main_task.hpp"
+#include "co_context/task.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/detail/worker_meta.hpp"
 
@@ -88,13 +88,13 @@ class [[nodiscard]] io_context final {
         const io_context *self, const liburingcxx::SQEntry *sqe
     ) noexcept;
 
-    inline liburingcxx::SQEntry *decompress_sqe(unsigned compressed_sqe
-    ) const noexcept {
+    [[deprecated]] inline liburingcxx::SQEntry *
+    decompress_sqe(unsigned compressed_sqe) const noexcept {
         return const_cast<liburingcxx::SQEntry *>(sqes_addr + compressed_sqe);
     }
 
   private:
-    [[nodiscard]] bool is_sqe(const liburingcxx::SQEntry *suspect
+    [[deprecated, nodiscard]] bool is_sqe(const liburingcxx::SQEntry *suspect
     ) const noexcept;
 
     void forward_task(std::coroutine_handle<> handle) noexcept;
@@ -157,7 +157,7 @@ class [[nodiscard]] io_context final {
 
     void make_thread_pool();
 
-    void co_spawn(main_task entrance);
+    void co_spawn(task<void> &&entrance);
 
     void can_stop() noexcept { will_stop = true; }
 
@@ -181,11 +181,11 @@ class [[nodiscard]] io_context final {
     io_context &operator=(io_context &&) = delete;
 };
 
-inline void co_spawn(main_task entrance) noexcept {
+inline void co_spawn(task<void> &&entrance) noexcept {
     if (detail::this_thread.worker != nullptr) [[likely]]
-        detail::this_thread.worker->co_spawn(entrance);
+        detail::this_thread.worker->co_spawn(std::move(entrance));
     else
-        detail::this_thread.ctx->co_spawn(entrance);
+        detail::this_thread.ctx->co_spawn(std::move(entrance));
 }
 
 inline void co_context_stop() noexcept {
