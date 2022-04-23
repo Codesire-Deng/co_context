@@ -55,7 +55,7 @@ co_context::task<> run(co_context::socket peer) {
     // while ((nr = ::recv(peer.fd(), buf, 8192, 0)) > 0) {}
     while (nr > 0) {
         nr = co_await (
-            peer.recv(buf, 0)
+            lazy::write(STDOUT_FILENO, {buf, (size_t)nr}, 0) + peer.recv(buf, 0)
         );
         // eager::write(STDOUT_FILENO, {buf, (size_t)nr}, 0).detach();
 

@@ -67,7 +67,7 @@ class [[nodiscard]] io_context final {
     // local read/write, high frequency data.
     alignas(cache_line_size) config::tid_t s_cur = 0;
     config::tid_t r_cur = 0;
-    // size_t requests_to_reap = 0;
+    size_t requests_to_reap = 0;
     bool need_ring_submit;
     bool will_stop = false;
     /*
