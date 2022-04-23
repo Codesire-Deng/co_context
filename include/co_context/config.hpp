@@ -5,8 +5,8 @@
 #include <cstdint>
 #include "uring/io_uring.h"
 
-#define calc_sizeof(S) char (*S##__LINE__)[sizeof(S)] = 1;
-#define calc_alignof(S) char (*S##__LINE__)[alignof(S)] = 1;
+#define calc_sizeof(S)  char(*S##__LINE__)[sizeof(S)] = 1;
+#define calc_alignof(S) char(*S##__LINE__)[alignof(S)] = 1;
 
 namespace co_context {
 
@@ -86,9 +86,9 @@ namespace config {
 
     // inline constexpr uint16_t swap_capacity = 32;
 
-    // inline constexpr uint16_t swap_capacity = 16;
+    inline constexpr uint16_t swap_capacity = 16;
 
-    inline constexpr uint16_t swap_capacity = 8;
+    // inline constexpr uint16_t swap_capacity = 8;
 
     // static_assert(swap_capacity % 8 == 0);
 

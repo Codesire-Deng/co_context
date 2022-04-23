@@ -57,13 +57,11 @@ class [[nodiscard]] io_context final {
 
   private:
 
-
   private:
     // multithread sharing
     alignas(cache_line_size) uring ring;
     alignas(cache_line_size) detail::swap_zone<detail::submit_info> submit_swap;
-    alignas(cache_line_size
-    ) detail::swap_zone<detail::reap_info> reap_swap;
+    alignas(cache_line_size) detail::swap_zone<detail::reap_info> reap_swap;
     alignas(cache_line_size) worker_meta worker[config::worker_threads_number];
 
     // local read/write, high frequency data.

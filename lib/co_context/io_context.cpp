@@ -156,7 +156,7 @@ namespace detail {
                     if constexpr (config::enable_link_io_result) {
                         if (info.io_info->type
                             == task_info::task_type::lazy_link_sqe)
-                        continue;
+                            continue;
                     }
                     return info.io_info->handle;
                 } else {
@@ -228,7 +228,7 @@ void io_context::handle_semaphore_release(task_info *sem_release) noexcept {
     counting_semaphore::T done = 0;
     std::coroutine_handle<> handle;
     while (done < update && bool(handle = sem.try_release())) {
-        log::d(
+        log::v(
             "ctx handle_semaphore_release: forwarding %lx\n", handle.address()
         );
         forward_task(handle);

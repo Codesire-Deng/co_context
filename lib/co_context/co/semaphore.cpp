@@ -59,7 +59,7 @@ void counting_semaphore::acquire_awaiter::await_suspend(
     std::coroutine_handle<> current
 ) noexcept {
     this->handle = current;
-    log::d("suspending coro: %lx\n", this->handle.address());
+    log::v("suspending coro: %lx\n", this->handle.address());
     // acquire failed
     acquire_awaiter *old_head = sem.awaiting.load(std::memory_order_acquire);
     do {

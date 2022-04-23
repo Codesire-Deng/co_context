@@ -52,7 +52,7 @@ class counting_semaphore final {
     bool try_acquire() noexcept;
 
     acquire_awaiter acquire() noexcept {
-        log::d("semaphore %lx acquiring\n", this);
+        log::v("semaphore %lx acquiring\n", this);
         return acquire_awaiter{*this};
     }
 
