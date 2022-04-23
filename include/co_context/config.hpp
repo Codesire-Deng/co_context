@@ -6,6 +6,7 @@
 #include "uring/io_uring.h"
 
 #define calc_sizeof(S) char (*S##__LINE__)[sizeof(S)] = 1;
+#define calc_alignof(S) char (*S##__LINE__)[alignof(S)] = 1;
 
 namespace co_context {
 
@@ -28,9 +29,9 @@ namespace config {
 #endif
 
     // About io_context
-    // inline constexpr unsigned io_uring_flags = 0;
+    inline constexpr unsigned io_uring_flags = 0;
 
-    inline constexpr unsigned io_uring_flags = IORING_SETUP_SQPOLL;
+    // inline constexpr unsigned io_uring_flags = IORING_SETUP_SQPOLL;
 
     inline constexpr bool is_SQPOLL = io_uring_flags & IORING_SETUP_SQPOLL;
 
@@ -45,9 +46,9 @@ namespace config {
 
     // inline constexpr unsigned total_threads_number = 4;
 
-    inline constexpr unsigned total_threads_number = 3;
+    // inline constexpr unsigned total_threads_number = 3;
 
-    // inline constexpr unsigned total_threads_number = 2;
+    inline constexpr unsigned total_threads_number = 2;
 
     inline constexpr unsigned worker_threads_number =
         total_threads_number - 1 - is_SQPOLL;
@@ -67,7 +68,7 @@ namespace config {
 
     // inline constexpr uint16_t swap_capacity = 16384;
 
-    inline constexpr uint16_t swap_capacity = 8192;
+    // inline constexpr uint16_t swap_capacity = 8192;
 
     // inline constexpr uint16_t swap_capacity = 4096;
 
@@ -87,7 +88,7 @@ namespace config {
 
     // inline constexpr uint16_t swap_capacity = 16;
 
-    // inline constexpr uint16_t swap_capacity = 8;
+    inline constexpr uint16_t swap_capacity = 8;
 
     // static_assert(swap_capacity % 8 == 0);
 
@@ -102,8 +103,14 @@ namespace config {
     using semaphore_counting_t = std::ptrdiff_t;
     using condition_variable_counting_t = std::uintptr_t;
 
+    // lazy_io configuration
+
+    inline constexpr bool enable_link_io_result = false;
+
     // eager_io configuration
     using eager_io_state_t = uint8_t;
+
+    inline constexpr bool enable_eager_io = false;
 
 } // namespace config
 

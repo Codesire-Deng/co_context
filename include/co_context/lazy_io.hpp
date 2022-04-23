@@ -75,13 +75,16 @@ namespace detail {
     inline lazy_link_io
     operator+(lazy_awaiter &&lhs, lazy_awaiter &&rhs) noexcept {
         lhs.sqe->setLink();
+        lhs.sqe->fetchData() |= __u64(task_info::task_type::lazy_link_sqe);
         lhs.io_info.type = task_info::task_type::lazy_link_sqe;
         return lazy_link_io{.last_io = &rhs};
     }
 
     inline lazy_link_io &&
     operator+(lazy_link_io &&lhs, lazy_awaiter &&rhs) noexcept {
-        lhs.last_io->sqe->setLink();
+        auto *const sqe = lhs.last_io->sqe;
+        sqe->setLink();
+        sqe->fetchData() |= __u64(task_info::task_type::lazy_link_sqe);
         lhs.last_io->io_info.type = task_info::task_type::lazy_link_sqe;
         lhs.last_io = &rhs;
         return std::move(lhs);

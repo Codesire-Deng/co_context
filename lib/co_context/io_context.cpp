@@ -147,10 +147,21 @@ namespace detail {
             if (!cur.is_empty_load_tail())
             */
             {
-                const std::coroutine_handle<> handle = reap_swap[cur.head()];
+                const reap_info info = reap_swap[cur.head()];
                 log::v("worker[%u] found [%u]\n", tid, cur.head());
                 cur.pop();
-                return handle;
+                if (!info.is_co_spawn()) [[likely]] {
+                    info.io_info->result = info.result;
+                    // info.io_info->flags = info.flags;
+                    if constexpr (config::enable_link_io_result) {
+                        if (info.io_info->type
+                            == task_info::task_type::lazy_link_sqe)
+                        continue;
+                    }
+                    return info.io_info->handle;
+                } else {
+                    return info.handle;
+                }
             }
             // TODO consider tid_hint here
         }
@@ -188,13 +199,13 @@ void io_context::forward_task(std::coroutine_handle<> handle) noexcept {
             "ctx forward_task to [%u][%u]: %lx\n", r_cur, cur.tail(),
             handle.address()
         );
-        reap_swap[r_cur].push(cur, handle);
+        reap_swap[r_cur].push(cur, detail::reap_info{handle});
         cur_next(r_cur);
     } else {
         /**
          * This means workers are too slow.
          */
-        reap_overflow_buf.push(handle);
+        reap_overflow_buf.push(detail::reap_info{handle});
         log::d("ctx forward_task to reap_OF (workers are too slow)\n");
     }
 }
@@ -365,7 +376,7 @@ bool io_context::try_clear_submit_overflow_buf() noexcept {
 }
 */
 
-bool io_context::try_reap(std::coroutine_handle<> handle) noexcept {
+bool io_context::try_reap(detail::reap_info info) noexcept {
     if (!try_find_reap_worker_acquire()) [[unlikely]] {
         log::d("ctx try_reap failed reap_swap is full\n");
         return false;
@@ -374,9 +385,16 @@ bool io_context::try_reap(std::coroutine_handle<> handle) noexcept {
     auto &cur = worker[r_cur].sharing.reap_cur;
 
     log::v("ctx try_reap at [%u][%u]\n", r_cur, cur.tail());
-    reap_swap[r_cur].push_notify(cur, handle);
+    reap_swap[r_cur].push_notify(cur, info);
     cur_next(r_cur);
     return true;
+}
+
+inline void io_context::reap_or_overflow(detail::reap_info info) noexcept {
+    if (!try_reap(info)) [[unlikely]] {
+        reap_overflow_buf.push(info);
+        log::d("ctx poll_completion failed reap_OF (workers are too slow)\n");
+    }
 }
 
 static bool eager_io_need_awake(detail::task_info *io_info) {
@@ -395,59 +413,48 @@ static bool eager_io_need_awake(detail::task_info *io_info) {
  */
 inline void io_context::poll_completion() noexcept {
     // reap round
-    liburingcxx::CQEntry *polling_cqe = ring.peekCQEntry();
+    const liburingcxx::CQEntry *const polling_cqe = ring.peekCQEntry();
     if (polling_cqe == nullptr) return;
 
     // --requests_to_reap;
     log::v("ctx poll_completion found\n");
 
-    task_info *io_info = reinterpret_cast<task_info *>(polling_cqe->getData());
-    assert(io_info != nullptr);
-    io_info->result = polling_cqe->getRes();
+    const uint64_t user_data = polling_cqe->getData();
+    const int32_t result = polling_cqe->getRes();
+    [[maybe_unused]] const uint32_t flags = polling_cqe->getFlags();
     ring.SeenCQEntry(polling_cqe);
+    assert(flags != detail::reap_info::co_spawn_flag);
 
     using task_type = task_info::task_type;
 
-    switch (io_info->type) {
-        case task_type::lazy_sqe:
-            break;
-
-        case task_type::lazy_link_sqe:
+    if constexpr (config::enable_eager_io) {
+        if (user_data & uint64_t(task_type::eager_sqe)) [[unlikely]] {
+            task_info *const eager_io_info = reinterpret_cast<task_info *>(
+                user_data ^ uint64_t(task_type::eager_sqe)
+            );
+            eager_io_info->result = result;
+            if (eager_io_need_awake(eager_io_info)) [[likely]]
+                reap_or_overflow(detail::reap_info{eager_io_info->handle});
             return;
-
-        case task_type::eager_sqe:
-            if (eager_io_need_awake(io_info)) [[likely]] {
-                break;
-            } else {
-                // return true;
-                return;
-            }
-
-        case task_type::co_spawn:
-            assert(false && "poll_completion(): found task_type::co_spawn");
-        default:
-            log::e("io_info->type==%u\n", io_info->type);
-            assert(false && "poll_completion(): unknown task_type");
-            break;
+        }
+        // must be lazy_sqe or lazy_link_sqe here
     }
 
-    if (try_reap(io_info->handle)) [[likely]] {
-        return;
-        // return true;
-    } else {
-        reap_overflow_buf.push(io_info->handle);
-        log::d("ctx poll_completion failed reap_OF (workers are too slow)\n");
-        return;
-        // return false;
+    if constexpr (!config::enable_link_io_result) {
+        // if link_io_result is not enabled, we can skip the lazy_link_sqe.
+        if (user_data & uint64_t(task_type::lazy_link_sqe)) return;
     }
+
+    task_info *const io_info = detail::raw_task_info_ptr(user_data);
+    reap_or_overflow(detail::reap_info{io_info, result, flags});
 }
 
 bool io_context::try_clear_reap_overflow_buf() noexcept {
     if (reap_overflow_buf.empty()) return true;
     do {
-        std::coroutine_handle<> handle = reap_overflow_buf.front();
+        const detail::reap_info info = reap_overflow_buf.front();
         // OPTIMIZE impossible for task_type::co_spawn
-        if (try_reap(handle)) {
+        if (try_reap(info)) {
             reap_overflow_buf.pop();
         } else {
             log::d("ctx try_clear_reap (partially) failed\n");
@@ -468,14 +475,14 @@ void io_context::init() noexcept {
     assert(this->sqring_entries == ring.getSQRingEntries());
     {
         const unsigned actual_sqring_size = this->sqring_entries;
-        const unsigned need_sqring_size =
+        const unsigned expect_sqring_size =
             config::worker_threads_number * config::swap_capacity * 2;
-        if (actual_sqring_size < need_sqring_size) {
+        if (actual_sqring_size < expect_sqring_size) {
             log::e(
                 "io_context::init(): "
                 "Entries inside the ring are not enough!\n"
-                "Actual=%u, need=%u\n",
-                actual_sqring_size, need_sqring_size
+                "Actual=%u, expect=%u\n",
+                actual_sqring_size, expect_sqring_size
             );
             exit(1);
         }

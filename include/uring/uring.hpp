@@ -226,7 +226,7 @@ class [[nodiscard]] URing final {
         return getCQEntry(/* submit */ 0, num, /* sigmask */ nullptr);
     }
 
-    inline void SeenCQEntry(CQEntry *cqe) noexcept {
+    inline void SeenCQEntry(const CQEntry *cqe) noexcept {
         assert(cqe != nullptr);
         CQAdvance(1);
     }

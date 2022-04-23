@@ -26,6 +26,7 @@
 #include "co_context/config.hpp"
 #include "co_context/detail/task_info.hpp"
 #include "co_context/detail/submit_info.hpp"
+#include "co_context/detail/reap_info.hpp"
 #include "co_context/main_task.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/detail/worker_meta.hpp"
@@ -55,11 +56,14 @@ class [[nodiscard]] io_context final {
     friend worker_meta;
 
   private:
+
+
+  private:
     // multithread sharing
     alignas(cache_line_size) uring ring;
     alignas(cache_line_size) detail::swap_zone<detail::submit_info> submit_swap;
     alignas(cache_line_size
-    ) detail::swap_zone<std::coroutine_handle<>> reap_swap;
+    ) detail::swap_zone<detail::reap_info> reap_swap;
     alignas(cache_line_size) worker_meta worker[config::worker_threads_number];
 
     // local read/write, high frequency data.
@@ -71,7 +75,7 @@ class [[nodiscard]] io_context final {
     /*
     std::queue<task_info *> submit_overflow_buf;
     */
-    std::queue<std::coroutine_handle<>> reap_overflow_buf;
+    std::queue<detail::reap_info> reap_overflow_buf;
 
     // read-only sharing
     alignas(cache_line_size) const unsigned sqring_entries;
@@ -117,7 +121,9 @@ class [[nodiscard]] io_context final {
     bool try_clear_submit_overflow_buf() noexcept;
     */
 
-    bool try_reap(std::coroutine_handle<> handle) noexcept;
+    bool try_reap(detail::reap_info info) noexcept;
+
+    void reap_or_overflow(detail::reap_info info) noexcept;
 
     /**
      * @brief poll the completion swap zone

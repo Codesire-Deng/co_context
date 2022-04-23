@@ -16,6 +16,8 @@ class CQEntry final : private io_uring_cqe {
     inline uint64_t getData() const noexcept { return this->user_data; }
 
     inline int32_t getRes() const noexcept { return this->res; }
+
+    inline uint32_t getFlags() const noexcept { return this->flags; }
 };
 
 } // namespace liburingcxx

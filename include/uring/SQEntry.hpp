@@ -29,6 +29,10 @@ class SQEntry final : private io_uring_sqe {
         return *this;
     }
 
+    inline __u64 &fetchData() noexcept {
+        return this->user_data;
+    }
+
     inline SQEntry &setFlags(uint8_t flags) noexcept {
         this->flags = flags;
         return *this;

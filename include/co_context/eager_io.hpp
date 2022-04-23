@@ -66,7 +66,7 @@ namespace detail {
             : shared_io_info(new task_info{task_info::task_type::eager_sqe}) {
             shared_io_info->eager_io_state = 0; // instead of tid_hint
             sqe = this_thread.worker->get_free_sqe();
-            sqe->setData(shared_io_info->as_user_data());
+            sqe->setData(shared_io_info->as_eager_user_data());
         }
 
         inline void submit() const noexcept {

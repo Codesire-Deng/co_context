@@ -3,6 +3,7 @@
 #include "co_context/config.hpp"
 #include "co_context/detail/swap_zone.hpp"
 #include "co_context/detail/submit_info.hpp"
+#include "co_context/detail/reap_info.hpp"
 #include "co_context/main_task.hpp"
 #include <thread>
 #include <queue>
@@ -37,7 +38,7 @@ namespace detail {
 
         alignas(config::cache_line_size
         ) worker_swap_zone<submit_info> *submit_swap_ptr;
-        worker_swap_zone<std::coroutine_handle<>> *reap_swap_ptr;
+        worker_swap_zone<reap_info> *reap_swap_ptr;
         cur_t local_submit_tail = 0;
         tid_t tid;
         std::thread host_thread;

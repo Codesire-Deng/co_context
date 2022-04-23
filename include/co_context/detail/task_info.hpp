@@ -45,12 +45,12 @@ namespace detail {
         };
 
         enum class task_type : uint8_t {
+            co_spawn,
+            eager_sqe,
             lazy_sqe,
             lazy_link_sqe,
-            eager_sqe,
             // cqe,
             // result,
-            co_spawn,
             semaphore_release,
             condition_variable_notify,
             nop
@@ -65,7 +65,28 @@ namespace detail {
         uint64_t as_user_data() const noexcept {
             return static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
         }
+
+        uint64_t as_eager_user_data() const noexcept {
+            return static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this))
+                   | uint64_t(task_type::eager_sqe);
+        }
+
+        uint64_t as_linked_user_data() const noexcept {
+            return static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this))
+                   | uint64_t(task_type::lazy_link_sqe);
+        }
     };
+
+    static_assert(uint8_t(task_info::task_type::nop) < alignof(task_info));
+
+    inline constexpr uintptr_t raw_task_info_mask =
+        ~uintptr_t(alignof(task_info) - 1);
+
+    static_assert((~raw_task_info_mask) == 0x7);
+
+    inline task_info *raw_task_info_ptr(uintptr_t info) noexcept {
+        return reinterpret_cast<task_info *>(info & raw_task_info_mask);
+    }
 
 } // namespace detail
 

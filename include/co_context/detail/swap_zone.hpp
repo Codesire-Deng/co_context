@@ -23,7 +23,8 @@ namespace detail {
         return *reinterpret_cast<const uintptr_t *>(std::addressof(value));
     }
 
-    template<trival_ptr T>
+    template<typename T>
+        requires std::is_trivially_copyable_v<T>
     struct worker_swap_zone final {
         using sz_t = config::swap_capacity_width_t;
         using cur_t = ::co_context::spsc_cursor<sz_t, config::swap_capacity>;
@@ -54,7 +55,8 @@ namespace detail {
         }
     };
 
-    template<trival_ptr T>
+    template<typename T>
+        requires std::is_trivially_copyable_v<T>
     struct swap_zone final {
         using sz_t = config::tid_t;
 
