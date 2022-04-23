@@ -19,7 +19,7 @@ task<> add() {
 }
 
 int main() {
-    io_context ctx{32};
+    io_context ctx{2048};
     for (int i = 0; i < 1000; ++i) ctx.co_spawn(add());
     ctx.run();
 }
