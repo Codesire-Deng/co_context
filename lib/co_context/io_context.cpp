@@ -521,6 +521,11 @@ void io_context::co_spawn(task<void> &&entrance) {
     entrance.detach();
 }
 
+void io_context::co_spawn(std::coroutine_handle<> entrance) {
+    assert(detail::this_thread.worker == nullptr);
+    forward_task(entrance);
+}
+
 [[noreturn]] void io_context::run() {
 #ifdef USE_CPU_AFFINITY
     detail::set_cpu_affinity(detail::this_thread.tid);

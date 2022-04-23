@@ -159,6 +159,8 @@ class [[nodiscard]] io_context final {
 
     void co_spawn(task<void> &&entrance);
 
+    void co_spawn(std::coroutine_handle<> entrance);
+
     void can_stop() noexcept { will_stop = true; }
 
     [[noreturn]] void run();
@@ -183,9 +185,10 @@ class [[nodiscard]] io_context final {
 
 inline void co_spawn(task<void> &&entrance) noexcept {
     if (detail::this_thread.worker != nullptr) [[likely]]
-        detail::this_thread.worker->co_spawn(std::move(entrance));
+        detail::this_thread.worker->co_spawn(entrance.get_handle());
     else
-        detail::this_thread.ctx->co_spawn(std::move(entrance));
+        detail::this_thread.ctx->co_spawn(entrance.get_handle());
+    entrance.detach();
 }
 
 inline void co_context_stop() noexcept {
