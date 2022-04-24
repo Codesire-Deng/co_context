@@ -13,7 +13,7 @@ namespace co_context {
 namespace config {
 
     inline constexpr bool using_hyper_threading = true;
-// #define USE_CPU_AFFINITY
+#define USE_CPU_AFFINITY
 #ifdef USE_CPU_AFFINITY
     inline constexpr bool use_CPU_affinity = true;
 #else
@@ -82,11 +82,11 @@ namespace config {
 
     // inline constexpr uint16_t swap_capacity = 128;
 
-    // inline constexpr uint16_t swap_capacity = 64;
+    inline constexpr uint16_t swap_capacity = 64;
 
     // inline constexpr uint16_t swap_capacity = 32;
 
-    inline constexpr uint16_t swap_capacity = 16;
+    // inline constexpr uint16_t swap_capacity = 16;
 
     // inline constexpr uint16_t swap_capacity = 8;
 
@@ -128,10 +128,10 @@ namespace config {
     };
 
     // inline constexpr level log_level = level::v;
-    inline constexpr level log_level = level::d;
+    // inline constexpr level log_level = level::d;
     // inline constexpr level log_level = level::i;
     // inline constexpr level log_level = level::w;
-    // inline constexpr level log_level = level::e;
+    inline constexpr level log_level = level::e;
     // inline constexpr level log_level = level::no_log;
 
 } // namespace config
