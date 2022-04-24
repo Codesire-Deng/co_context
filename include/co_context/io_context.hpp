@@ -81,7 +81,8 @@ class [[nodiscard]] io_context final {
 
   private:
     inline static void cur_next(config::tid_t &context_cur) noexcept {
-        context_cur = (context_cur + 1) % config::worker_threads_number;
+        if constexpr (config::worker_threads_number > 1)
+            context_cur = (context_cur + 1) % config::worker_threads_number;
     }
 
     friend unsigned compress_sqe(

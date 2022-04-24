@@ -80,13 +80,13 @@ namespace config {
 
     // inline constexpr uint16_t swap_capacity = 256;
 
-    // inline constexpr uint16_t swap_capacity = 128;
+    inline constexpr uint16_t swap_capacity = 128;
 
     // inline constexpr uint16_t swap_capacity = 64;
 
     // inline constexpr uint16_t swap_capacity = 32;
 
-    inline constexpr uint16_t swap_capacity = 16;
+    // inline constexpr uint16_t swap_capacity = 16;
 
     // inline constexpr uint16_t swap_capacity = 8;
 

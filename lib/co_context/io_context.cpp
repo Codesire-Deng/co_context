@@ -74,8 +74,8 @@ namespace detail {
         // cur.push(1);
         cur.store_raw_tail(local_submit_tail);
         log::v(
-            "worker[%u] submit_sqe until [%u]\n", this_thread.tid,
-            local_submit_tail & cur.mask
+            "worker[%u] submit_sqe to [%u]\n", this_thread.tid,
+            (local_submit_tail-1U) & cur.mask
         );
     }
 
@@ -292,8 +292,8 @@ void io_context::try_submit(detail::submit_info &info) noexcept {
     // lazy_sqe or eager_sqe
     if (info.address == 0UL) [[likely]] {
         // submit to ring
-        log::v("ctx ring.submit()...\n");
         ++requests_to_reap;
+        log::v("ctx ring.submit(), requests_to_reap=%u...\n", requests_to_reap);
         need_ring_submit = true;
         ring.appendSQEntry(info.submit_sqe);
         auto *const victim_sqe = ring.getSQEntry();
@@ -415,8 +415,8 @@ inline void io_context::poll_completion() noexcept {
     const liburingcxx::CQEntry *const polling_cqe = ring.peekCQEntry();
     if (polling_cqe == nullptr) return;
 
+    log::v("ctx poll_completion found, remaining=%u\n", requests_to_reap);
     --requests_to_reap;
-    log::v("ctx poll_completion found\n");
 
     const uint64_t user_data = polling_cqe->getData();
     const int32_t result = polling_cqe->getRes();
@@ -555,7 +555,7 @@ void io_context::co_spawn(std::coroutine_handle<> entrance) {
             // }
 
             if constexpr (!config::use_standalone_completion_poller)
-                while (requests_to_reap != 0) poll_completion();
+                if (requests_to_reap != 0) poll_completion();
             // if (try_clear_reap_overflow_buf()) {
             // while (requests_to_reap != 0) {
             // for (uint8_t i = 0; i < config::reap_poll_rounds; ++i) {
