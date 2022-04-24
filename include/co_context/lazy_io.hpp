@@ -388,7 +388,6 @@ namespace detail {
     };
 
     struct lazy_yield {
-
         constexpr bool await_ready() const noexcept { return false; }
 
         void await_suspend(std::coroutine_handle<> current) noexcept {

@@ -30,7 +30,7 @@ void gen(char (&buf)[BLOCK_LEN]) {
     buf[BLOCK_LEN - 1] = '\n';
 }
 
-task<>  run(size_t offset) {
+task<> run(size_t offset) {
     char buf[BLOCK_LEN];
 
     auto log = [](std::string_view tag, uint32_t x) {
@@ -85,7 +85,7 @@ int main(int argc, char *argv[]) {
     io_context context{256};
 
     alive.store(0);
-    context.co_spawn([]() -> task<>  {
+    context.co_spawn([]() -> task<> {
         std::mt19937_64 rng(0);
         for (int i = 0; i < times; ++i) {
             const size_t offset = (rng() % file_size) & ~(BLOCK_LEN - 1);

@@ -67,7 +67,7 @@ class [[nodiscard]] io_context final {
     // local read/write, high frequency data.
     alignas(cache_line_size) config::tid_t s_cur = 0;
     config::tid_t r_cur = 0;
-    size_t requests_to_reap = 0;
+    int32_t requests_to_reap = 0;
     bool need_ring_submit;
     bool will_stop = false;
     /*
@@ -106,7 +106,11 @@ class [[nodiscard]] io_context final {
 
     bool try_find_submit_worker_relaxed() noexcept;
 
-    bool try_find_reap_worker_acquire() noexcept;
+    [[deprecated]] bool try_find_submit_worker_acquire() noexcept;
+
+    bool try_find_reap_worker_relaxed() noexcept;
+
+    [[deprecated]] bool try_find_reap_worker_acquire() noexcept;
 
     void try_submit(detail::submit_info &info) noexcept;
 

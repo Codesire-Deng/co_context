@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
 
     int output_fd = ::open("output", O_WRONLY | O_TRUNC);
 
-    io_context.co_spawn([&]() -> task<>  {
+    io_context.co_spawn([&]() -> task<> {
         constexpr int buf_size = 4096 * 2;
         char buf[buf_size];
 

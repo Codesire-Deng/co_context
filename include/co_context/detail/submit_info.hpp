@@ -22,16 +22,12 @@ namespace detail {
         };
 
         union {
-            liburingcxx::SQEntry* available_sqe;
-            liburingcxx::SQEntry* submit_sqe;
+            liburingcxx::SQEntry *available_sqe;
+            liburingcxx::SQEntry *submit_sqe;
         };
     };
 
-    enum submit_type : uint8_t {
-        co_spawn,
-        sem_rel,
-        cv_notify
-    };
+    enum submit_type : uint8_t { co_spawn, sem_rel, cv_notify };
 
     /*
     - submit:

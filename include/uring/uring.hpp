@@ -218,6 +218,14 @@ class [[nodiscard]] URing final {
         return result;
     }
 
+    inline unsigned CQReadyRelaxed() const noexcept {
+        return *cq.ktail - *cq.khead;
+    }
+
+    inline unsigned CQReadyAcquire() const noexcept {
+        return io_uring_smp_load_acquire(cq.ktail) - *cq.khead;
+    }
+
     inline CQEntry *waitCQEntry() { return waitCQEntryNum(1); }
 
     inline CQEntry *peekCQEntry() { return waitCQEntryNum(0); }

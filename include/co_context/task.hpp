@@ -7,8 +7,8 @@
 namespace co_context {
 
 /**
- * @brief A task<> is a lazy synchronous coroutine that only executes at co_await
- * <task> (or co_await <task>.when_ready()).
+ * @brief A task<> is a lazy synchronous coroutine that only executes at
+ * co_await <task> (or co_await <task>.when_ready()).
  * @note As long as a task<> has been awaited, it will execute immediately at
  * current thread, and will not return until it's all finished.
  * @tparam T

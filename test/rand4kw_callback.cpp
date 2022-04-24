@@ -29,7 +29,7 @@ void gen(char (&buf)[BLOCK_LEN]) {
     buf[BLOCK_LEN - 1] = '\n';
 }
 
-task<>  run() {
+task<> run() {
     log::d("r4kw at ?? run()\n");
     const uint32_t tid = co_get_tid();
     const int32_t pid = ::gettid();

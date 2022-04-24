@@ -14,7 +14,7 @@ int times;
 std::atomic_int finish = 0;
 constexpr int concur = 2;
 
-task<>  workload() {
+task<> workload() {
     int now = finish.fetch_add(1) + 1;
     if (now > times) { printf("logic error!\n"); }
     if (now == times) {
@@ -25,7 +25,7 @@ task<>  workload() {
     co_await eager::nop();
 }
 
-task<>  gen_task() {
+task<> gen_task() {
     for (int i = 0; i < times / concur; ++i) { co_spawn(workload()); }
     co_await eager::nop();
 }

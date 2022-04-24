@@ -23,7 +23,7 @@ alignas(512) char buf[MAX_ON_FLY][BLOCK_LEN];
 
 std::mt19937_64 rng(time(nullptr));
 
-task<>  run(const uint32_t idx) {
+task<> run(const uint32_t idx) {
 restart:
     const size_t off = (rng() % file_size) & ~(BLOCK_LEN - 1);
     int nr = co_await lazy::read(file_fd, buf[idx], off);

@@ -12,42 +12,8 @@
 
 #include <string_view>
 
-// TODO 性能受 swap_capacity 影响明显，需分析原因
-
-int write_n(int fd, const void *buf, int length) {
-    int written = 0;
-    // while (written < length)
-    {
-        int nw = ::write(
-            fd, static_cast<const char *>(buf) + written, length - written
-        );
-        // if (nw > 0) {
-        // written += nw;
-        // } else if (nw == 0) {
-        //     break; // EOF
-        // } else if (errno != EINTR) {
-        //     perror("write");
-        //     break;
-        // }
-    }
-    return written;
-}
-
-co_context::task<int>
-send_all(co_context::socket &sock, std::span<const char> buf) {
-    int written = 0;
-    while (written < buf.size()) {
-        int nw = co_await sock.send(buf, 0);
-        if (nw > 0)
-            written += nw;
-        else
-            break;
-    }
-    co_return written;
-}
-
 co_context::task<> run(co_context::socket peer) {
-    printf("Running\n");
+    printf("run: Running\n");
     using namespace co_context;
     char buf[8192];
     int nr = co_await peer.recv(buf, 0);
@@ -55,12 +21,10 @@ co_context::task<> run(co_context::socket peer) {
     // while ((nr = ::recv(peer.fd(), buf, 8192, 0)) > 0) {}
     while (nr > 0) {
         nr = co_await (
-            lazy::write(STDOUT_FILENO, {buf, (size_t)nr}, 0) + peer.recv(buf, 0)
+            /* lazy::write(STDOUT_FILENO, {buf, (size_t)nr}, 0) +  */ peer.recv(
+                buf, 0
+            )
         );
-        // eager::write(STDOUT_FILENO, {buf, (size_t)nr}, 0).detach();
-
-        // int nw = write_n(STDOUT_FILENO, buf, nr); // 将收到的字节全部打印到
-        // stdout if (nw < nr) break;
     }
     ::exit(0);
 }

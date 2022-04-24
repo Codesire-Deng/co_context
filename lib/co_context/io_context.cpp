@@ -75,7 +75,7 @@ namespace detail {
         cur.store_raw_tail(local_submit_tail);
         log::v(
             "worker[%u] submit_sqe to [%u]\n", this_thread.tid,
-            (local_submit_tail-1U) & cur.mask
+            (local_submit_tail - 1U) & cur.mask
         );
     }
 
@@ -194,7 +194,7 @@ io_context::is_sqe(const liburingcxx::SQEntry *suspect) const noexcept {
 
 void io_context::forward_task(std::coroutine_handle<> handle) noexcept {
     // TODO optimize scheduling strategy
-    if (try_find_reap_worker_acquire()) [[likely]] {
+    if (try_find_reap_worker_relaxed()) [[likely]] {
         auto &cur = worker[r_cur].sharing.reap_cur;
         log::v(
             "ctx forward_task to [%u][%u]: %lx\n", r_cur, cur.tail(),
@@ -279,10 +279,27 @@ bool io_context::try_find_submit_worker_relaxed() noexcept {
     return false;
 }
 
-bool io_context::try_find_reap_worker_acquire() noexcept {
+[[deprecated]] bool io_context::try_find_submit_worker_acquire() noexcept {
+    for (config::tid_t i = 0; i < config::worker_threads_number; ++i) {
+        if (!this->worker[s_cur].sharing.submit_cur.is_empty_load_tail())
+            return true;
+        cur_next(s_cur);
+    }
+    return false;
+}
+
+[[deprecated]] bool io_context::try_find_reap_worker_acquire() noexcept {
     for (config::tid_t i = 0; i < config::worker_threads_number; ++i) {
         if (this->worker[r_cur].sharing.reap_cur.is_available_load_head())
             return true;
+        cur_next(r_cur);
+    }
+    return false;
+}
+
+bool io_context::try_find_reap_worker_relaxed() noexcept {
+    for (config::tid_t i = 0; i < config::worker_threads_number; ++i) {
+        if (this->worker[r_cur].sharing.reap_cur.is_available()) return true;
         cur_next(r_cur);
     }
     return false;
@@ -293,7 +310,7 @@ void io_context::try_submit(detail::submit_info &info) noexcept {
     if (info.address == 0UL) [[likely]] {
         // submit to ring
         ++requests_to_reap;
-        log::v("ctx ring.submit(), requests_to_reap=%u...\n", requests_to_reap);
+        log::v("ctx ring.submit(), requests_to_reap=%d...\n", requests_to_reap);
         need_ring_submit = true;
         ring.appendSQEntry(info.submit_sqe);
         auto *const victim_sqe = ring.getSQEntry();
@@ -307,7 +324,7 @@ void io_context::try_submit(detail::submit_info &info) noexcept {
         task_info *const io_info = detail::raw_task_info_ptr(info.address);
 
         // PERF May call cur.pop() to make worker start sooner.
-        switch (uint32_t(info.address) & 0x7) {
+        switch (uint32_t(info.address) & 0x7U) {
             case submit_type::co_spawn:
                 forward_task(std::coroutine_handle<>::from_address(info.ptr));
                 return;
@@ -376,7 +393,7 @@ bool io_context::try_clear_submit_overflow_buf() noexcept {
 */
 
 bool io_context::try_reap(detail::reap_info info) noexcept {
-    if (!try_find_reap_worker_acquire()) [[unlikely]] {
+    if (!try_find_reap_worker_relaxed()) [[unlikely]] {
         log::d("ctx try_reap failed reap_swap is full\n");
         return false;
     }
@@ -415,8 +432,8 @@ inline void io_context::poll_completion() noexcept {
     const liburingcxx::CQEntry *const polling_cqe = ring.peekCQEntry();
     if (polling_cqe == nullptr) return;
 
-    log::v("ctx poll_completion found, remaining=%u\n", requests_to_reap);
     --requests_to_reap;
+    log::v("ctx poll_completion found, remaining=%d\n", requests_to_reap);
 
     const uint64_t user_data = polling_cqe->getData();
     const int32_t result = polling_cqe->getRes();
@@ -538,8 +555,10 @@ void io_context::co_spawn(std::coroutine_handle<> entrance) {
     if constexpr (config::use_standalone_completion_poller)
         std::thread{[this] {
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
-            log::w("completion_poller runs on %d\n", gettid());
-            while (true) { poll_completion(); }
+            log::w("ctx completion_poller runs on %d\n", gettid());
+            while (true) {
+                if (this->ring.CQReadyAcquire()) { poll_completion(); }
+            }
         }}.detach();
 
     while (!will_stop) [[likely]] {
@@ -554,8 +573,14 @@ void io_context::co_spawn(std::coroutine_handle<> entrance) {
                 poll_submission();
             // }
 
-            if constexpr (!config::use_standalone_completion_poller)
-                if (requests_to_reap != 0) poll_completion();
+            if constexpr (!config::use_standalone_completion_poller) {
+                // if (requests_to_reap > 1)
+                //     log::w("abnormal requests_to_reap=%d\n",
+                //     requests_to_reap);
+                // TODO judge the memory order (relaxed may cause bugs)
+                if (requests_to_reap > 0 && ring.CQReadyRelaxed())
+                    poll_completion();
+            }
             // if (try_clear_reap_overflow_buf()) {
             // while (requests_to_reap != 0) {
             // for (uint8_t i = 0; i < config::reap_poll_rounds; ++i) {
