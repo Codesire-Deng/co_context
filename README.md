@@ -96,7 +96,7 @@ int main(int argc, const char *argv[]) {
 2. **co_context** 的数据结构保证「可能频繁读写」的 cacheline 最多被两个线程访问，无论并发强度有多大。这个保证本身也不经过互斥锁或原子变量。（若使用原子变量，高竞争下性能损失约 33%～70%）
 3. 对于可能被多于两个线程读写的 cacheline，**co_context** 保证乒乓缓存问题最多发生常数次。
 4. 在 AMD-5800X，3200 Mhz-ddr4 环境下，若绕过 io_uring，**co_context** 的线程交互频率可达 1.25 GHz。
-5. 创建、运行、销毁高竞争协程的频率可达 58 M（线程数=4，swap_capacity=32768，0.986 s 内完成 58 M 原子变量自增），代码见 example/nop.cpp。
+5. 创建、运行、销毁高竞争协程的频率可达 58 M（线程数=4，swap_capacity=32768，0.986 s 内完成 58 M 原子变量自增），代码见 test/nop.cpp。
 6. 协程自身的缓存不友好问题（主要由 `operator new` 引起），需要借助其他工具来解决，例如 [mimalloc](https://github.com/microsoft/mimalloc)。
 
 ---
