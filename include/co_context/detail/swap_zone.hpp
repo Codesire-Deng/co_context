@@ -26,7 +26,7 @@ namespace detail {
     template<typename T>
         requires std::is_trivially_copyable_v<T>
     struct worker_swap_zone final {
-        using sz_t = config::swap_capacity_width_t;
+        using sz_t = config::swap_capacity_size_t;
         using cur_t = ::co_context::spsc_cursor<sz_t, config::swap_capacity>;
 
         T data[config::swap_capacity];

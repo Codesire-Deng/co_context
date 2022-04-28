@@ -18,7 +18,7 @@ namespace detail {
     struct alignas(config::cache_line_size) worker_meta final {
         enum class worker_state : uint8_t { running, idle, blocked };
 
-        using cur_t = config::swap_capacity_width_t;
+        using cur_t = config::swap_capacity_size_t;
 
         /**
          * @brief sharing zone with main thread
@@ -33,7 +33,7 @@ namespace detail {
             // int temp;
         };
 
-        using tid_t = config::threads_number_width_t;
+        using tid_t = config::threads_number_size_t;
 
         alignas(config::cache_line_size) sharing_zone sharing;
 

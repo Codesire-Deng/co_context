@@ -5,7 +5,7 @@
 using namespace co_context;
 
 constexpr uint32_t total_switch = 1e8;
-int count = 0;
+uint32_t count = 0;
 
 task<> run() {
     auto start = std::chrono::steady_clock::now();

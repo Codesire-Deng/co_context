@@ -32,7 +32,7 @@ namespace detail {
         this->submit_swap_ptr = &context->submit_swap[thread_index];
         this->reap_swap_ptr = &context->reap_swap[thread_index];
         log::w("worker[%u] runs on %u\n", this->tid, gettid());
-#ifdef USE_CPU_AFFINITY
+#ifdef CO_CONTEXT_USE_CPU_AFFINITY
         const unsigned logic_cores = std::thread::hardware_concurrency();
         if constexpr (config::using_hyper_threading) {
             if (thread_index * 2 < logic_cores) {
@@ -544,7 +544,7 @@ void io_context::co_spawn(std::coroutine_handle<> entrance) {
 }
 
 [[noreturn]] void io_context::run() {
-#ifdef USE_CPU_AFFINITY
+#ifdef CO_CONTEXT_USE_CPU_AFFINITY
     detail::set_cpu_affinity(detail::this_thread.tid);
 #endif
     log::w("io_context runs on %d\n", gettid());
