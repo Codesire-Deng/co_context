@@ -62,6 +62,12 @@ namespace config {
     // inline constexpr tid_size_t worker_threads_number = 3;
     // inline constexpr tid_size_t worker_threads_number = 4;
 
+    /**
+     * @note Do not modify this, check `worker_threads_number` instead.
+     */
+    inline constexpr tid_size_t workers_number =
+        worker_threads_number > 1 ? worker_threads_number : 1;
+
     inline constexpr bool use_standalone_completion_poller = false;
     static_assert(
         !use_standalone_completion_poller || worker_threads_number > 0
@@ -69,9 +75,15 @@ namespace config {
     // ========================================================================
 
     // ======================= io_context configuration =======================
+    // Enabling this would significantly increase latency in multi-thread model.
+    inline constexpr bool use_wait_and_notify = false;
+    static_assert(!use_wait_and_notify || worker_threads_number != 0);
+
     using swap_capacity_size_t = uint16_t;
+    using cur_t = swap_capacity_size_t;
 
     // inline constexpr swap_capacity_size_t swap_capacity = 1;
+    // inline constexpr swap_capacity_size_t swap_capacity = 4;
     // inline constexpr swap_capacity_size_t swap_capacity = 8;
     // inline constexpr swap_capacity_size_t swap_capacity = 16;
     // inline constexpr swap_capacity_size_t swap_capacity = 32;
@@ -118,11 +130,11 @@ namespace config {
     enum class level : uint8_t { verbose, debug, info, warning, error, no_log };
 
     // inline constexpr level log_level = level::verbose;
-    inline constexpr level log_level = level::debug;
+    // inline constexpr level log_level = level::debug;
     // inline constexpr level log_level = level::info;
     // inline constexpr level log_level = level::warning;
     // inline constexpr level log_level = level::error;
-    // inline constexpr level log_level = level::no_log;
+    inline constexpr level log_level = level::no_log;
 
 } // namespace config
 

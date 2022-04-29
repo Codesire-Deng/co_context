@@ -27,4 +27,4 @@ namespace detail {
 
 } // namespace co_context
 
-#endif
+#endif // ifdef CO_CONTEXT_USE_CPU_AFFINITY

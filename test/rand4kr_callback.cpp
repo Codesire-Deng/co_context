@@ -28,7 +28,7 @@ constexpr size_t BLOCK_LEN = 4096;
 // constexpr int MAX_ON_FLY = 24; // 6 worker thread
 constexpr int MAX_ON_FLY = 24; // 3 worker thread
 // constexpr int MAX_ON_FLY = 4; // 1 worker thread
-constexpr unsigned threads = config::worker_threads_number;
+constexpr unsigned threads = config::workers_number;
 
 alignas(config::cache_line_size) char buf[threads][BLOCK_LEN];
 

@@ -6,7 +6,7 @@
 namespace co_context {
 
 template<std::unsigned_integral T, T capacity>
-struct spsc_cursor {
+struct [[deprecated]] spsc_cursor {
     static_assert(lowbit(capacity) == capacity);
     inline static constexpr T mask = capacity - 1;
 

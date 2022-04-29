@@ -41,34 +41,24 @@ class io_context;
 // class lazy_io;
 
 class [[nodiscard]] io_context final {
-  public:
-    /**
-     * One thread for io_context submit/reap. Another thread for io_uring (if
-     * needed).
-     */
-    static_assert(config::worker_threads_number >= 1);
-
+  private:
     using uring = liburingcxx::URing<config::io_uring_flags>;
 
     using task_info = detail::task_info;
 
+    friend class detail::worker_meta;
     using worker_meta = detail::worker_meta;
-    friend worker_meta;
-
-  private:
 
   private:
     // multithread sharing
     alignas(cache_line_size) uring ring;
-    alignas(cache_line_size) detail::swap_zone<detail::submit_info> submit_swap;
-    alignas(cache_line_size) detail::swap_zone<detail::reap_info> reap_swap;
-    alignas(cache_line_size) worker_meta worker[config::worker_threads_number];
+    alignas(cache_line_size) worker_meta worker[config::workers_number];
 
     // local read/write, high frequency data.
     alignas(cache_line_size) config::tid_t s_cur = 0;
     config::tid_t r_cur = 0;
     int32_t requests_to_reap = 0;
-    bool need_ring_submit;
+    bool need_ring_submit = false;
     bool will_stop = false;
     /*
     std::queue<task_info *> submit_overflow_buf;
@@ -81,11 +71,11 @@ class [[nodiscard]] io_context final {
 
   private:
     inline static void cur_next(config::tid_t &context_cur) noexcept {
-        if constexpr (config::worker_threads_number > 1)
-            context_cur = (context_cur + 1) % config::worker_threads_number;
+        if constexpr (config::workers_number > 1)
+            context_cur = (context_cur + 1) % config::workers_number;
     }
 
-    friend unsigned compress_sqe(
+    [[deprecated]] friend unsigned compress_sqe(
         const io_context *self, const liburingcxx::SQEntry *sqe
     ) noexcept;
 

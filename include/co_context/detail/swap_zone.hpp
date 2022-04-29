@@ -60,7 +60,7 @@ namespace detail {
     struct swap_zone final {
         using sz_t = config::tid_t;
 
-        worker_swap_zone<T> data[config::worker_threads_number];
+        worker_swap_zone<T> data[config::workers_number];
 
         swap_zone() noexcept = default;
         swap_zone(const swap_zone &) = delete;

@@ -15,10 +15,11 @@ class io_context;
 
 namespace detail {
 
-    struct alignas(config::cache_line_size) worker_meta final {
-        enum class worker_state : uint8_t { running, idle, blocked };
+    struct worker_meta final {
+        enum class [[deprecated]] worker_state : uint8_t{
+            running, idle, blocked};
 
-        using cur_t = config::swap_capacity_size_t;
+        using cur_t = config::cur_t;
 
         /**
          * @brief sharing zone with main thread
@@ -28,18 +29,20 @@ namespace detail {
             ) spsc_cursor<cur_t, config::swap_capacity> submit_cur;
 
             alignas(config::cache_line_size
+            ) worker_swap_zone<detail::submit_info> submit_swap;
+
+            alignas(config::cache_line_size
             ) spsc_cursor<cur_t, config::swap_capacity> reap_cur;
-            // worker_state state; // TODO atomic?
-            // int temp;
+
+            alignas(config::cache_line_size
+            ) worker_swap_zone<detail::reap_info> reap_swap;
         };
 
         using tid_t = config::threads_number_size_t;
 
         alignas(config::cache_line_size) sharing_zone sharing;
 
-        alignas(config::cache_line_size
-        ) worker_swap_zone<submit_info> *submit_swap_ptr;
-        worker_swap_zone<reap_info> *reap_swap_ptr;
+        alignas(config::cache_line_size) io_context *ctx = nullptr;
         cur_t local_submit_tail = 0;
         tid_t tid;
         std::thread host_thread;
@@ -59,13 +62,22 @@ namespace detail {
 
         std::coroutine_handle<> schedule() noexcept;
 
+        cur_t number_to_schedule_relaxed() noexcept {
+            const auto &cur = this->sharing.reap_cur;
+            return cur.size();
+        }
+
+        std::coroutine_handle<> try_schedule() noexcept;
+
         void init(const int thread_index, io_context *const context);
 
         void co_spawn(task<void> &&entrance) noexcept;
 
         void co_spawn(std::coroutine_handle<> entrance) noexcept;
 
-        void worker_run(const int thread_index, io_context *const context);
+        void worker_run_loop(const int thread_index, io_context *const context);
+
+        void worker_run_once();
     };
 
     inline void worker_meta::co_spawn(std::coroutine_handle<> entrance
