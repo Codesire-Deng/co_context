@@ -1,4 +1,4 @@
-#include <mimalloc-2.0/mimalloc-new-delete.h>
+#include <mimalloc-new-delete.h>
 #include "co_context/io_context.hpp"
 #include "co_context/utility/set_cpu_affinity.hpp"
 #include "co_context/co/semaphore.hpp"
@@ -342,7 +342,7 @@ bool io_context::try_find_submit_worker_relaxed() noexcept {
 
 [[deprecated]] bool io_context::try_find_reap_worker_acquire() noexcept {
     if constexpr (config::workers_number == 1) {
-        return this->worker[r_cur].sharing.reap_cur.is_available_load_head();
+        return this->worker[0].sharing.reap_cur.is_available_load_head();
     } else {
         for (config::tid_t i = 0; i < config::workers_number; ++i) {
             if (this->worker[r_cur].sharing.reap_cur.is_available_load_head())
@@ -355,7 +355,7 @@ bool io_context::try_find_submit_worker_relaxed() noexcept {
 
 bool io_context::try_find_reap_worker_relaxed() noexcept {
     if constexpr (config::workers_number == 1) {
-        return this->worker[r_cur].sharing.reap_cur.is_available();
+        return this->worker[0].sharing.reap_cur.is_available();
     } else {
         for (config::tid_t i = 0; i < config::workers_number; ++i) {
             if (this->worker[r_cur].sharing.reap_cur.is_available())

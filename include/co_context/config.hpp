@@ -10,8 +10,8 @@ namespace co_context {
 namespace config {
 
     // ======================== io_uring configuration ========================
-    inline constexpr unsigned io_uring_flags = 0;
-    // inline constexpr unsigned io_uring_flags = IORING_SETUP_SQPOLL;
+    // inline constexpr unsigned io_uring_flags = 0;
+    inline constexpr unsigned io_uring_flags = IORING_SETUP_SQPOLL;
     // ========================================================================
 
     // ========================== CPU configuration ===========================
@@ -83,11 +83,11 @@ namespace config {
     using cur_t = swap_capacity_size_t;
 
     // inline constexpr swap_capacity_size_t swap_capacity = 1;
-    // inline constexpr swap_capacity_size_t swap_capacity = 4;
+    inline constexpr swap_capacity_size_t swap_capacity = 4;
     // inline constexpr swap_capacity_size_t swap_capacity = 8;
     // inline constexpr swap_capacity_size_t swap_capacity = 16;
     // inline constexpr swap_capacity_size_t swap_capacity = 32;
-    inline constexpr swap_capacity_size_t swap_capacity = 64;
+    // inline constexpr swap_capacity_size_t swap_capacity = 64;
     // inline constexpr swap_capacity_size_t swap_capacity = 128;
     // inline constexpr swap_capacity_size_t swap_capacity = 256;
     // inline constexpr swap_capacity_size_t swap_capacity = 512;
@@ -129,12 +129,12 @@ namespace config {
 
     enum class level : uint8_t { verbose, debug, info, warning, error, no_log };
 
-    // inline constexpr level log_level = level::verbose;
+    inline constexpr level log_level = level::verbose;
     // inline constexpr level log_level = level::debug;
     // inline constexpr level log_level = level::info;
     // inline constexpr level log_level = level::warning;
     // inline constexpr level log_level = level::error;
-    inline constexpr level log_level = level::no_log;
+    // inline constexpr level log_level = level::no_log;
 
 } // namespace config
 
