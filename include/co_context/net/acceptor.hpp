@@ -23,6 +23,8 @@ class acceptor {
         return eager::accept(listen_socket.fd(), nullptr, nullptr, flags);
     }
 
+    int listen_fd() const noexcept { return listen_socket.fd(); }
+
     // socket acceptSocketOrDie();
 
   private:

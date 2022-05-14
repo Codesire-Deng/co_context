@@ -10,8 +10,8 @@ namespace co_context {
 namespace config {
 
     // ======================== io_uring configuration ========================
-    // inline constexpr unsigned io_uring_flags = 0;
-    inline constexpr unsigned io_uring_flags = IORING_SETUP_SQPOLL;
+    inline constexpr unsigned io_uring_flags = 0;
+    // inline constexpr unsigned io_uring_flags = IORING_SETUP_SQPOLL;
     // ========================================================================
 
     // ========================== CPU configuration ===========================
@@ -19,12 +19,14 @@ namespace config {
      * @brief This tells if each thread (io_contexts and workers) should stay
      * on the corresponding CPU. Doing so would dismiss some cache miss.
      */
-#define CO_CONTEXT_USE_CPU_AFFINITY
+// #define CO_CONTEXT_USE_CPU_AFFINITY
 
     /**
      * @brief Size of cache line on the CPU L1 cache. Usually this is 64 byte.
+     * @note Now `std::hardware_destructive_interference_size` is not used 
+     * because of warning from gcc 12
      */
-#if __cpp_lib_hardware_interference_size >= 201603
+#if 0 && __cpp_lib_hardware_interference_size >= 201603
     inline constexpr size_t cache_line_size =
         std::hardware_destructive_interference_size;
 #else
@@ -106,6 +108,7 @@ namespace config {
 
     // ========================== net configuration ===========================
     inline constexpr bool loopback_only = true;
+    // inline constexpr bool loopback_only = false;
     // ========================================================================
 
     // =========================== co configuration ===========================
@@ -129,8 +132,8 @@ namespace config {
 
     enum class level : uint8_t { verbose, debug, info, warning, error, no_log };
 
-    inline constexpr level log_level = level::verbose;
-    // inline constexpr level log_level = level::debug;
+    // inline constexpr level log_level = level::verbose;
+    inline constexpr level log_level = level::debug;
     // inline constexpr level log_level = level::info;
     // inline constexpr level log_level = level::warning;
     // inline constexpr level log_level = level::error;

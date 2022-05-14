@@ -11,11 +11,6 @@
 
 namespace co_context {
 
-[[deprecated]] unsigned
-compress_sqe(const io_context *self, const liburingcxx::SQEntry *sqe) noexcept {
-    return sqe - self->sqes_addr;
-}
-
 namespace detail {
 
     thread_local thread_meta this_thread;
@@ -65,9 +60,10 @@ namespace detail {
                 std::this_thread::sleep_for(std::chrono::microseconds(1));
             }
         */
-        assert(swap[local_submit_tail & cur.mask].available_sqe != nullptr);
-        swap[local_submit_tail & cur.mask].address = 0UL;
-        return swap[local_submit_tail++ & cur.mask].available_sqe;
+        submit_info &submit_tail = swap[local_submit_tail++ & cur.mask];
+        assert(submit_tail.available_sqe != nullptr);
+        submit_tail.address = 0UL;
+        return submit_tail.available_sqe;
     }
 
     void worker_meta::submit_sqe() noexcept {

@@ -77,7 +77,9 @@ class [[nodiscard]] io_context final {
 
     [[deprecated]] friend unsigned compress_sqe(
         const io_context *self, const liburingcxx::SQEntry *sqe
-    ) noexcept;
+    ) noexcept {
+        return sqe - self->sqes_addr;
+    }
 
     [[deprecated]] inline liburingcxx::SQEntry *
     decompress_sqe(unsigned compressed_sqe) const noexcept {

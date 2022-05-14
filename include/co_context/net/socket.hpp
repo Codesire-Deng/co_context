@@ -115,13 +115,13 @@ class socket {
 inline socket socket::create_tcp(sa_family_t family) {
     int sockfd = ::socket(family, SOCK_STREAM | SOCK_CLOEXEC, IPPROTO_TCP);
     assert(sockfd >= 0);
-    return socket(sockfd);
+    return socket{sockfd};
 }
 
 inline socket socket::create_udp(sa_family_t family) {
     int sockfd = ::socket(family, SOCK_DGRAM | SOCK_CLOEXEC, IPPROTO_UDP);
     assert(sockfd >= 0);
-    return socket(sockfd);
+    return socket{sockfd};
 }
 
 } // namespace co_context

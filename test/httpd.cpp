@@ -183,6 +183,7 @@ int add_accept_request(
     struct request *req = (request *)malloc(sizeof(*req));
     req->event_type = EVENT_TYPE_ACCEPT;
     sqe.setData((uint64_t)req);
+    ring.appendSQEntry(&sqe);
     ring.submit();
 
     return 0;
@@ -200,6 +201,7 @@ int add_read_request(int client_socket) {
     /* Linux kernel 5.5 has support for readv, but not for recv() or read() */
     sqe.prepareReadv(client_socket, {req->iov, 1}, 0);
     sqe.setData((uint64_t)req);
+    ring.appendSQEntry(&sqe);
     ring.submit();
     return 0;
 }
@@ -209,6 +211,7 @@ int add_write_request(struct request *req) {
     req->event_type = EVENT_TYPE_WRITE;
     sqe.prepareWritev(req->client_socket, {req->iov, req->iovec_count}, 0);
     sqe.setData((uint64_t)req);
+    ring.appendSQEntry(&sqe);
     ring.submit();
     return 0;
 }

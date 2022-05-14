@@ -82,7 +82,10 @@
         "mutex": "cpp",
         "typeindex": "cpp",
         "*.ipp": "cpp",
-        "filesystem": "cpp"
+        "filesystem": "cpp",
+        "unordered_set": "cpp",
+        "fstream": "cpp",
+        "future": "cpp"
     },
     "cmake.buildTask": true
 }

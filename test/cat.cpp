@@ -70,6 +70,7 @@ void submitReadRequest(URing &ring, const std::filesystem::path path) {
         .setData(reinterpret_cast<uint64_t>(fi));
 
     // Must be called after any request (except for polling mode)
+    ring.appendSQEntry(&sqe);
     ring.submit();
 }
 

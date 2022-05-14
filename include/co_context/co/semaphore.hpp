@@ -36,7 +36,7 @@ class counting_semaphore final {
     };
 
   public:
-    constexpr explicit counting_semaphore(T desired) noexcept
+    explicit counting_semaphore(T desired) noexcept
         : counter(desired)
         , awaiting(nullptr)
         , to_resume(nullptr)

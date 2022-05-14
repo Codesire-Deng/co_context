@@ -42,11 +42,16 @@ co_context::task<> client(std::string_view hostname, uint16_t port) {
     if (inet_address::resolve(hostname, port, addr)) {
         co_context::socket sock{co_context::socket::create_tcp(addr.family())};
         // 连接一个 server
-        co_await sock.connect(addr);
+        int res = co_await sock.connect(addr);
+        if (res < 0) {
+            printf("res=%d: %s\n", res, strerror(-res));
+            ::exit(0);
+        }
         // 生成一个 worker 协程
         co_spawn(run(std::move(sock)));
     } else {
         printf("Unable to resolve %s\n", hostname.data());
+        ::exit(0);
     }
 }
 
