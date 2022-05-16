@@ -177,6 +177,26 @@ class SQEntry final : private io_uring_sqe {
         return *this;
     }
 
+    inline SQEntry &prepareCancle(uint64_t user_data, int flags) noexcept {
+        prepareRW(IORING_OP_ASYNC_CANCEL, -1, nullptr, 0, 0);
+        this->addr = user_data;
+        this->cancel_flags = (uint32_t)flags;
+        return *this;
+    }
+
+    inline SQEntry &prepareCancleFd(int fd, unsigned int flags) noexcept {
+        prepareRW(IORING_OP_ASYNC_CANCEL, fd, nullptr, 0, 0);
+        this->cancel_flags = (uint32_t)flags | IORING_ASYNC_CANCEL_FD;
+        return *this;
+    }
+
+    inline SQEntry &
+    prepareCancleFd(struct __kernel_timespec *ts, unsigned flags) noexcept {
+        prepareRW(IORING_OP_LINK_TIMEOUT, -1, ts, 1, 0);
+        this->timeout_flags = flags;
+        return *this;
+    }
+
     inline SQEntry &
     prepareConnect(int fd, const sockaddr *addr, socklen_t addrlen) noexcept {
         return prepareRW(IORING_OP_CONNECT, fd, addr, 0, addrlen);
@@ -404,8 +424,7 @@ class SQEntry final : private io_uring_sqe {
         return *this;
     }
 
-    /* TODO: more prepare: cancel, epoll_ctl
-     * ......
+    /* TODO: more prepare: epoll_ctl ...
      */
 };
 
