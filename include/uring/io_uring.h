@@ -74,6 +74,7 @@ enum {
 	IOSQE_IO_HARDLINK_BIT,
 	IOSQE_ASYNC_BIT,
 	IOSQE_BUFFER_SELECT_BIT,
+	IOSQE_CQE_SKIP_SUCCESS_BIT,
 };
 
 /*
@@ -91,6 +92,8 @@ enum {
 #define IOSQE_ASYNC		(1U << IOSQE_ASYNC_BIT)
 /* select buffer from sqe->buf_group */
 #define IOSQE_BUFFER_SELECT	(1U << IOSQE_BUFFER_SELECT_BIT)
+/* don't post CQE if request succeeded */
+#define IOSQE_CQE_SKIP_SUCCESS	(1U << IOSQE_CQE_SKIP_SUCCESS_BIT)
 
 /*
  * io_uring_setup() flags
@@ -102,6 +105,7 @@ enum {
 #define IORING_SETUP_CLAMP	(1U << 4)	/* clamp SQ/CQ ring sizes */
 #define IORING_SETUP_ATTACH_WQ	(1U << 5)	/* attach to existing wq */
 #define IORING_SETUP_R_DISABLED	(1U << 6)	/* start with ring disabled */
+#define IORING_SETUP_SUBMIT_ALL	(1U << 7)	/* continue submit on error */
 
 enum {
 	IORING_OP_NOP,
@@ -144,6 +148,7 @@ enum {
 	IORING_OP_MKDIRAT,
 	IORING_OP_SYMLINKAT,
 	IORING_OP_LINKAT,
+	IORING_OP_MSG_RING,
 
 	/* this goes last, obviously */
 	IORING_OP_LAST,
@@ -162,6 +167,7 @@ enum {
 #define IORING_TIMEOUT_BOOTTIME		(1U << 2)
 #define IORING_TIMEOUT_REALTIME		(1U << 3)
 #define IORING_LINK_TIMEOUT_UPDATE	(1U << 4)
+#define IORING_TIMEOUT_ETIME_SUCCESS	(1U << 5)
 #define IORING_TIMEOUT_CLOCK_MASK	(IORING_TIMEOUT_BOOTTIME | IORING_TIMEOUT_REALTIME)
 #define IORING_TIMEOUT_UPDATE_MASK	(IORING_TIMEOUT_UPDATE | IORING_LINK_TIMEOUT_UPDATE)
 /*
@@ -186,6 +192,28 @@ enum {
 #define IORING_POLL_UPDATE_USER_DATA	(1U << 2)
 
 /*
+ * ASYNC_CANCEL flags.
+ *
+ * IORING_ASYNC_CANCEL_ALL	Cancel all requests that match the given key
+ * IORING_ASYNC_CANCEL_FD	Key off 'fd' for cancelation rather than the
+ *				request 'user_data'
+ * IORING_ASYNC_CANCEL_ANY	Match any request
+ */
+#define IORING_ASYNC_CANCEL_ALL	(1U << 0)
+#define IORING_ASYNC_CANCEL_FD	(1U << 1)
+#define IORING_ASYNC_CANCEL_ANY (1U << 2)
+
+/*
+ * send/sendmsg and recv/recvmsg flags (sqe->addr2)
+ *
+ * IORING_RECVSEND_POLL_FIRST	If set, instead of first attempting to send
+ *				or receive and arm poll if that yields an
+ *				-EAGAIN result, arm poll upfront and skip
+ *				the initial transfer attempt.
+ */
+#define IORING_RECVSEND_POLL_FIRST	(1U << 0)
+
+/*
  * IO completion data structure (Completion Queue Entry)
  */
 struct io_uring_cqe {
@@ -199,9 +227,11 @@ struct io_uring_cqe {
  *
  * IORING_CQE_F_BUFFER	If set, the upper 16 bits are the buffer ID
  * IORING_CQE_F_MORE	If set, parent SQE will generate more CQE entries
+ * IORING_CQE_F_SOCK_NONEMPTY	If set, more data to read after socket recv
  */
 #define IORING_CQE_F_BUFFER		(1U << 0)
 #define IORING_CQE_F_MORE		(1U << 1)
+#define IORING_CQE_F_SOCK_NONEMPTY	(1U << 2)
 
 enum {
 	IORING_CQE_BUFFER_SHIFT		= 16,
@@ -234,6 +264,7 @@ struct io_sqring_offsets {
  */
 #define IORING_SQ_NEED_WAKEUP	(1U << 0) /* needs io_uring_enter wakeup */
 #define IORING_SQ_CQ_OVERFLOW	(1U << 1) /* CQ ring is overflown */
+#define IORING_SQ_TASKRUN	(1U << 2) /* task should enter the kernel */
 
 struct io_cqring_offsets {
 	__u32 head;
@@ -257,10 +288,11 @@ struct io_cqring_offsets {
 /*
  * io_uring_enter(2) flags
  */
-#define IORING_ENTER_GETEVENTS	(1U << 0)
-#define IORING_ENTER_SQ_WAKEUP	(1U << 1)
-#define IORING_ENTER_SQ_WAIT	(1U << 2)
-#define IORING_ENTER_EXT_ARG	(1U << 3)
+#define IORING_ENTER_GETEVENTS		(1U << 0)
+#define IORING_ENTER_SQ_WAKEUP		(1U << 1)
+#define IORING_ENTER_SQ_WAIT		(1U << 2)
+#define IORING_ENTER_EXT_ARG		(1U << 3)
+#define IORING_ENTER_REGISTERED_RING	(1U << 4)
 
 /*
  * Passed in for io_uring_setup(2). Copied back with updated info on success
@@ -292,6 +324,8 @@ struct io_uring_params {
 #define IORING_FEAT_EXT_ARG		(1U << 8)
 #define IORING_FEAT_NATIVE_WORKERS	(1U << 9)
 #define IORING_FEAT_RSRC_TAGS		(1U << 10)
+#define IORING_FEAT_CQE_SKIP		(1U << 11)
+#define IORING_FEAT_LINKED_FILE		(1U << 12)
 
 /*
  * io_uring_register(2) opcodes and arguments
@@ -321,11 +355,21 @@ enum {
 	IORING_REGISTER_IOWQ_AFF		= 17,
 	IORING_UNREGISTER_IOWQ_AFF		= 18,
 
-	/* set/get max number of async workers */
+	/* set/get max number of io-wq workers */
 	IORING_REGISTER_IOWQ_MAX_WORKERS	= 19,
+
+	/* register/unregister io_uring fd with the ring */
+	IORING_REGISTER_RING_FDS		= 20,
+	IORING_UNREGISTER_RING_FDS		= 21,
 
 	/* this goes last */
 	IORING_REGISTER_LAST
+};
+
+/* io-wq worker categories */
+enum {
+	IO_WQ_BOUND,
+	IO_WQ_UNBOUND,
 };
 
 /* deprecated, see struct io_uring_rsrc_update */
@@ -335,10 +379,12 @@ struct io_uring_files_update {
 	__aligned_u64 /* __s32 * */ fds;
 };
 
+#define IORING_RSRC_REGISTER_SPARSE	(1U << 0)
+
 struct io_uring_rsrc_register {
 	__u32 nr;
-	__u32 resv;
-	__u64 resv2;
+	__u32 flags;
+	__u32 resv2;
 	__aligned_u64 data;
 	__aligned_u64 tags;
 };

@@ -226,9 +226,19 @@ class [[nodiscard]] URing final {
         return io_uring_smp_load_acquire(cq.ktail) - *cq.khead;
     }
 
-    inline CQEntry *waitCQEntry() { return waitCQEntryNum(1); }
+    inline CQEntry *waitCQEntry() {
+        auto [cqe, availableNum] = __peekCQEntry();
+        if (cqe != nullptr) return cqe;
 
-    inline CQEntry *peekCQEntry() { return waitCQEntryNum(0); }
+        return waitCQEntryNum(1);
+    }
+
+    inline CQEntry *peekCQEntry() {
+        auto [cqe, availableNum] = __peekCQEntry();
+        if (cqe != nullptr) return cqe;
+
+        return waitCQEntryNum(0);
+    }
 
     inline CQEntry *waitCQEntryNum(unsigned num) {
         return getCQEntry(/* submit */ 0, num, /* sigmask */ nullptr);
@@ -342,6 +352,15 @@ class [[nodiscard]] URing final {
     ) const noexcept {
         if constexpr (!(URingFlags & IORING_SETUP_SQPOLL)) return true;
 
+        /*
+         * Ensure the kernel can see the store to the SQ tail before we read
+         * the flags.
+         * See https://github.com/axboe/liburing/issues/541
+         */
+        // PERF memory order
+        // BUG
+        // std::atomic_thread_fence(std::memory_order_seq_cst);
+
         if (IO_URING_READ_ONCE(*sq.kflags) & IORING_SQ_NEED_WAKEUP)
             [[unlikely]] {
             enterFlags |= IORING_ENTER_SQ_WAKEUP;
@@ -352,7 +371,13 @@ class [[nodiscard]] URing final {
     }
 
     inline bool isCQRingNeedFlush() const noexcept {
-        return IO_URING_READ_ONCE(*sq.kflags) & IORING_SQ_CQ_OVERFLOW;
+        return IO_URING_READ_ONCE(*sq.kflags)
+               & (IORING_SQ_CQ_OVERFLOW | IORING_SQ_TASKRUN);
+    }
+
+    inline bool isCQRingNeedEnter() const noexcept {
+        if constexpr (URingFlags & IORING_SETUP_IOPOLL) return true;
+        return isCQRingNeedFlush();
     }
 
     inline void CQAdvance(unsigned num) noexcept {
@@ -396,29 +421,32 @@ class [[nodiscard]] URing final {
     }
 
     CQEntry *getCQEntry(detail::CQEGetter &data) {
+        bool isLooped = false;
         while (true) {
             bool isNeedEnter = false;
-            bool isCQOverflowFlush = false;
             unsigned flags = 0;
 
             auto [cqe, availableNum] = __peekCQEntry();
             if (cqe == nullptr && data.waitNum == 0 && data.submit == 0) {
-                if (!isCQRingNeedFlush()) return nullptr;
+                /*
+                 * If we already looped once, we already entererd
+                 * the kernel. Since there's nothing to submit or
+                 * wait for, don't keep retrying.
+                 */
+                if (isLooped || !isCQRingNeedEnter()) return nullptr;
                 // TODO Reconsider whether to use exceptions
                 // throw std::system_error{
                 //     EAGAIN, std::system_category(), "getCQEntry_impl.1"};
-                isCQOverflowFlush = true;
+                isNeedEnter = true;
             }
-            if (data.waitNum > availableNum || isCQOverflowFlush) {
+            if (data.waitNum > availableNum || isNeedEnter) {
                 flags = IORING_ENTER_GETEVENTS | data.getFlags;
                 isNeedEnter = true;
             }
-            if (data.submit) {
-                isSQRingNeedEnter(flags);
-                isNeedEnter = true;
-            }
+            if (data.submit && isSQRingNeedEnter(flags)) { isNeedEnter = true; }
             if (!isNeedEnter) return cqe;
 
+            // TODO Upgrade for ring.int_flags & INT_FLAG_REG_RING
             const int result = detail::__sys_io_uring_enter2(
                 ring_fd, data.submit, data.waitNum, flags, (sigset_t *)data.arg,
                 data.size
@@ -430,6 +458,7 @@ class [[nodiscard]] URing final {
                     errno, std::system_category(), "getCQEntry_impl.2"};
             data.submit -= result;
             if (cqe != nullptr) return cqe;
+            isLooped = true;
         }
     }
 
