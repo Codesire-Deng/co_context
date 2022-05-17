@@ -8,11 +8,11 @@ A coroutine framework aimed at high-concurrency io with reasonable latency, base
 
 ## 已有功能
 
-1. Lazy IO: `read{,v,_fixed}`, `write{,v,_fixed}`, `accept`, `accept_direct`, `recv(msg)`, `send(msg)`, `connect`, `close`, `shutdown`, `fsync`, `sync_file_range`, `timeout`, `link_timeout`, `cancel`, `cancel_fd`, `uring_nop`, `files_update`, `fallocate`, `openat`, `openat_direct`, `openat2`, `openat2_direct`,  `statx`, `unlinkat`, `renameat`, `mkdirat`, `symlinkat`, `linkat`, `splice`, `tee`, `provide_buffers`, `remove_buffers`. 38 in total.
-2. Linked lazy IO: About 2.5% more efficient, and safe.
-3. Eager IO: All functions of lazy IO.
-4. Concurrency support: `mutex`, `semaphore`, `condition_variable`
-5. Scheduling hint: `yield`
+1. Lazy IO: `read{,v,_fixed}`, `write{,v,_fixed}`, `accept`, `accept_direct`, `recv(msg)`, `send(msg)`, `connect`, `close`, `shutdown`, `fsync`, `sync_file_range`, `timeout`, `link_timeout`, `cancel`, `cancel_fd`, `uring_nop`, `files_update`, `fallocate`, `openat`, `openat_direct`, `openat2`, `openat2_direct`,  `statx`, `unlinkat`, `renameat`, `mkdirat`, `symlinkat`, `linkat`, `splice`, `tee`, `provide_buffers`, `remove_buffers`.  总计 38 个功能。
+2. Linked lazy IO: 白嫖提升约 2.5% 的性能。
+3. Eager IO: 无需 `co_await` 就发起I/O。
+4. 并发支持: `mutex`, `semaphore`, `condition_variable`
+5. 调度提示: `yield`
 
 ## Requirement
 
@@ -154,6 +154,10 @@ nr = co_await (
 
 ---
 
+<details>
+
+<summary>Draft</summary>
+
 ## 协程存在的问题
 
 ### 弱点
@@ -176,10 +180,6 @@ nr = co_await (
 1. 暂停和恢复都需要通过异步框架。
 2. 表达式模板的潜力不如 sender/receiver 模型：
    - 协程是顺序/分支/循环结构，s/r是表达式。
-
-<details>
-
-<summary>Draft</summary>
 
 ## draft
 
