@@ -2,7 +2,7 @@
 
 #include <coroutine>
 #include <atomic>
-#include "co_context/task_info.hpp"
+#include "co_context/detail/task_info.hpp"
 #include <cassert>
 
 namespace co_context {
@@ -17,24 +17,28 @@ class mutex final {
 
     class [[nodiscard("Did you forget to co_await?")]] lock_awaiter {
       public:
-        explicit lock_awaiter(mutex & mtx) noexcept : mtx(mtx) {}
+        explicit lock_awaiter(mutex & mtx) noexcept : mtx(mtx) {
+        }
 
-        constexpr bool await_ready() const noexcept { return false; }
+        constexpr bool await_ready() const noexcept {
+            return false;
+        }
 
         bool await_suspend(std::coroutine_handle<> current) noexcept {
             register_coroutine(current);
             return register_awaiting();
         }
 
-        void await_resume() const noexcept {}
+        void await_resume() const noexcept {
+        }
 
       protected:
         void register_coroutine(std::coroutine_handle<> handle) noexcept {
-            awaken_task.handle = handle;
+            awaken_coro = handle;
         }
 
         std::coroutine_handle<> get_coroutine() noexcept {
-            return awaken_task.handle;
+            return awaken_coro;
         }
 
         /**
@@ -50,7 +54,7 @@ class mutex final {
       protected:
         mutex &mtx;
         lock_awaiter *next;
-        task_info awaken_task{task_info::task_type::co_spawn};
+        std::coroutine_handle<> awaken_coro;
         friend class mutex;
         friend class locked_mutex;
         friend class detail::cv_wait_awaiter;
@@ -62,11 +66,14 @@ class mutex final {
       private:
         friend class mutex;
 
-        class [[nodiscard(
-            "Remember to hold the lock_guard.")]] lock_guard final {
+        class [[nodiscard("Remember to hold the lock_guard."
+        )]] lock_guard final {
           public:
-            explicit lock_guard(mutex & mtx) noexcept : mtx(mtx) {}
-            ~lock_guard() noexcept { mtx.unlock(); }
+            explicit lock_guard(mutex & mtx) noexcept : mtx(mtx) {
+            }
+            ~lock_guard() noexcept {
+                mtx.unlock();
+            }
 
             lock_guard(const lock_guard &) = delete;
 #ifdef __INTELLISENSE__
@@ -94,14 +101,17 @@ class mutex final {
       public:
         using lock_awaiter::lock_awaiter;
 
-        lock_guard await_resume() const noexcept { return lock_guard{mtx}; }
+        lock_guard await_resume() const noexcept {
+            return lock_guard{mtx};
+        }
     };
 
   public:
     /**
      * @brief Construct a new mutex that is not locked.
      */
-    mutex() noexcept : awaiting(not_locked), to_resume(nullptr) {}
+    mutex() noexcept : awaiting(not_locked), to_resume(nullptr) {
+    }
 
     /**
      * @brief Destroy the mutex.
@@ -127,7 +137,9 @@ class mutex final {
      * @return A lock_awaiter that must(should) be `co_await`ed to wait until
      * the lock is acquired. Type of `co_await m.lock()` is `void`.
      */
-    lock_awaiter lock() noexcept { return lock_awaiter{*this}; }
+    lock_awaiter lock() noexcept {
+        return lock_awaiter{*this};
+    }
 
     lock_guard_awaiter lock_guard() noexcept {
         return lock_guard_awaiter{*this};

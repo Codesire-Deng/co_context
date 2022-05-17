@@ -1,10 +1,10 @@
 #include "co_context/net/inet_address.hpp"
+#include "co_context/log/log.hpp"
 #include <cstring>
 #include <string>
 #include <string_view>
 #include <sys/socket.h>
 #include <arpa/inet.h>
-#include <netdb.h>
 #include <cassert>
 
 namespace co_context {
@@ -97,25 +97,34 @@ bool inet_address::operator==(const inet_address &rhs) const noexcept {
         return addr6.sin6_port == rhs.addr6.sin6_port
                && memcmp(
                       &addr6.sin6_addr, &rhs.addr6.sin6_addr,
-                      sizeof(addr6.sin6_addr))
-                      == 0;
+                      sizeof(addr6.sin6_addr)
+                  ) == 0;
     }
 }
 
 bool inet_address::resolve(
-    std::string_view hostname, uint16_t port, inet_address &out) {
-    auto addrs = resolve_all(hostname, port, out);
+    std::string_view hostname, uint16_t port, inet_address &out
+) {
+    ::addrinfo hints;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_flags |= AI_ADDRCONFIG; // for connect. see getaddrinfo(3)
+    auto addrs = resolve_all(hostname, port, &hints);
+
+    for (auto &addr : addrs) {
+        log::v("ip port: %s\n", addr.to_ip_port().data());
+    }
 
     if (addrs.empty()) return false;
-    out = addrs.front();
+    out = addrs.back(); // for ipv4 precedence
     return true;
 }
 
 std::vector<inet_address> inet_address::resolve_all(
-    std::string_view hostname, uint16_t port, inet_address &) {
+    std::string_view hostname, uint16_t port, const ::addrinfo *hints
+) {
     std::vector<inet_address> ret;
     struct addrinfo *result = nullptr;
-    int err = getaddrinfo(hostname.data(), nullptr, nullptr, &result);
+    int err = getaddrinfo(hostname.data(), nullptr, hints, &result);
     if (err != 0) {
         if (err == EAI_SYSTEM)
             perror("inet_address::resolve");

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <type_traits>
-#include "co_context/task_info.hpp"
+#include "co_context/detail/task_info.hpp"
 #include "co_context/utility/as_atomic.hpp"
 
 namespace co_context {
@@ -9,12 +9,13 @@ namespace co_context {
 class counting_semaphore final {
   private:
     using task_info = detail::task_info;
-    using T = config::semaphore_counting_type;
+    using T = config::semaphore_counting_t;
     static_assert(std::is_integral_v<T>);
 
     class [[nodiscard("Did you forget to co_await?")]] acquire_awaiter final {
       public:
-        explicit acquire_awaiter(counting_semaphore & sem) noexcept : sem(sem) {}
+        explicit acquire_awaiter(counting_semaphore & sem) noexcept : sem(sem) {
+        }
 
         bool await_ready() noexcept {
             T old_counter =
@@ -23,7 +24,8 @@ class counting_semaphore final {
         }
 
         void await_suspend(std::coroutine_handle<> current) noexcept;
-        void await_resume() const noexcept {}
+        void await_resume() const noexcept {
+        }
 
       private:
         counting_semaphore &sem;
@@ -34,12 +36,12 @@ class counting_semaphore final {
     };
 
   public:
-    constexpr explicit counting_semaphore(T desired) noexcept
+    explicit counting_semaphore(T desired) noexcept
         : counter(desired)
         , awaiting(nullptr)
         , to_resume(nullptr)
         , awaken_task(task_info::task_type::semaphore_release) {
-        awaken_task.sem = this;
+        // awaken_task.sem = this; // deprecated
         as_atomic(awaken_task.update).store(0, std::memory_order_relaxed);
     }
 
@@ -50,7 +52,7 @@ class counting_semaphore final {
     bool try_acquire() noexcept;
 
     acquire_awaiter acquire() noexcept {
-        log::d("semaphore %lx acquiring\n", this);
+        log::v("semaphore %lx acquiring\n", this);
         return acquire_awaiter{*this};
     }
 
@@ -66,6 +68,11 @@ class counting_semaphore final {
     std::atomic<T> counter;
 
     task_info awaken_task;
+
+  public:
+    static consteval auto __task_offset() noexcept {
+        return offsetof(counting_semaphore, awaken_task);
+    }
 };
 
 } // namespace co_context

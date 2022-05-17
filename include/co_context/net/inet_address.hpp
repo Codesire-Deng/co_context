@@ -1,6 +1,7 @@
 #pragma once
 
 #include <netinet/in.h>
+#include <netdb.h>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -54,10 +55,11 @@ class inet_address {
     bool operator==(const inet_address &rhs) const noexcept;
 
     static bool
-    resolve(std::string_view hostname, uint16_t port, inet_address &);
+    resolve(std::string_view hostname, uint16_t port, inet_address &out);
 
-    static std::vector<inet_address>
-    resolve_all(std::string_view hostname, uint16_t port, inet_address &);
+    static std::vector<inet_address> resolve_all(
+        std::string_view hostname, uint16_t port, const ::addrinfo *hints
+    );
 
   private:
     union {

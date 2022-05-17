@@ -36,6 +36,7 @@ class socket {
     }
 
     socket &operator=(socket &&other) noexcept {
+        assert(this != std::addressof(other));
         sockfd = other.sockfd;
         other.sockfd = -1;
         return *this;
@@ -65,12 +66,24 @@ class socket {
         return lazy::connect(sockfd, addr.get_sockaddr(), addr.length());
     }
 
-    auto recv(std::span<char> buf, int flags=0) noexcept {
+    auto eager_connect(const inet_address &addr) noexcept {
+        return eager::connect(sockfd, addr.get_sockaddr(), addr.length());
+    }
+
+    auto recv(std::span<char> buf, int flags = 0) noexcept {
         return lazy::recv(sockfd, buf, flags);
     }
 
-    auto send(std::span<const char> buf, int flags=0) noexcept {
+    auto eager_recv(std::span<char> buf, int flags = 0) noexcept {
+        return eager::recv(sockfd, buf, flags);
+    }
+
+    auto send(std::span<const char> buf, int flags = 0) noexcept {
         return lazy::send(sockfd, buf, flags);
+    }
+
+    auto eager_send(std::span<const char> buf, int flags = 0) noexcept {
+        return eager::send(sockfd, buf, flags);
     }
 
     auto close() noexcept {
@@ -79,7 +92,17 @@ class socket {
         return lazy::close(tmp);
     }
 
+    auto eager_close() noexcept {
+        int tmp = sockfd;
+        sockfd = -1;
+        return eager::close(tmp);
+    }
+
     auto shutdown_write() noexcept { return lazy::shutdown(sockfd, SHUT_WR); }
+
+    auto eager_shutdown_write() noexcept {
+        return eager::shutdown(sockfd, SHUT_WR);
+    }
 
     // factory methods
     static socket create_tcp(sa_family_t family); // AF_INET or AF_INET6
@@ -92,13 +115,13 @@ class socket {
 inline socket socket::create_tcp(sa_family_t family) {
     int sockfd = ::socket(family, SOCK_STREAM | SOCK_CLOEXEC, IPPROTO_TCP);
     assert(sockfd >= 0);
-    return socket(sockfd);
+    return socket{sockfd};
 }
 
 inline socket socket::create_udp(sa_family_t family) {
     int sockfd = ::socket(family, SOCK_DGRAM | SOCK_CLOEXEC, IPPROTO_UDP);
     assert(sockfd >= 0);
-    return socket(sockfd);
+    return socket{sockfd};
 }
 
 } // namespace co_context

@@ -9,7 +9,24 @@ if (NOT CMAKE_BUILD_TYPE)
     message("Setting default build type to Release")
 endif()
 
-project(co_context VERSION 0.2.0 LANGUAGES C CXX)
+project(co_context VERSION 0.3.0 LANGUAGES C CXX)
+
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    if (${CMAKE_BUILD_TYPE} MATCHES Debug)
+        message("Enable -fsanitize for gcc")
+        set(CMAKE_CXX_FLAGS "-fsanitize=undefined,address,leak -fno-omit-frame-pointer")
+        # add_definitions(-DNDEBUG)
+    else()
+        message(${CMAKE_BUILD_TYPE})
+        message("Disable -fsanitize for gcc")
+    endif()
+
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -flto")
+
+    message("CMAKE_CXX_FLAGS = ${CMAKE_CXX_FLAGS}")
+else()
+    message(WARNING "Not using GNU g++ for CXX")
+endif()
 
 include_directories(${PROJECT_SOURCE_DIR}/include)
 

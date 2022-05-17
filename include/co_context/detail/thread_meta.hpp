@@ -3,7 +3,7 @@
 #include "co_context/config.hpp"
 
 namespace co_context {
-    
+
 class io_context;
 
 namespace detail {

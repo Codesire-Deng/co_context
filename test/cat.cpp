@@ -21,7 +21,7 @@
 // #include <sys/stat.h>
 #include <iostream>
 #include <filesystem>
-#include "uring.hpp"
+#include "uring/uring.hpp"
 
 constexpr unsigned BLOCK_SZ = 1024;
 
@@ -40,9 +40,7 @@ void output(std::string_view s) noexcept {
 
 using URing = liburingcxx::URing<0>;
 
-void submitReadRequest(
-    URing &ring, const std::filesystem::path path) {
-
+void submitReadRequest(URing &ring, const std::filesystem::path path) {
     // open the file
     int file_fd = open(path.c_str(), O_RDONLY);
     if (file_fd < 0) {
@@ -72,10 +70,9 @@ void submitReadRequest(
         .setData(reinterpret_cast<uint64_t>(fi));
 
     // Must be called after any request (except for polling mode)
+    ring.appendSQEntry(&sqe);
     ring.submit();
 }
-
-
 
 void waitResultAndPrint(URing &ring) {
     // get a result from the ring

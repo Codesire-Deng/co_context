@@ -1,5 +1,5 @@
 #include "co_context/co/semaphore.hpp"
-#include "co_context.hpp"
+#include "co_context/io_context.hpp"
 #include "co_context/log/log.hpp"
 #include <cassert>
 
@@ -15,16 +15,20 @@ bool counting_semaphore::try_acquire() noexcept {
     return old_counter > 0
            && counter.compare_exchange_strong(
                old_counter, old_counter - 1, std::memory_order_acquire,
-               std::memory_order_relaxed);
+               std::memory_order_relaxed
+           );
 }
 
-inline static void send_task(detail::task_info_ptr awaken_task) noexcept {
+inline static void send_task(detail::task_info *awaken_task) noexcept {
     using namespace co_context::detail;
     auto *worker = this_thread.worker;
     assert(
         worker != nullptr
-        && "semaphore::release() must run inside an io_context");
-    worker->submit(awaken_task);
+        && "semaphore::release() must run inside an io_context"
+    );
+    worker->submit_non_sqe(
+        reinterpret_cast<uintptr_t>(awaken_task) | submit_type::sem_rel
+    );
 }
 
 void counting_semaphore::release(T update) noexcept {
@@ -54,15 +58,17 @@ std::coroutine_handle<> counting_semaphore::try_release() noexcept {
 }
 
 void counting_semaphore::acquire_awaiter::await_suspend(
-    std::coroutine_handle<> current) noexcept {
+    std::coroutine_handle<> current
+) noexcept {
     this->handle = current;
-    log::d("suspending coro: %lx\n", this->handle.address());
+    log::v("suspending coro: %lx\n", this->handle.address());
     // acquire failed
     acquire_awaiter *old_head = sem.awaiting.load(std::memory_order_acquire);
     do {
         this->next = old_head;
     } while (!sem.awaiting.compare_exchange_weak(
-        old_head, this, std::memory_order_release, std::memory_order_relaxed));
+        old_head, this, std::memory_order_release, std::memory_order_relaxed
+    ));
 }
 
 } // namespace co_context

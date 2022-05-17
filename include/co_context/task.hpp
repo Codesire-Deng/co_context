@@ -1,16 +1,15 @@
 #pragma once
 
 #include <coroutine>
-#include <variant>
 #include <concepts>
 #include <cassert>
 
 namespace co_context {
 
 /**
- * @brief A task is a lazy synchronous coroutine that only executes at co_await
- * <task> (or co_await <task>.when_ready()).
- * @note As long as a task has been awaited, it will execute immediately at
+ * @brief A task<> is a lazy synchronous coroutine that only executes at
+ * co_await <task> (or co_await <task>.when_ready()).
+ * @note As long as a task<> has been awaited, it will execute immediately at
  * current thread, and will not return until it's all finished.
  * @tparam T
  */
@@ -27,7 +26,7 @@ namespace detail {
         friend struct final_awaiter;
 
         /**
-         * @brief current task is finished therefore resume the father
+         * @brief current task<> is finished therefore resume the father
          */
         struct final_awaiter {
             constexpr bool await_ready() const noexcept { return false; }
@@ -56,57 +55,70 @@ namespace detail {
         }
 
       private:
-        std::coroutine_handle<> fa_coro;
+        std::coroutine_handle<> fa_coro{std::noop_coroutine()};
     };
 
     /**
-     * @brief Task with a return value
+     * @brief task<> with a return value
      *
      * @tparam T the type of the final result
      */
     template<typename T>
     class task_promise final : public task_promise_base {
       public:
-        using var = std::variant<std::monostate, T, std::exception_ptr>;
+        task_promise() noexcept : state(value_state::mono){};
 
-      public:
-        task_promise() noexcept = default;
-
-        // Automatically deconstruct `value`, done by std::variant.
-        ~task_promise() = default;
+        ~task_promise() {
+            switch (state) {
+                [[likely]] case value_state::value:
+                    value.~T();
+                    break;
+                case value_state::exception:
+                    ex_ptr.~exception_ptr();
+                    [[fallthrough]];
+                default:
+                    break;
+            }
+        };
 
         task<T> get_return_object() noexcept;
 
         void unhandled_exception() noexcept {
-            value.template emplace<std::exception_ptr>(
-                std::current_exception());
+            ex_ptr = std::current_exception();
+            state = value_state::exception;
         }
 
         template<typename Value>
             requires std::convertible_to<Value &&, T>
-        void return_value(Value &&result) noexcept(
-            std::is_nothrow_constructible_v<T, Value &&>) {
-            value.template emplace<T>(std::forward<Value>(result));
+        void return_value(Value &&result
+        ) noexcept(std::is_nothrow_constructible_v<T, Value &&>) {
+            std::construct_at(
+                std::addressof(value), std::forward<Value>(result)
+            );
         }
 
         // get the lvalue ref
         T &result() & {
-            if (value.index() == 2) [[unlikely]]
-                std::rethrow_exception(get<std::exception_ptr>(value));
-            assert(value.index() == 1);
-            return get<T>(value);
+            if (state == value_state::exception) [[unlikely]]
+                std::rethrow_exception(ex_ptr);
+            assert(state == value_state::value);
+            return value;
         }
 
         // get the prvalue
         T &&result() && {
-            if (value.index() == 2) [[unlikely]]
-                std::rethrow_exception(get<std::exception_ptr>(value));
-            assert(value.index() == 1);
-            return std::move(get<T>(value));
+            if (state == value_state::exception) [[unlikely]]
+                std::rethrow_exception(ex_ptr);
+            assert(state == value_state::value);
+            return std::move(value);
         }
 
       private:
-        var value;
+        union {
+            T value;
+            std::exception_ptr ex_ptr;
+        };
+        enum class value_state : uint8_t { mono, value, exception } state;
     };
 
     template<>
@@ -187,15 +199,18 @@ class [[nodiscard("Did you forget to co_await?")]] task {
     task() noexcept = default;
 
     explicit task(std::coroutine_handle<promise_type> current) noexcept
-        : handle(current) {}
+        : handle(current) {
+    }
 
-    task(task &&other) noexcept : handle(other) { other.handle = nullptr; }
+    task(task<> && other) noexcept : handle(other) {
+        other.handle = nullptr;
+    }
 
     // Ban copy
-    task(const task &) = delete;
-    task &operator=(const task &) = delete;
+    task(const task<> &) = delete;
+    task<> &operator=(const task<> &) = delete;
 
-    task &operator=(task &&other) noexcept {
+    task<> &operator=(task<> &&other) noexcept {
         if (this != std::addressof(other)) [[likely]] {
             if (handle) handle.destroy();
             handle = other.handle;
@@ -209,10 +224,12 @@ class [[nodiscard("Did you forget to co_await?")]] task {
         if (handle) handle.destroy();
     }
 
-    inline bool is_ready() const noexcept { return !handle || handle.done(); }
+    inline bool is_ready() const noexcept {
+        return !handle || handle.done();
+    }
 
     /**
-     * @brief wait for the task to complete, and get the ref of the result
+     * @brief wait for the task<> to complete, and get the ref of the result
      */
     auto operator co_await() const &noexcept {
         struct awaiter : awaiter_base {
@@ -229,7 +246,7 @@ class [[nodiscard("Did you forget to co_await?")]] task {
     }
 
     /**
-     * @brief wait for the task to complete, and get the rvalue ref of the
+     * @brief wait for the task<> to complete, and get the rvalue ref of the
      * result
      */
     auto operator co_await() const &&noexcept {
@@ -247,15 +264,24 @@ class [[nodiscard("Did you forget to co_await?")]] task {
     }
 
     /**
-     * @brief wait for the task to complete, but do not get the result
+     * @brief wait for the task<> to complete, but do not get the result
      */
     auto when_ready() const noexcept {
         struct awaiter : awaiter_base {
             using awaiter_base::awaiter_base;
+
             constexpr void await_resume() const noexcept {}
         };
 
         return awaiter{handle};
+    }
+
+    std::coroutine_handle<promise_type> get_handle() noexcept {
+        return handle;
+    }
+
+    void detach() noexcept {
+        handle = nullptr;
     }
 
   private:

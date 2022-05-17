@@ -6,7 +6,7 @@
 #include "co_context/co/mutex.hpp"
 #include <random>
 #include "co_context/co/condition_variable.hpp"
-#include "co_context.hpp"
+#include "co_context/io_context.hpp"
 #include "co_context/task.hpp"
 
 using namespace co_context;
@@ -18,7 +18,7 @@ std::string data;
 bool ready = false;
 bool processed = false;
 
-main_task worker_thread() {
+task<void> worker_thread() {
     // Wait until main() sends data
     co_await m.lock();
     co_await cv.wait(m, [] { return ready; });
@@ -37,7 +37,7 @@ main_task worker_thread() {
     cv.notify_one();
 }
 
-main_task main_thread() {
+task<> main_thread() {
     data = "Example data";
     // send data to the worker thread
     {
@@ -48,7 +48,8 @@ main_task main_thread() {
     cv.notify_one(); // fake notify
 
     char s[4];
-    scanf("%s", s);
+    printf("input a char to continue:");
+    [[maybe_unused]] int _ = scanf("%s", s);
     m.unlock();
     cv.notify_one(); // real notify
 

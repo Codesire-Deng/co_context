@@ -1,6 +1,6 @@
 # co_context
 
-A coroutine framework aimed at high-concurrency or(and) low-latency io, based on [liburingcxx](https://github.com/Codesire-Deng/liburingcxx).
+A coroutine framework aimed at high-concurrency io with reasonable latency, based on [liburingcxx](https://github.com/Codesire-Deng/liburingcxx).
 
 **co_context** 是一个**协程**异步多线程并发框架，以提供可靠的性能为使命，也致力于减轻用户的心智负担，让 C++ 初学者也能轻松写出高并发程序。
 
@@ -8,9 +8,11 @@ A coroutine framework aimed at high-concurrency or(and) low-latency io, based on
 
 ## 已有功能
 
-1. Lazy IO: `read`, `write`, `accept`, `recv`, `send`, `connect`, `close`, `shutdown`, `fsync`, `sync_file_range`
-2. Concurrency support: `mutex`, `semaphore`
-3. Scheduling hint: `yield`
+1. Lazy IO: `read{,v,_fixed}`, `write{,v,_fixed}`, `accept`, `accept_direct`, `recv(msg)`, `send(msg)`, `connect`, `close`, `shutdown`, `fsync`, `sync_file_range`, `timeout`, `uring_nop`, `files_update`, `fallocate`, `openat`, `openat_direct`, `openat2`, `openat2_direct`,  `statx`, `unlinkat`, `renameat`, `mkdirat`, `symlinkat`, `linkat`, `splice`, `tee`, `provide_buffers`, `remove_buffers`. 35 in total.
+2. Linked lazy IO: About 2.5% more efficient, and safe.
+3. Eager IO: All functions of lazy IO.
+4. Concurrency support: `mutex`, `semaphore`, `condition_variable`
+5. Scheduling hint: `yield`
 
 ## Requirement
 
@@ -78,12 +80,6 @@ int main(int argc, const char *argv[]) {
 
 ```
 
-## 已有功能
-
-1. Lazy IO: `read`, `write`, `accept`, `recv`, `send`, `connect`, `close`, `shutdown`, `fsync`, `sync_file_range`
-2. Scheduling: `nop`, `yield`
-3. Concurrency support: `mutex`, `semaphore`
-
 ## 谁不需要协程
 
 在我创建这个项目之前，我已经知道基于协程的异步框架很可能**不是**性能最优解，如果你正在寻找 C++ 异步的终极解决方案，且不在乎编程复杂度，我推荐你学习 **sender/receiver model**，而无需尝试协程。
@@ -100,7 +96,7 @@ int main(int argc, const char *argv[]) {
 2. **co_context** 的数据结构保证「可能频繁读写」的 cacheline 最多被两个线程访问，无论并发强度有多大。这个保证本身也不经过互斥锁或原子变量。（若使用原子变量，高竞争下性能损失约 33%～70%）
 3. 对于可能被多于两个线程读写的 cacheline，**co_context** 保证乒乓缓存问题最多发生常数次。
 4. 在 AMD-5800X，3200 Mhz-ddr4 环境下，若绕过 io_uring，**co_context** 的线程交互频率可达 1.25 GHz。
-5. 创建、运行、销毁高竞争协程的频率可达 58 M（线程数=4，swap_capacity=32768，0.986 s 内完成 58 M 原子变量自增），代码见 example/nop.cpp。
+5. 创建、运行、销毁高竞争协程的频率可达 58 M（线程数=4，swap_capacity=32768，0.986 s 内完成 58 M 原子变量自增），代码见 test/nop.cpp。
 6. 协程自身的缓存不友好问题（主要由 `operator new` 引起），需要借助其他工具来解决，例如 [mimalloc](https://github.com/microsoft/mimalloc)。
 
 ---
@@ -181,6 +177,26 @@ TODO: 改用原子变量，弃用检查队列
    1. 若协程为「等待状态」，则弹出检查队列，并加入调度队列，令其自行销毁。
    2. 若协程为「初始状态」或者「IO 后状态」，不管它。
    3. 若协程为「待销毁」，销毁它，弹出检查队列。
+
+xxx <-> is_detached is_waiting is_ready
+
+manager:
+
+- ready: xx0 to xx1
+  - 1x1 : manager delete task_info, do not resume.
+  - 001 : worker will delete task_info, do not resume.
+  - 011 : worker will delete task_info, resume
+
+worker:
+
+- wait: x0x to x1x
+  - 11x : wait after detached, logic error
+  - 010 : suspend, worker will delete task_info
+  - 011 : do not suspend, worker will delete task_info
+- detach: 0xx to 1xx
+  - 1x1 : worker will delete task_info
+  - 100 : manager will delete task_info
+  - 110 : detach after waited, logic error
 
 此实现中可能的漏洞：
 

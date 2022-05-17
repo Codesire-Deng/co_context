@@ -1,5 +1,5 @@
 // #include <mimalloc-new-delete.h>
-#include "co_context.hpp"
+#include "co_context/io_context.hpp"
 #include "co_context/lazy_io.hpp"
 #include "co_context/net/socket.hpp"
 #include "co_context/net/acceptor.hpp"
@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
 
     int output_fd = ::open("output", O_WRONLY | O_TRUNC);
 
-    io_context.co_spawn([&]() -> main_task {
+    io_context.co_spawn([&]() -> task<> {
         constexpr int buf_size = 4096 * 2;
         char buf[buf_size];
 

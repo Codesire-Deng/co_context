@@ -13,7 +13,7 @@ inline std::atomic<T> &as_atomic(T &value) noexcept {
 
 template<typename T>
     requires std::is_trivially_copyable_v<T>
-inline const std::atomic<T> &as_atomic(const T &value) noexcept {
+inline const std::atomic<T> &as_c_atomic(const T &value) noexcept {
     return *reinterpret_cast<const std::atomic<T> *>(std::addressof(value));
 }
 

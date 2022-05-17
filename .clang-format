@@ -3,7 +3,8 @@ BasedOnStyle: LLVM
 IndentWidth: 4
 TabWidth: 4
 Language: Cpp
-AlignAfterOpenBracket: AlwaysBreak # BlockIndent
+# AlignAfterOpenBracket: AlwaysBreak # BlockIndent
+AlignAfterOpenBracket: BlockIndent # BlockIndent
 AlignConsecutiveBitFields: true
 AlignConsecutiveMacros: true
 AlignEscapedNewlines: Left
@@ -43,14 +44,15 @@ IndentExternBlock: Indent
 IndentGotoLabels: true
 IndentPPDirectives: None
 # IndentPragmas: false
-IndentRequires: true
+IndentRequires: true # llvm 14
 IndentWrappedFunctionNames: false
 KeepEmptyLinesAtTheStartOfBlocks: false
 MaxEmptyLinesToKeep: 1
 NamespaceIndentation: Inner
 PointerAlignment: Right
 ReflowComments: true
-# RequiresClausePosition: OwnLine
+# RequiresClausePosition: OwnLine # llvm 15
+SeparateDefinitionBlocks: Always
 ShortNamespaceLines: 5
 SortIncludes:    false
 SortUsingDeclarations: false

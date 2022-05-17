@@ -1,5 +1,5 @@
 // #include <mimalloc-new-delete.h>
-#include "co_context.hpp"
+#include "co_context/io_context.hpp"
 #include "co_context/net/acceptor.hpp"
 #include "co_context/utility/buffer.hpp"
 #include "co_context/lazy_io.hpp"
@@ -28,13 +28,13 @@ constexpr size_t BLOCK_LEN = 4096;
 // constexpr int MAX_ON_FLY = 24; // 6 worker thread
 constexpr int MAX_ON_FLY = 24; // 3 worker thread
 // constexpr int MAX_ON_FLY = 4; // 1 worker thread
-constexpr unsigned threads = config::worker_threads_number;
+constexpr unsigned threads = config::workers_number;
 
 alignas(config::cache_line_size) char buf[threads][BLOCK_LEN];
 
 std::mt19937_64 rng(0);
 
-main_task run() {
+task<> run() {
     // log::d("r4kr at [%u] read()\n", co_get_tid());
     const size_t off = (rng() % file_size) & ~(BLOCK_LEN - 1);
     const int idx = buf_idx.fetch_add(1) % threads;
@@ -50,7 +50,7 @@ main_task run() {
         // log::d("r4kr at [%u] callback\n", co_get_tid());
         auto t = run();
         // log::d("r4kr at [%u] spawn ready\n", co_get_tid());
-        co_spawn(t);
+        co_spawn(std::move(t));
     }
     // log::d("r4kr at [%u] end\n", co_get_tid());
 }

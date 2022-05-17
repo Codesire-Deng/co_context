@@ -1,6 +1,6 @@
 #pragma once
 
-#ifdef USE_CPU_AFFINITY // see config.hpp
+#ifdef CO_CONTEXT_USE_CPU_AFFINITY // see config.hpp
 
 #include <sched.h>
 
@@ -27,4 +27,4 @@ namespace detail {
 
 } // namespace co_context
 
-#endif
+#endif // ifdef CO_CONTEXT_USE_CPU_AFFINITY

@@ -67,4 +67,11 @@ draft/
 perf.data*
 *.data
 
-.log
+# log for perf
+log
+tmp
+*.rdb
+*.svg
+
+# public/index.html for httpd
+public/
