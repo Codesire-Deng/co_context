@@ -48,7 +48,7 @@ namespace detail {
             eager_sqe,
             lazy_sqe,
             lazy_link_sqe,
-            // cqe,
+            // lazy_detached_sqe,
             // result,
             semaphore_release,
             condition_variable_notify,

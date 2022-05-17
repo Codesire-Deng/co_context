@@ -10,7 +10,7 @@ task<> reply(co_context::socket sock) {
     char recv_buf[100];
     int n = co_await sock.recv(recv_buf);
     while (n > 0) {
-        n = co_await (sock.send({"+OK\r\n", 5}) + sock.recv(recv_buf));
+        n = co_await (sock.send({"+OK\r\n", 5}) && sock.recv(recv_buf));
     }
 }
 

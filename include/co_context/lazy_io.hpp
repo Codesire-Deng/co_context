@@ -41,6 +41,7 @@ namespace detail {
 
       protected:
         friend class lazy_link_io;
+        friend struct lazy_link_timeout;
         liburingcxx::SQEntry *sqe;
         task_info io_info;
 
@@ -49,13 +50,19 @@ namespace detail {
             worker->submit_sqe();
         }
 
-        friend lazy_link_io operator+(
+        friend lazy_link_io operator&&(
             lazy_awaiter &&lhs, lazy_awaiter &&rhs
         ) noexcept;
 
-        friend lazy_link_io &&operator+(
+        friend lazy_link_io &&operator&&(
             lazy_link_io &&lhs, lazy_awaiter &&rhs
         ) noexcept;
+
+        friend lazy_link_io &&operator&&(
+            lazy_link_io &&lhs, lazy_link_io &&rhs
+        ) noexcept;
+
+        friend void set_link_awaiter(lazy_awaiter & awaiter) noexcept;
 
         lazy_awaiter() noexcept : io_info(task_info::task_type::lazy_sqe) {
             io_info.tid_hint = detail::this_thread.tid;
@@ -72,22 +79,37 @@ namespace detail {
 #endif
     };
 
+    inline void set_link_sqe(liburingcxx::SQEntry *sqe) noexcept {
+        sqe->setLink();
+        sqe->fetchData() |= __u64(task_info::task_type::lazy_link_sqe);
+    }
+
+    inline void set_link_awaiter(lazy_awaiter &awaiter) noexcept {
+        set_link_sqe(awaiter.sqe);
+        awaiter.io_info.type = task_info::task_type::lazy_link_sqe;
+    }
+
+    inline void set_link_link_io(lazy_link_io &link_io) noexcept {
+        set_link_awaiter(*link_io.last_io);
+    }
+
     inline lazy_link_io
-    operator+(lazy_awaiter &&lhs, lazy_awaiter &&rhs) noexcept {
-        lhs.sqe->setLink();
-        lhs.sqe->fetchData() |= __u64(task_info::task_type::lazy_link_sqe);
-        lhs.io_info.type = task_info::task_type::lazy_link_sqe;
+    operator&&(lazy_awaiter &&lhs, lazy_awaiter &&rhs) noexcept {
+        set_link_awaiter(lhs);
         return lazy_link_io{.last_io = &rhs};
     }
 
     inline lazy_link_io &&
-    operator+(lazy_link_io &&lhs, lazy_awaiter &&rhs) noexcept {
-        auto *const sqe = lhs.last_io->sqe;
-        sqe->setLink();
-        sqe->fetchData() |= __u64(task_info::task_type::lazy_link_sqe);
-        lhs.last_io->io_info.type = task_info::task_type::lazy_link_sqe;
+    operator&&(lazy_link_io &&lhs, lazy_awaiter &&rhs) noexcept {
+        set_link_link_io(lhs);
         lhs.last_io = &rhs;
         return std::move(lhs);
+    }
+
+    inline lazy_link_io &&
+    operator&&(lazy_link_io &&lhs, lazy_link_io &&rhs) noexcept {
+        set_link_link_io(lhs);
+        return std::move(rhs);
     }
 
     inline void lazy_link_io::await_suspend(std::coroutine_handle<> current
@@ -169,6 +191,20 @@ namespace detail {
             uint32_t fileIndex
         ) noexcept {
             sqe->prepareAcceptDirect(fd, addr, addrlen, flags, fileIndex);
+        }
+    };
+
+    struct lazy_cancel : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?"
+        )]] inline lazy_cancel(uint64_t user_data, int flags) noexcept {
+            sqe->prepareCancle(user_data, flags);
+        }
+    };
+
+    struct lazy_cancel_fd : lazy_awaiter {
+        [[nodiscard("Did you forget to co_await?"
+        )]] inline lazy_cancel_fd(int fd, unsigned int flags) noexcept {
+            sqe->prepareCancleFd(fd, flags);
         }
     };
 
@@ -362,20 +398,24 @@ namespace detail {
     };
 
     struct lazy_timeout_timespec : lazy_awaiter {
+      public:
         [[nodiscard("Did you forget to co_await?")]] inline lazy_timeout_timespec(
             __kernel_timespec *ts, unsigned int count, unsigned int flags
         ) noexcept {
             sqe->prepareTimeout(ts, count, flags);
         }
+
+      protected:
+        inline lazy_timeout_timespec() noexcept {}
     };
 
-    struct lazy_timeout : lazy_awaiter {
+    struct lazy_timeout_base : lazy_awaiter {
+      protected:
         __kernel_timespec ts;
 
+      public:
         template<class Rep, class Period = std::ratio<1>>
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_timeout(
-            std::chrono::duration<Rep, Period> duration, unsigned int flags
-        ) noexcept {
+        void set_ts(std::chrono::duration<Rep, Period> duration) noexcept {
             using namespace std;
             using namespace std::literals;
             ts.tv_sec = duration / 1s;
@@ -383,7 +423,53 @@ namespace detail {
             ts.tv_nsec =
                 duration_cast<chrono::duration<long long, std::nano>>(duration)
                     .count();
+        }
+
+        template<class Rep, class Period = std::ratio<1>>
+        [[nodiscard("Should not be used directly"
+        )]] inline lazy_timeout_base(std::chrono::duration<Rep, Period> duration
+        ) noexcept {
+            set_ts(duration);
+        }
+    };
+
+    struct lazy_timeout : lazy_timeout_base {
+        template<class Rep, class Period = std::ratio<1>>
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_timeout(
+            std::chrono::duration<Rep, Period> duration, unsigned int flags
+        ) noexcept
+            : lazy_timeout_base(duration) {
             sqe->prepareTimeout(&ts, 0, flags);
+        }
+    };
+
+    struct lazy_link_timeout_base : lazy_timeout_base {
+        template<class Rep, class Period = std::ratio<1>>
+        [[nodiscard("Should not be used directly")]] inline lazy_link_timeout_base(
+            std::chrono::duration<Rep, Period> duration, unsigned int flags
+        ) noexcept
+            : lazy_timeout_base(duration) {
+            sqe->prepareLinkTimeout(&this->ts, flags);
+        }
+    };
+
+    struct lazy_link_timeout : lazy_link_io {
+        lazy_link_timeout_base timer;
+
+        template<class Rep, class Period = std::ratio<1>>
+        [[nodiscard("Did you forget to co_await?")]] inline lazy_link_timeout(
+            lazy_awaiter &&timed_io,
+            std::chrono::duration<Rep, Period> duration,
+            unsigned int flags
+        ) noexcept
+            : timer(duration, flags) {
+            auto &worker = *detail::this_thread.worker;
+            // Mark timed_io as normal task type, and set sqe link.
+            timed_io.sqe->setLink();
+            // Mark timer as lazy_link_sqe task type, and without sqe link.
+            timer.io_info.type = task_info::task_type::lazy_link_sqe;
+            // Send the result to timed_io.
+            this->last_io = &timed_io;
         }
     };
 
@@ -479,6 +565,15 @@ inline namespace lazy {
         uint32_t fileIndex
     ) noexcept {
         return detail::lazy_accept_direct{fd, addr, addrlen, flags, fileIndex};
+    }
+
+    [[deprecated("Consider cancel_fd instead.")]] inline detail::lazy_cancel
+    cancel(uint64_t user_data, int flags) noexcept {
+        return detail::lazy_cancel{user_data, flags};
+    }
+
+    inline detail::lazy_cancel_fd cancel(int fd, unsigned int flags) noexcept {
+        return detail::lazy_cancel_fd{fd, flags};
     }
 
     inline detail::lazy_recv
@@ -636,24 +731,35 @@ inline namespace lazy {
         return detail::lazy_timeout{duration, flags};
     }
 
+    template<class Rep, class Period = std::ratio<1>>
+    inline detail::lazy_link_timeout timeout(
+        detail::lazy_awaiter &&timed_io,
+        std::chrono::duration<Rep, Period> duration,
+        unsigned int flags = 0
+    ) noexcept {
+        return detail::lazy_link_timeout{std::move(timed_io), duration, flags};
+    }
+
     /**
      * @pre Either fd_in or fd_out must be a pipe.
      * @param off_in If fd_in refers to a pipe, off_in must be (int64_t) -1;
-     *               If fd_in does not refer to a pipe and off_in is (int64_t)
-     * -1, then bytes are read from fd_in starting from the file offset and it
-     * is adjust appropriately; If fd_in does not refer to a pipe and off_in is
-     * not (int64_t) -1, then the starting offset of fd_in will be off_in.
+     * If fd_in does not refer to a pipe and off_in is (int64_t) -1,
+     * then bytes are read from fd_in starting from the file offset and it is
+     * adjust appropriately; If fd_in does not refer to a pipe and off_in is not
+     * (int64_t) -1, then the starting offset of fd_in will be off_in.
      * @param off_out The description of off_in also applied to off_out.
      * @param splice_flags see man splice(2) for description of flags.
      *
-     * This splice operation can be used to implement sendfile by splicing to an
-     * intermediate pipe first, then splice to the final destination. In fact,
-     * the implementation of sendfile in kernel uses splice internally.
+     * This splice operation can be used to implement sendfile by splicing
+     * to an intermediate pipe first, then splice to the final destination.
+     * In fact, the implementation of sendfile in kernel uses splice
+     * internally.
      *
-     * NOTE that even if fd_in or fd_out refers to a pipe, the splice operation
-     * can still failed with EINVAL if one of the fd doesn't explicitly support
-     * splice operation, e.g. reading from terminal is unsupported from
-     * kernel 5.7 to 5.11. Check issue #291 for more information.
+     * NOTE that even if fd_in or fd_out refers to a pipe, the splice
+     * operation can still failed with EINVAL if one of the fd doesn't
+     * explicitly support splice operation, e.g. reading from terminal is
+     * unsupported from kernel 5.7 to 5.11. Check issue #291 for more
+     * information.
      */
     inline detail::lazy_splice splice(
         int fd_in,

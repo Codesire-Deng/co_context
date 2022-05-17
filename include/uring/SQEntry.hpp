@@ -191,7 +191,7 @@ class SQEntry final : private io_uring_sqe {
     }
 
     inline SQEntry &
-    prepareCancleFd(struct __kernel_timespec *ts, unsigned flags) noexcept {
+    prepareLinkTimeout(struct __kernel_timespec *ts, unsigned flags) noexcept {
         prepareRW(IORING_OP_LINK_TIMEOUT, -1, ts, 1, 0);
         this->timeout_flags = flags;
         return *this;

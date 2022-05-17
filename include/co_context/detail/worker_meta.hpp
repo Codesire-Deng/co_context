@@ -52,6 +52,8 @@ namespace detail {
 
         liburingcxx::SQEntry *get_free_sqe() noexcept;
 
+        [[deprecated]] void swap_last_two_sqes() noexcept;
+
         void submit_sqe() noexcept;
 
         void submit_non_sqe(uintptr_t typed_task) noexcept;

@@ -11,29 +11,35 @@
 #include "co_context/task.hpp"
 
 #include <string_view>
+#include <chrono>
+using namespace std::literals;
 
 co_context::task<> run(co_context::socket peer) {
     printf("run: Running\n");
     using namespace co_context;
     char buf[8192];
-    int nr = co_await peer.recv(buf, 0);
+    int nr = co_await timeout(peer.recv(buf, 0), 3s);
     // 不断接收字节流
     // while ((nr = ::recv(peer.fd(), buf, 8192, 0)) > 0) {}
     while (nr > 0) {
-        nr = co_await (
-            lazy::write(STDOUT_FILENO, {buf, (size_t)nr}, 0)
-            && peer.recv(buf, 0)
-        );
+        co_await lazy::write(STDOUT_FILENO, {buf, (size_t)nr}, 0);
+        nr = co_await timeout(peer.recv(buf, 0), 3s);
     }
+    printf("nr = %d\n", nr);
+    perror(strerror(-nr));
+    co_await lazy::yield();
     ::exit(0);
 }
 
 co_context::task<> server(uint16_t port) {
     using namespace co_context;
     acceptor ac{inet_address{port}};
-    // 不断接受 client，每个连接生成一个 worker 协程
-    for (int sockfd; (sockfd = co_await ac.accept()) >= 0;) {
+    // 限时，只接受一个 client
+    int sockfd = co_await timeout(ac.accept(), 2s);
+    if (sockfd >= 0) {
         co_spawn(run(co_context::socket{sockfd}));
+    } else {
+        printf("err = %d", -sockfd);
     }
 }
 
@@ -63,7 +69,7 @@ int main(int argc, const char *argv[]) {
     }
 
     using namespace co_context;
-    io_context context{16};
+    io_context context{32};
 
     int port = atoi(argv[2]);
     if (strcmp(argv[1], "-l") == 0) {

@@ -66,6 +66,15 @@ namespace detail {
         return submit_tail.available_sqe;
     }
 
+    void worker_meta::swap_last_two_sqes() noexcept {
+        // may acquire the cur.head
+        auto &swap = this->sharing.submit_swap;
+        const auto &cur = this->sharing.submit_cur;
+        auto &sqe_0 = swap[(local_submit_tail - 1) & cur.mask].available_sqe;
+        auto &sqe_1 = swap[(local_submit_tail - 2) & cur.mask].available_sqe;
+        std::swap(sqe_0, sqe_1);
+    }
+
     void worker_meta::submit_sqe() noexcept {
         [[maybe_unused]] const auto &swap = this->sharing.submit_swap;
         auto &cur = this->sharing.submit_cur;
@@ -496,6 +505,15 @@ inline void io_context::poll_completion() noexcept {
     const uint64_t user_data = polling_cqe->getData();
     const int32_t result = polling_cqe->getRes();
     [[maybe_unused]] const uint32_t flags = polling_cqe->getFlags();
+
+    if (config::log_level <= config::level::verbose && result < 0) {
+        log::v(
+            "cqe reports error: user_data=%lx, result=%d, flags=%u\n",
+            user_data, result, flags
+        );
+        perror(strerror(-result));
+    }
+
     ring.SeenCQEntry(polling_cqe);
     assert(flags != detail::reap_info::co_spawn_flag);
 

@@ -1,4 +1,5 @@
 #include "co_context/net/inet_address.hpp"
+#include "co_context/log/log.hpp"
 #include <cstring>
 #include <string>
 #include <string_view>
@@ -108,8 +109,9 @@ bool inet_address::resolve(
     memset(&hints, 0, sizeof(hints));
     hints.ai_flags |= AI_ADDRCONFIG; // for connect. see getaddrinfo(3)
     auto addrs = resolve_all(hostname, port, &hints);
+
     for (auto &addr : addrs) {
-        printf("ip port: %s\n", addr.to_ip_port().data());
+        log::v("ip port: %s\n", addr.to_ip_port().data());
     }
 
     if (addrs.empty()) return false;

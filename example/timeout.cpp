@@ -14,7 +14,7 @@ task<> delay_output() {
 task<> my_clock() {
     for (int cnt = 0;;) {
         printf("Time = %d\n", cnt++);
-        co_await (timeout(1s) + lazy::write(STDOUT_FILENO, "Tick\n", 0));
+        co_await (timeout(1s) && lazy::write(STDOUT_FILENO, "Tick\n", 0));
     }
 }
 
