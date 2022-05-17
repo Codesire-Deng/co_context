@@ -13,38 +13,46 @@
 #include <string_view>
 #include <chrono>
 using namespace std::literals;
+using namespace co_context;
 
-co_context::task<> run(co_context::socket peer) {
+void log_error(int err) {
+    switch (err) {
+        case ECANCELED:
+            log::e("timeout\n");
+            break;
+        default:
+            perror(strerror(err));
+            break;
+    }
+}
+
+task<> run(co_context::socket peer) {
     printf("run: Running\n");
-    using namespace co_context;
     char buf[8192];
-    int nr = co_await timeout(peer.recv(buf, 0), 3s);
-    // 不断接收字节流
-    // while ((nr = ::recv(peer.fd(), buf, 8192, 0)) > 0) {}
+    int nr = co_await timeout(peer.recv(buf), 3s);
+
     while (nr > 0) {
         co_await lazy::write(STDOUT_FILENO, {buf, (size_t)nr}, 0);
-        nr = co_await timeout(peer.recv(buf, 0), 3s);
+        nr = co_await timeout(peer.recv(buf), 3s);
     }
-    printf("nr = %d\n", nr);
-    perror(strerror(-nr));
-    co_await lazy::yield();
+
+    log_error(-nr);
     ::exit(0);
 }
 
-co_context::task<> server(uint16_t port) {
-    using namespace co_context;
+task<> server(uint16_t port) {
     acceptor ac{inet_address{port}};
-    // 限时，只接受一个 client
+    // 限时2s，只接受一个 client
     int sockfd = co_await timeout(ac.accept(), 2s);
     if (sockfd >= 0) {
         co_spawn(run(co_context::socket{sockfd}));
     } else {
-        printf("err = %d", -sockfd);
+        log_error(-sockfd);
+        ::exit(0);
     }
 }
 
-co_context::task<> client(std::string_view hostname, uint16_t port) {
-    using namespace co_context;
+task<> client(std::string_view hostname, uint16_t port) {
     inet_address addr;
     if (inet_address::resolve(hostname, port, addr)) {
         co_context::socket sock{co_context::socket::create_tcp(addr.family())};
@@ -68,7 +76,6 @@ int main(int argc, const char *argv[]) {
         return 0;
     }
 
-    using namespace co_context;
     io_context context{32};
 
     int port = atoi(argv[2]);

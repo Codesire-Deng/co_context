@@ -8,7 +8,7 @@ A coroutine framework aimed at high-concurrency io with reasonable latency, base
 
 ## 已有功能
 
-1. Lazy IO: `read{,v,_fixed}`, `write{,v,_fixed}`, `accept`, `accept_direct`, `recv(msg)`, `send(msg)`, `connect`, `close`, `shutdown`, `fsync`, `sync_file_range`, `timeout`, `uring_nop`, `files_update`, `fallocate`, `openat`, `openat_direct`, `openat2`, `openat2_direct`,  `statx`, `unlinkat`, `renameat`, `mkdirat`, `symlinkat`, `linkat`, `splice`, `tee`, `provide_buffers`, `remove_buffers`. 35 in total.
+1. Lazy IO: `read{,v,_fixed}`, `write{,v,_fixed}`, `accept`, `accept_direct`, `recv(msg)`, `send(msg)`, `connect`, `close`, `shutdown`, `fsync`, `sync_file_range`, `timeout`, `link_timeout`, `cancel`, `cancel_fd`, `uring_nop`, `files_update`, `fallocate`, `openat`, `openat_direct`, `openat2`, `openat2_direct`,  `statx`, `unlinkat`, `renameat`, `mkdirat`, `symlinkat`, `linkat`, `splice`, `tee`, `provide_buffers`, `remove_buffers`. 38 in total.
 2. Linked lazy IO: About 2.5% more efficient, and safe.
 3. Eager IO: All functions of lazy IO.
 4. Concurrency support: `mutex`, `semaphore`, `condition_variable`
@@ -16,9 +16,11 @@ A coroutine framework aimed at high-concurrency io with reasonable latency, base
 
 ## Requirement
 
-1. [mimalloc](https://github.com/microsoft/mimalloc)
+1. [mimalloc](https://github.com/microsoft/mimalloc)  通常从包管理器安装即可。
 
 ## Example
+
+### Basic usage
 
 创建一个 io_context，指定 io_uring 的循环队列大小：
 
@@ -30,8 +32,7 @@ A coroutine framework aimed at high-concurrency io with reasonable latency, base
 定义一个 socket 监听任务：
 
 ```cpp
-co_context::main_task server(uint16_t port) {
-    using namespace co_context;
+task<> server(uint16_t port) {
     acceptor ac{inet_address{port}};
     for (int sockfd; (sockfd = co_await ac.accept()) >= 0;) {// 异步接受 client
         co_spawn(run(co_context::socket{sockfd})); // 每个连接生成一个 worker 任务
@@ -42,13 +43,14 @@ co_context::main_task server(uint16_t port) {
 描述业务逻辑（以 netcat 为例）：
 
 ```cpp
-co_context::main_task run(co_context::socket peer) {
+task<> run(co_context::socket peer) {
     using namespace co_context;
     char buf[8192];
     int nr = 0;
     // 不断接收字节流
-    while ((nr = co_await peer.recv(buf, 0)) > 0) { // 异步 socket recv
-        int nw = write_n(STDOUT_FILENO, buf, nr); // 同步打印到 stdout
+    while ((nr = co_await peer.recv(buf, 0)) > 0) { // 接收消息
+        // 打印到 stdout
+        int nw = co_await lazy::write(STDOUT_FILENO, {buf, (size_t)nr}, 0); 
         if (nw < nr) break;
     }
 }
@@ -63,7 +65,6 @@ int main(int argc, const char *argv[]) {
         return 0;
     }
 
-    using namespace co_context;
     io_context context{32};
 
     int port = atoi(argv[2]);
@@ -73,20 +74,72 @@ int main(int argc, const char *argv[]) {
         context.co_spawn(client(argv[1], port));
     }
 
-    context.run(); // 启动 io_context（多线程）
+    context.run(); // 启动 io_context（可选单线程或多线程）
 
     return 0;
 }
 
 ```
 
-## 谁不需要协程
+### More widgets
 
-在我创建这个项目之前，我已经知道基于协程的异步框架很可能**不是**性能最优解，如果你正在寻找 C++ 异步的终极解决方案，且不在乎编程复杂度，我推荐你学习 **sender/receiver model**，而无需尝试协程。
+#### One second timer
 
-## 谁需要协程
+```cpp
+task<> my_clock() {
+    for (int cnt = 0;;) {
+        printf("Time = %d\n", cnt++);
+        co_await timeout(1s);
+    }
+}
+```
 
-如果你希望异步框架能够最佳地平衡「开发、维护成本」和「项目质量、性能」，从而最大化经济效益，我推荐你关注协程方案。
+#### Network timeout
+
+```cpp
+task<> run(co_context::socket peer) {
+    printf("run: Running\n");
+    char buf[8192];
+    int nr = co_await timeout(peer.recv(buf), 3s);
+
+    while (nr > 0) {
+        co_await lazy::write(STDOUT_FILENO, {buf, (size_t)nr}, 0);
+        nr = co_await timeout(peer.recv(buf), 3s);
+    }
+
+    log_error(-nr);
+}
+
+void log_error(int err) {
+    switch (err) {
+        case ECANCELED:
+            log::e("timeout!\n");
+            break;
+        default:
+            perror(strerror(err));
+            break;
+    }
+}
+```
+
+#### link_io
+
+用 `&&` 来链接两个 I/O。链接 I/O 可以减少重入内核态和调度器，增强性能表现。（默认只返回最后一个返回值。）
+
+```cpp
+nr = co_await (
+    lazy::write(STDOUT_FILENO, {buf, (size_t)nr}, 0)
+    && peer.recv(buf)
+);
+```
+
+## 协程方案的局限场景
+
+由于内置动态内存分配，基于协程的异步框架可能**不是**性能的最优解，如果你正处于类似 30ns 延迟的极端性能场景，且不在乎编程复杂度，推荐关注 **sender/receiver model**，而无需尝试协程。
+
+## 协程方案的适用场景
+
+如果你希望异步框架能够最佳地平衡「开发、维护成本」和「项目质量、性能」，从而最大化经济效益，推荐你关注协程方案。感性理解：协程 + 内核态 I/O 的性能类似于 Redis 的网络模块。
 
 ## 关于缓存友好问题
 
@@ -96,7 +149,7 @@ int main(int argc, const char *argv[]) {
 2. **co_context** 的数据结构保证「可能频繁读写」的 cacheline 最多被两个线程访问，无论并发强度有多大。这个保证本身也不经过互斥锁或原子变量。（若使用原子变量，高竞争下性能损失约 33%～70%）
 3. 对于可能被多于两个线程读写的 cacheline，**co_context** 保证乒乓缓存问题最多发生常数次。
 4. 在 AMD-5800X，3200 Mhz-ddr4 环境下，若绕过 io_uring，**co_context** 的线程交互频率可达 1.25 GHz。
-5. 创建、运行、销毁高竞争协程的频率可达 58 M（线程数=4，swap_capacity=32768，0.986 s 内完成 58 M 原子变量自增），代码见 test/nop.cpp。
+5. 在一个本地测试中，协程切换的平均延迟为 37 ns，代码于 [test/ctx_swtch.cpp](test/ctx_swtch.cpp)。
 6. 协程自身的缓存不友好问题（主要由 `operator new` 引起），需要借助其他工具来解决，例如 [mimalloc](https://github.com/microsoft/mimalloc)。
 
 ---
