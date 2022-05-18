@@ -110,8 +110,7 @@ class mutex final {
     /**
      * @brief Construct a new mutex that is not locked.
      */
-    mutex() noexcept : awaiting(not_locked), to_resume(nullptr) {
-    }
+    mutex() noexcept : awaiting(not_locked), to_resume(nullptr) {}
 
     /**
      * @brief Destroy the mutex.
@@ -137,9 +136,7 @@ class mutex final {
      * @return A lock_awaiter that must(should) be `co_await`ed to wait until
      * the lock is acquired. Type of `co_await m.lock()` is `void`.
      */
-    lock_awaiter lock() noexcept {
-        return lock_awaiter{*this};
-    }
+    lock_awaiter lock() noexcept { return lock_awaiter{*this}; }
 
     lock_guard_awaiter lock_guard() noexcept {
         return lock_guard_awaiter{*this};

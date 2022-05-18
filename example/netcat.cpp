@@ -17,12 +17,11 @@ co_context::task<> run(co_context::socket peer) {
     using namespace co_context;
     char buf[8192];
     int nr = co_await peer.recv(buf);
-    
+
     // 不断接收字节流
     while (nr > 0) {
         nr = co_await (
-            lazy::write(STDOUT_FILENO, {buf, (size_t)nr}, 0)
-            && peer.recv(buf)
+            lazy::write(STDOUT_FILENO, {buf, (size_t)nr}, 0) && peer.recv(buf)
         );
     }
     ::exit(0);

@@ -19,11 +19,11 @@ namespace config {
      * @brief This tells if each thread (io_contexts and workers) should stay
      * on the corresponding CPU. Doing so would dismiss some cache miss.
      */
-// #define CO_CONTEXT_USE_CPU_AFFINITY
+    // #define CO_CONTEXT_USE_CPU_AFFINITY
 
     /**
      * @brief Size of cache line on the CPU L1 cache. Usually this is 64 byte.
-     * @note Now `std::hardware_destructive_interference_size` is not used 
+     * @note Now `std::hardware_destructive_interference_size` is not used
      * because of warning from gcc 12
      */
 #if 0 && __cpp_lib_hardware_interference_size >= 201603

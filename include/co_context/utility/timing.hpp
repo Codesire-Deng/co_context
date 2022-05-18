@@ -14,4 +14,5 @@ void hostTiming(const F &func) {
     std::chrono::duration<double, std::micro> duration = end - start;
     printf("Host Time = %7.3f us.\n", duration.count());
 }
+
 // 2e9 ~ 4138.81ms -> 2.069ns/times
