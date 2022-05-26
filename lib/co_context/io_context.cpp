@@ -41,7 +41,7 @@ namespace detail {
             }
         }
 #endif
-        log::w("worker[%u] runs on %u\n", this->tid, gettid());
+        log::i("worker[%u] runs on %u\n", this->tid, gettid());
     }
 
     liburingcxx::SQEntry *worker_meta::get_free_sqe() noexcept {
@@ -322,10 +322,12 @@ void io_context::handle_condition_variable_notify(task_info *cv_notify
 
 bool io_context::try_find_submit_worker_relaxed() noexcept {
     if constexpr (config::workers_number == 1) {
-        return !this->worker[0].sharing.submit_cur.is_empty();
+        return !this->worker[0].sharing.submit_cur.is_empty_load_tail_relaxed();
     } else {
         for (config::tid_t i = 0; i < config::workers_number; ++i) {
-            if (!this->worker[s_cur].sharing.submit_cur.is_empty()) return true;
+            if (!this->worker[s_cur]
+                     .sharing.submit_cur.is_empty_load_tail_relaxed())
+                return true;
             cur_next(s_cur);
         }
         return false;
@@ -410,7 +412,7 @@ void io_context::try_submit(detail::submit_info &info) noexcept {
 
 /**
  * @brief poll the submission swap zone
- * @return if submit_swap capacity might be healthy
+ * @return if any submission is found
  */
 bool io_context::poll_submission() noexcept {
     // submit round
@@ -629,7 +631,7 @@ void io_context::co_spawn(std::coroutine_handle<> entrance) {
 #ifdef CO_CONTEXT_USE_CPU_AFFINITY
     detail::set_cpu_affinity(detail::this_thread.tid);
 #endif
-    log::w("io_context runs on %d\n", gettid());
+    log::i("io_context runs on %d\n", gettid());
 
     if constexpr (config::worker_threads_number > 0) {
         make_thread_pool();
@@ -640,9 +642,10 @@ void io_context::co_spawn(std::coroutine_handle<> entrance) {
     if constexpr (config::use_standalone_completion_poller)
         std::thread{[this] {
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
-            log::w("ctx completion_poller runs on %d\n", gettid());
+            log::i("ctx completion_poller runs on %d\n", gettid());
             while (true) {
-                if (this->ring.CQReadyAcquire()) { poll_completion(); }
+                auto num = ring.CQReadyAcquire();
+                while (num--) { poll_completion(); }
             }
         }}.detach();
 
@@ -654,6 +657,7 @@ void io_context::co_spawn(std::coroutine_handle<> entrance) {
             }
 
             // if (try_clear_submit_overflow_buf()) {
+            // log::v("ctx poll_submission...\n");
             if constexpr (config::submit_poll_rounds > 1)
                 for (uint8_t i = 0; i < config::submit_poll_rounds; ++i) {
                     if (!poll_submission()) break;
@@ -668,8 +672,11 @@ void io_context::co_spawn(std::coroutine_handle<> entrance) {
                 //     requests_to_reap);
                 // TODO judge the memory order (relaxed may cause bugs)
                 // TODO consider reap_poll_rounds and reap_overflow_buf
-                if (requests_to_reap > 0 && ring.CQReadyRelaxed())
-                    poll_completion();
+                // log::v("ctx poll_completion...\n");
+                if (requests_to_reap > 0) {
+                    auto num = ring.CQReadyRelaxed();
+                    while (num--) { poll_completion(); }
+                }
             }
         }
 

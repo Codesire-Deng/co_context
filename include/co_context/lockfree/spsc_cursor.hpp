@@ -66,6 +66,13 @@ struct spsc_cursor {
             return raw_tail();
     }
 
+    inline T load_raw_tail_relaxed() const noexcept {
+        if constexpr (thread_safe)
+            return as_c_atomic(m_tail).load(std::memory_order_relaxed);
+        else
+            return raw_tail();
+    }
+
     // inline void set_raw_tail(T tail) const noexcept { m_tail = tail; }
 
     inline void store_raw_tail(T tail) noexcept {
@@ -81,6 +88,10 @@ struct spsc_cursor {
 
     inline bool is_empty_load_tail() const noexcept {
         return m_head == load_raw_tail();
+    }
+
+    inline bool is_empty_load_tail_relaxed() const noexcept {
+        return m_head == load_raw_tail_relaxed();
     }
 
     inline bool is_available_load_head() const noexcept {
