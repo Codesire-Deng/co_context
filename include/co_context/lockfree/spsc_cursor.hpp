@@ -8,11 +8,11 @@ namespace co_context {
 
 template<std::unsigned_integral T, T capacity>
 struct spsc_cursor {
-    static_assert(lowbit(capacity) == capacity);
+    static_assert(is_pow_of_two(capacity));
     // Check config::swap_capacity_size_t if this assertion fails.
     static_assert(std::atomic<T>::is_always_lock_free);
     inline static constexpr T mask = capacity - 1;
-    inline static constexpr bool thread_safe =
+    inline static constexpr bool need_thread_safe =
         config::worker_threads_number != 0;
 
     T m_head = 0;
@@ -39,35 +39,35 @@ struct spsc_cursor {
     }
 
     inline T load_head() const noexcept {
-        if constexpr (thread_safe)
+        if constexpr (need_thread_safe)
             return as_c_atomic(m_head).load(std::memory_order_acquire) & mask;
         else
             return head();
     }
 
     inline T load_tail() const noexcept {
-        if constexpr (thread_safe)
+        if constexpr (need_thread_safe)
             return as_c_atomic(m_tail).load(std::memory_order_acquire) & mask;
         else
             return tail();
     }
 
     inline T load_raw_head() const noexcept {
-        if constexpr (thread_safe)
+        if constexpr (need_thread_safe)
             return as_c_atomic(m_head).load(std::memory_order_acquire);
         else
             return raw_head();
     }
 
     inline T load_raw_tail() const noexcept {
-        if constexpr (thread_safe)
+        if constexpr (need_thread_safe)
             return as_c_atomic(m_tail).load(std::memory_order_acquire);
         else
             return raw_tail();
     }
 
     inline T load_raw_tail_relaxed() const noexcept {
-        if constexpr (thread_safe)
+        if constexpr (need_thread_safe)
             return as_c_atomic(m_tail).load(std::memory_order_relaxed);
         else
             return raw_tail();
@@ -76,7 +76,7 @@ struct spsc_cursor {
     // inline void set_raw_tail(T tail) const noexcept { m_tail = tail; }
 
     inline void store_raw_tail(T tail) noexcept {
-        if constexpr (thread_safe)
+        if constexpr (need_thread_safe)
             as_atomic(m_tail).store(tail, std::memory_order_release);
         else
             m_tail = tail;
@@ -117,14 +117,14 @@ struct spsc_cursor {
     }
 
     inline void push(T num = 1) noexcept {
-        if constexpr (thread_safe)
+        if constexpr (need_thread_safe)
             as_atomic(m_tail).store(m_tail + num, std::memory_order_release);
         else
             m_tail += num;
     }
 
     inline void pop(T num = 1) noexcept {
-        if constexpr (thread_safe)
+        if constexpr (need_thread_safe)
             as_atomic(m_head).store(m_head + num, std::memory_order_release);
         else
             m_head += num;

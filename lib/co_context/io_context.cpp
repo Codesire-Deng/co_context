@@ -234,12 +234,6 @@ namespace detail {
 
 } // namespace detail
 
-[[deprecated, nodiscard]] bool
-io_context::is_sqe(const liburingcxx::SQEntry *suspect) const noexcept {
-    return static_cast<size_t>(suspect - this->sqes_addr)
-           < this->sqring_entries;
-}
-
 void io_context::forward_task(std::coroutine_handle<> handle) noexcept {
     // TODO optimize scheduling strategy
     if (try_find_reap_worker_relaxed()) [[likely]] {
@@ -375,7 +369,7 @@ bool io_context::try_find_reap_worker_relaxed() noexcept {
 
 void io_context::try_submit(detail::submit_info &info) noexcept {
     // lazy_sqe or eager_sqe
-    if (info.address == 0UL) [[likely]] {
+    if (info.address == 0) [[likely]] {
         // submit to ring
         ++requests_to_reap;
         log::v("ctx ring.submit(), requests_to_reap=%d...\n", requests_to_reap);
@@ -510,10 +504,10 @@ inline void io_context::poll_completion() noexcept {
 
     if (config::log_level <= config::level::verbose && result < 0) {
         log::v(
-            "cqe reports error: user_data=%lx, result=%d, flags=%u\n",
-            user_data, result, flags
+            "cqe reports error: user_data=%lx, result=%d, flags=%u\n"
+            "message: %s\n",
+            user_data, result, flags, strerror(-result)
         );
-        perror(strerror(-result));
     }
 
     ring.SeenCQEntry(polling_cqe);
@@ -567,6 +561,7 @@ void io_context::init() noexcept {
     // assert(submit_overflow_buf.empty());
     assert(reap_overflow_buf.empty());
     assert(this->sqring_entries == ring.getSQRingEntries());
+    
     {
         const unsigned actual_sqring_size = this->sqring_entries;
         const unsigned expect_sqring_size =
@@ -581,7 +576,7 @@ void io_context::init() noexcept {
             exit(1);
         }
     }
-    this->sqes_addr = ring.__getSqes();
+
     for (unsigned i = 0; i < config::workers_number; ++i) {
         for (unsigned j = 0; j < config::swap_capacity; ++j) {
             worker[i].sharing.submit_swap[j] = detail::submit_info{
@@ -616,13 +611,13 @@ inline void io_context::make_thread_pool() {
     log::v("ctx make_thread_pool end\n");
 }
 
-void io_context::co_spawn(task<void> &&entrance) {
+void io_context::co_spawn(task<void> &&entrance) noexcept {
     assert(detail::this_thread.worker == nullptr);
     forward_task(entrance.get_handle());
     entrance.detach();
 }
 
-void io_context::co_spawn(std::coroutine_handle<> entrance) {
+void io_context::co_spawn(std::coroutine_handle<> entrance) noexcept {
     assert(detail::this_thread.worker == nullptr);
     forward_task(entrance);
 }

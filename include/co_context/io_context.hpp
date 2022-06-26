@@ -37,9 +37,6 @@ using config::cache_line_size;
 
 class io_context;
 
-// class eager_io;
-// class lazy_io;
-
 class [[nodiscard]] io_context final {
   private:
     using uring = liburingcxx::URing<config::io_uring_flags>;
@@ -50,64 +47,122 @@ class [[nodiscard]] io_context final {
     using worker_meta = detail::worker_meta;
 
   private:
-    // multithread sharing
+    /**
+     * ---------------------------------------------------
+     * Multi-thread sharing data
+     * ---------------------------------------------------
+     */
+
+    // An instant of io_uring
     alignas(cache_line_size) uring ring;
+
+    // The meta data of worker(s)
     alignas(cache_line_size) worker_meta worker[config::workers_number];
 
-    // local read/write, high frequency data.
+    /**
+     * ---------------------------------------------------
+     * local read/write, high frequency data
+     * ---------------------------------------------------
+     */
+
+    // cursor pointing to the submit worker
     alignas(cache_line_size) config::tid_t s_cur = 0;
+
+    // cursor pointing to the reap worker
     config::tid_t r_cur = 0;
+
+    // number of I/O tasks running inside io_uring
     int32_t requests_to_reap = 0;
+
+    // if there is at least one entry to submit to io_uring
     bool need_ring_submit = false;
+
+    // should io_context stop
     bool will_stop = false;
+
+    // buffer to hold the exceeded submission
     /*
     std::queue<task_info *> submit_overflow_buf;
     */
+
+    // buffer to hold the exceeded completion
     std::queue<detail::reap_info> reap_overflow_buf;
 
-    // read-only sharing
+    /**
+     * ---------------------------------------------------
+     * read-only sharing data
+     * ---------------------------------------------------
+     */
+
+    // SQ capacity in the io_uring instant
     alignas(cache_line_size) const unsigned sqring_entries;
-    const liburingcxx::SQEntry *sqes_addr;
 
   private:
-    inline static void cur_next(config::tid_t &context_cur) noexcept {
+    /**
+     * @brief `cur = (cur + 1) % workers_number`
+     */
+    inline static void cur_next(config::tid_t &cur) noexcept {
         if constexpr (config::workers_number > 1)
-            context_cur = (context_cur + 1) % config::workers_number;
-    }
-
-    [[deprecated]] friend unsigned compress_sqe(
-        const io_context *self, const liburingcxx::SQEntry *sqe
-    ) noexcept {
-        return sqe - self->sqes_addr;
-    }
-
-    [[deprecated]] inline liburingcxx::SQEntry *
-    decompress_sqe(unsigned compressed_sqe) const noexcept {
-        return const_cast<liburingcxx::SQEntry *>(sqes_addr + compressed_sqe);
+            cur = (cur + 1) % config::workers_number;
     }
 
   private:
-    [[deprecated, nodiscard]] bool is_sqe(const liburingcxx::SQEntry *suspect
-    ) const noexcept;
-
+    /**
+     * @brief forward a coroutine to a random worker. If failed (because workers
+     * are full), forward to the overflow buffer.
+     */
     void forward_task(std::coroutine_handle<> handle) noexcept;
 
+    /**
+     * @brief handler where io_context finds a semaphore::release task
+     */
     void handle_semaphore_release(task_info *sem_release) noexcept;
 
+    /**
+     * @brief handler where io_context finds a condition_variable::notify_* task
+     */
     void handle_condition_variable_notify(task_info *cv_notify) noexcept;
 
+    /**
+     * @brief find a worker who has a submission.
+     * @note use relaxed memory order.
+     *
+     * @return true if there is a worker. `s_cur` will point to it.
+     * false if that does not exist. `s_cur` remains unchanged.
+     */
     bool try_find_submit_worker_relaxed() noexcept;
 
+    /**
+     * @brief same as `try_find_submit_worker_relaxed()`, except for memory
+     * order
+     * @note use acquire memory order.
+     */
     [[deprecated]] bool try_find_submit_worker_acquire() noexcept;
 
+    /**
+     * @brief find a worker who can undertake a completion.
+     * @note use relaxed memory order.
+     *
+     * @return true if there is a worker. `r_cur` will point to it.
+     * false if that does not exist. `r_cur` remains unchanged.
+     */
     bool try_find_reap_worker_relaxed() noexcept;
 
+    /**
+     * @brief same as `try_find_reap_worker_relaxed()`, except for memory
+     * order
+     * @note use acquire memory order.
+     */
     [[deprecated]] bool try_find_reap_worker_acquire() noexcept;
 
+    /**
+     * @brief handle the submission from the worker.
+     */
     void try_submit(detail::submit_info &info) noexcept;
 
     /**
      * @brief poll the submission swap zone
+     *
      * @return if submit_swap capacity might be healthy
      */
     bool poll_submission() noexcept;
@@ -116,22 +171,48 @@ class [[nodiscard]] io_context final {
     bool try_clear_submit_overflow_buf() noexcept;
     */
 
+    /**
+     * @brief forward the completion from the io_uring to a worker. If failed
+     * (because workers are full), do nothing.
+     *
+     * @return true if a worker undertake this completion. false otherwise.
+     */
     bool try_reap(detail::reap_info info) noexcept;
 
+    /**
+     * @brief forward the completion from the io_uring to a worker. If failed
+     * (because workers are full), forward to the overflow buffer.
+     */
     void reap_or_overflow(detail::reap_info info) noexcept;
 
     /**
-     * @brief poll the completion swap zone
-     * @return if load exists and capacity of reap_swap might be healthy
+     * @brief poll the completion inside the io_uring
      */
     void poll_completion() noexcept;
 
+    /**
+     * @brief forward the completion waiting in the overflow buffer.
+     *
+     * @return true if the overflow buffer is cleared. false otherwise.
+     */
     bool try_clear_reap_overflow_buf() noexcept;
 
+    /**
+     * @brief exit(0)
+     */
     [[noreturn]] void stop() noexcept {
         log::i("ctx stopped\n");
         ::exit(0);
     }
+
+  private:
+    void init() noexcept;
+
+    void make_thread_pool();
+
+    void co_spawn(std::coroutine_handle<> entrance) noexcept;
+    
+    friend void co_spawn(task<void> &&entrance) noexcept;
 
   public:
     io_context(unsigned io_uring_entries, uring::Params &io_uring_params)
@@ -148,15 +229,9 @@ class [[nodiscard]] io_context final {
     io_context(unsigned io_uring_entries, uring::Params &&io_uring_params)
         : io_context(io_uring_entries, io_uring_params) {}
 
-    void init() noexcept;
-
     void probe() const;
 
-    void make_thread_pool();
-
-    void co_spawn(task<void> &&entrance);
-
-    void co_spawn(std::coroutine_handle<> entrance);
+    void co_spawn(task<void> &&entrance) noexcept;
 
     void can_stop() noexcept { will_stop = true; }
 

@@ -568,11 +568,12 @@ inline namespace lazy {
     }
 
     [[deprecated("Consider cancel_fd instead.")]] inline detail::lazy_cancel
-    cancel(uint64_t user_data, int flags) noexcept {
+    cancel(uint64_t user_data, int flags = 0) noexcept {
         return detail::lazy_cancel{user_data, flags};
     }
 
-    inline detail::lazy_cancel_fd cancel(int fd, unsigned int flags) noexcept {
+    inline detail::lazy_cancel_fd
+    cancel(int fd, unsigned int flags = 0) noexcept {
         return detail::lazy_cancel_fd{fd, flags};
     }
 

@@ -85,7 +85,8 @@
         "filesystem": "cpp",
         "unordered_set": "cpp",
         "fstream": "cpp",
-        "future": "cpp"
+        "future": "cpp",
+        "source_location": "cpp"
     },
     "cmake.buildTask": true
 }

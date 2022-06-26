@@ -4,8 +4,6 @@ A coroutine framework aimed at high-concurrency io with reasonable latency, base
 
 **co_context** 是一个**协程**异步多线程并发框架，以提供可靠的性能为使命，也致力于减轻用户的心智负担，让 C++ 初学者也能轻松写出高并发程序。
 
-目前 **co_context** 已经完成开题报告和蓝图设计，预计5月中旬发布正式版。
-
 ## 已有功能
 
 1. Lazy IO: `read{,v,_fixed}`, `write{,v,_fixed}`, `accept`, `accept_direct`, `recv(msg)`, `send(msg)`, `connect`, `close`, `shutdown`, `fsync`, `sync_file_range`, `timeout`, `link_timeout`, `cancel`, `cancel_fd`, `uring_nop`, `files_update`, `fallocate`, `openat`, `openat_direct`, `openat2`, `openat2_direct`,  `statx`, `unlinkat`, `renameat`, `mkdirat`, `symlinkat`, `linkat`, `splice`, `tee`, `provide_buffers`, `remove_buffers`.  总计 38 个功能。
