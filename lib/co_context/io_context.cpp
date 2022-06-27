@@ -561,7 +561,7 @@ void io_context::init() noexcept {
     // assert(submit_overflow_buf.empty());
     assert(reap_overflow_buf.empty());
     assert(this->sqring_entries == ring.getSQRingEntries());
-    
+
     {
         const unsigned actual_sqring_size = this->sqring_entries;
         const unsigned expect_sqring_size =
