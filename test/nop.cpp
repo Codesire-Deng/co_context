@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
     times = atoi(argv[1]);
     times -= times % concur;
 
-    io_context context{256};
+    io_context context{32768};
 
     for (int i = 0; i < concur; ++i) context.co_spawn(gen_task());
 

@@ -81,7 +81,7 @@ int main(int argc, char *argv[]) {
     }
 
     const int port = atoi(argv[1]);
-    io_context context{256};
+    io_context context{32768};
     context.co_spawn(server(port, argv[2]));
 
     context.run();

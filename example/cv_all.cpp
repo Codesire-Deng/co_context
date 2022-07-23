@@ -45,7 +45,7 @@ task<> signals() {
 }
 
 int main() {
-    io_context ctx{32};
+    io_context ctx{32768};
     ctx.co_spawn(waits());
     ctx.co_spawn(waits());
     ctx.co_spawn(waits());

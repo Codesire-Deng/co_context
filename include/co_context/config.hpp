@@ -10,8 +10,8 @@ namespace co_context {
 namespace config {
 
     // ======================== io_uring configuration ========================
-    // inline constexpr unsigned io_uring_flags = 0;
-    inline constexpr unsigned io_uring_flags = IORING_SETUP_SQPOLL;
+    inline constexpr unsigned io_uring_flags = 0;
+    // inline constexpr unsigned io_uring_flags = IORING_SETUP_SQPOLL;
     // ========================================================================
 
     // ========================== CPU configuration ===========================
@@ -136,8 +136,8 @@ namespace config {
     // inline constexpr level log_level = level::debug;
     // inline constexpr level log_level = level::info;
     // inline constexpr level log_level = level::warning;
-    // inline constexpr level log_level = level::error;
-    inline constexpr level log_level = level::no_log;
+    inline constexpr level log_level = level::error;
+    // inline constexpr level log_level = level::no_log;
 
 } // namespace config
 

@@ -76,7 +76,7 @@ int main(int argc, const char *argv[]) {
         return 0;
     }
 
-    io_context context{32};
+    io_context context{32768};
 
     int port = atoi(argv[2]);
     if (strcmp(argv[1], "-l") == 0) {

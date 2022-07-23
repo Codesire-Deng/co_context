@@ -24,7 +24,7 @@ A coroutine framework aimed at high-concurrency io with reasonable latency, base
 
 ```cpp
     using namespace co_context;
-    io_context context{32};
+    io_context context{32768};
 ```
 
 定义一个 socket 监听任务：
@@ -63,7 +63,7 @@ int main(int argc, const char *argv[]) {
         return 0;
     }
 
-    io_context context{32};
+    io_context context{32768};
 
     int port = atoi(argv[2]);
     if (strcmp(argv[1], "-l") == 0) {

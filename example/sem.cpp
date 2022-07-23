@@ -91,7 +91,7 @@ task<> workerThread(unsigned id) {
 }
 
 int main() {
-    io_context ctx{128};
+    io_context ctx{32768};
 
     for (auto id{0U}; id != max_threads; ++id) {
         ctx.co_spawn(workerThread(id));
