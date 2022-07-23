@@ -102,7 +102,7 @@ int main(int argc, const char *argv[]) {
     }
 
     using namespace co_context;
-    io_context context{4};
+    io_context context{32768};
 
     int port = atoi(argv[2]);
     if (strcmp(argv[1], "-l") == 0) {

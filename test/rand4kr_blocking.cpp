@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
     times = atoi(argv[2]);
     file_size = argc == 4 ? atoll(argv[3]) : 1'000'000'000;
 
-    io_context context{256};
+    io_context context{32768};
 
     context.co_spawn([]() -> task<> {
         std::mt19937_64 rng(0);

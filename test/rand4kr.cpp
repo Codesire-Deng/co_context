@@ -82,7 +82,7 @@ int main(int argc, char *argv[]) {
     file_size = argc == 4 ? atoll(argv[3]) : 60'000'000;
     // file_size = argc == 4 ? atoll(argv[3]) : 3'000'000'000;
 
-    io_context context{256};
+    io_context context{32768};
 
     alive.store(0);
     context.co_spawn([]() -> task<> {

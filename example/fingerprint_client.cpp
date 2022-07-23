@@ -76,7 +76,7 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    io_context context{128};
+    io_context context{32768};
 
     const int port = atoi(argv[2]);
     concurrency = atoi(argv[3]);

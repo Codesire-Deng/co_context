@@ -19,7 +19,7 @@ task<> my_clock() {
 }
 
 int main() {
-    io_context ctx{32};
+    io_context ctx{32768};
     // ctx.co_spawn(delay_output());
     ctx.co_spawn(my_clock());
     ctx.run();
