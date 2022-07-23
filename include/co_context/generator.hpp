@@ -288,27 +288,27 @@ class _Gen_promise_base {
     }
 
     // clang-format off
-        [[nodiscard]] auto yield_value(const std::remove_reference_t<_Yielded>& _Val)
-            noexcept(std::is_nothrow_constructible_v<std::remove_cvref_t<_Yielded>, const std::remove_reference_t<_Yielded>&>)
-            requires (std::is_rvalue_reference_v<_Yielded> &&
-                std::constructible_from<std::remove_cvref_t<_Yielded>, const std::remove_reference_t<_Yielded>&>) {
-        // clang-format on
+    [[nodiscard]] auto yield_value(const std::remove_reference_t<_Yielded>& _Val)
+        noexcept(std::is_nothrow_constructible_v<std::remove_cvref_t<_Yielded>, const std::remove_reference_t<_Yielded>&>)
+        requires (std::is_rvalue_reference_v<_Yielded> &&
+            std::constructible_from<std::remove_cvref_t<_Yielded>, const std::remove_reference_t<_Yielded>&>) {
         return _Element_awaiter{_Val};
     }
+    // clang-format on
 
     // clang-format off
-        template <class _Rty, class _Vty, class _Alloc, class _Unused>
-            requires std::same_as<_Gen_yield_t<_Gen_reference_t<_Rty, _Vty>>, _Yielded>
-        [[nodiscard]] auto yield_value(
-            ::co_context::ranges::elements_of<generator<_Rty, _Vty, _Alloc>&&, _Unused> _Elem) noexcept {
-        // clang-format on
+    template <class _Rty, class _Vty, class _Alloc, class _Unused>
+        requires std::same_as<_Gen_yield_t<_Gen_reference_t<_Rty, _Vty>>, _Yielded>
+    [[nodiscard]] auto yield_value(
+        ::co_context::ranges::elements_of<generator<_Rty, _Vty, _Alloc>&&, _Unused> _Elem) noexcept {
         return _Nested_awaitable<_Rty, _Vty, _Alloc>{std::move(_Elem.range)};
     }
+    // clang-format on
 
     // clang-format off
-        template <::std::ranges::input_range _Rng, class _Alloc>
-            requires std::convertible_to<::std::ranges::range_reference_t<_Rng>, _Yielded>
-        [[nodiscard]] auto yield_value(::co_context::ranges::elements_of<_Rng, _Alloc> _Elem) noexcept {
+    template <::std::ranges::input_range _Rng, class _Alloc>
+        requires std::convertible_to<::std::ranges::range_reference_t<_Rng>, _Yielded>
+    [[nodiscard]] auto yield_value(::co_context::ranges::elements_of<_Rng, _Alloc> _Elem) noexcept {
         // clang-format on
         using _Vty = ::std::ranges::range_value_t<_Rng>;
         return _Nested_awaitable<_Yielded, _Vty, _Alloc>{
