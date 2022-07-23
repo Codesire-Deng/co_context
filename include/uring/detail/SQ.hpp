@@ -1,5 +1,6 @@
 #pragma once
 
+#include <numeric>
 #include "uring/SQEntry.hpp"
 
 namespace liburingcxx {
@@ -44,7 +45,7 @@ namespace detail {
         }
 
         void initFreeQueue() noexcept {
-            for (unsigned int i = 0; i < ring_entries; ++i) { array[i] = i; }
+            std::iota(array, array + ring_entries, 0);
         }
 
         /**
