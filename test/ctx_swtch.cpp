@@ -4,13 +4,14 @@
 
 using namespace co_context;
 
-constexpr uint32_t total_switch = 1e8;
+constexpr uint32_t total_switch = 2e8;
 uint32_t count = 0;
 
 task<> run() {
     auto start = std::chrono::steady_clock::now();
 
-    while (++count < total_switch) [[likely]] co_await lazy::yield();
+    while (++count < total_switch) [[likely]]
+        co_await lazy::yield();
 
     if (count == total_switch) [[unlikely]] {
         auto end = std::chrono::steady_clock::now();
