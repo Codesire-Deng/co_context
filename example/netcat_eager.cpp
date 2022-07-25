@@ -51,7 +51,9 @@ co_context::task<> run(co_context::socket peer) {
     char buf[8192];
     int nr = 0;
 
-    while (true) { co_await peer.eager_recv(buf, 0); }
+    while (true) {
+        co_await peer.eager_recv(buf, 0);
+    }
 
     peer.eager_close().detach();
     ::exit(0);

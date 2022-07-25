@@ -121,7 +121,8 @@ void check_for_index_file() {
  * */
 
 void strtolower(char *str) {
-    for (; *str; ++str) *str = (char)tolower(*str);
+    for (; *str; ++str)
+        *str = (char)tolower(*str);
 }
 
 /*
@@ -262,7 +263,9 @@ void copy_file_contents(char *file_path, off_t file_size, struct iovec *iov) {
 
     /* We should really check for short reads here */
     int ret = read(fd, buf, file_size);
-    if (ret < file_size) { fprintf(stderr, "Encountered a short read.\n"); }
+    if (ret < file_size) {
+        fprintf(stderr, "Encountered a short read.\n");
+    }
     close(fd);
 
     iov->iov_base = buf;
@@ -495,7 +498,9 @@ void sigint_handler(int signo) {
 }
 
 int main() {
-    if (check_kernel_version()) { return EXIT_FAILURE; }
+    if (check_kernel_version()) {
+        return EXIT_FAILURE;
+    }
     check_for_index_file();
     int server_socket = setup_listening_socket(DEFAULT_SERVER_PORT);
     printf("ZeroHTTPd listening on port: %d\n", DEFAULT_SERVER_PORT);

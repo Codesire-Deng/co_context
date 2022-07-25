@@ -35,7 +35,8 @@ constexpr int countBlocks(size_t size, unsigned block_sz) noexcept {
 }
 
 void output(std::string_view s) noexcept {
-    for (char c : s) putchar(c);
+    for (char c : s)
+        putchar(c);
 }
 
 using URing = liburingcxx::URing<0>;
@@ -109,7 +110,9 @@ int main(int argc, char *argv[]) {
             waitResultAndPrint(ring);
         } catch (const std::system_error &e) {
             cerr << e.what() << "\n" << e.code() << "\n";
-        } catch (const std::exception &e) { cerr << e.what() << '\n'; }
+        } catch (const std::exception &e) {
+            cerr << e.what() << '\n';
+        }
     }
 
     return 0;

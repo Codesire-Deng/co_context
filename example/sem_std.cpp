@@ -51,7 +51,9 @@ class alignas(128 /*std::hardware_destructive_interference_size*/) Guide {
     void visualize(unsigned id, unsigned x_scale = 2) const {
         auto cout_n = [=](auto str, unsigned n) {
             n *= x_scale;
-            while (n-- > 0) { std::cout << str; }
+            while (n-- > 0) {
+                std::cout << str;
+            }
         };
         auto lk = std::lock_guard(cout_mutex);
 

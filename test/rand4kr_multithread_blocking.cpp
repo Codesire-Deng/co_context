@@ -26,7 +26,9 @@ restart:
     const size_t off = (rng() % file_size) & ~(BLOCK_LEN - 1);
     (void)buf_idx.fetch_add(1);
     int nr = ::pread(file_fd, buf[idx], BLOCK_LEN, off);
-    if (nr < 0) { perror("read err"); }
+    if (nr < 0) {
+        perror("read err");
+    }
 
     int ref = remain.fetch_sub(1);
     if (ref <= 0) [[unlikely]] {
@@ -63,9 +65,13 @@ int main(int argc, char *argv[]) {
 
     std::vector<std::thread> ths;
 
-    for (int i = 0; i < concur; ++i) { ths.emplace_back(run, i); }
+    for (int i = 0; i < concur; ++i) {
+        ths.emplace_back(run, i);
+    }
 
-    for (int i = 0; i < concur; ++i) { ths[i].join(); }
+    for (int i = 0; i < concur; ++i) {
+        ths[i].join();
+    }
 
     return 0;
 }

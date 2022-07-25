@@ -54,7 +54,9 @@ namespace detail {
             assert(
                 !(old_state & io_wait) && "logic error: detach after waited"
             );
-            if (old_state & io_ready) { delete shared_io_info; }
+            if (old_state & io_ready) {
+                delete shared_io_info;
+            }
         }
 
       protected:

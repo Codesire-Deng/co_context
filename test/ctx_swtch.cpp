@@ -28,7 +28,8 @@ task<> run() {
 int main() {
     io_context ctx{32768};
 
-    for (int i = 0; i < config::swap_capacity / 2; ++i) ctx.co_spawn(run());
+    for (int i = 0; i < config::swap_capacity / 2; ++i)
+        ctx.co_spawn(run());
 
     ctx.run();
 

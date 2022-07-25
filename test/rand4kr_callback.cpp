@@ -39,7 +39,9 @@ task<> run() {
     const size_t off = (rng() % file_size) & ~(BLOCK_LEN - 1);
     const int idx = buf_idx.fetch_add(1) % threads;
     int nr = co_await lazy::read(file_fd, buf[idx], off);
-    if (nr < 0) { perror("read err"); }
+    if (nr < 0) {
+        perror("read err");
+    }
 
     if (remain.fetch_sub(1) == 0) [[unlikely]] {
         printf("All done\n");
@@ -74,7 +76,8 @@ int main(int argc, char *argv[]) {
 
     int concur = std::min(MAX_ON_FLY, times);
     remain.store(times - concur);
-    for (int i = 0; i < concur; ++i) context.co_spawn(run());
+    for (int i = 0; i < concur; ++i)
+        context.co_spawn(run());
 
     context.run();
 

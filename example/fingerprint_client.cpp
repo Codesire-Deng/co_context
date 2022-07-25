@@ -25,7 +25,9 @@ task<> run(co_context::socket sock, const uint32_t offset) {
     auto log = [](std::string_view tag, uint32_t x) {
 #ifndef NDEBUG
         printf("%s: %08x", tag.data(), x);
-        for (auto c : as_buf(&x)) { printf(" %hhx", c); }
+        for (auto c : as_buf(&x)) {
+            printf(" %hhx", c);
+        }
         printf("\n");
 #endif
     };

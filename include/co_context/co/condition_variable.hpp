@@ -71,7 +71,9 @@ class condition_variable final {
 
     template<std::predicate Pred>
     task<void> wait(mutex &mtx, Pred stop_waiting) {
-        while (!stop_waiting()) { co_await this->wait(mtx); }
+        while (!stop_waiting()) {
+            co_await this->wait(mtx);
+        }
     }
 
     void notify_one() noexcept {

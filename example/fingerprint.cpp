@@ -22,7 +22,9 @@ task<> run(co_context::socket sock) {
     auto log = [](std::string_view tag, uint32_t x) {
 #ifndef NDEBUG
         printf("%s: %08x", tag.data(), x);
-        for (auto c : as_buf(&x)) { printf(" %hhx", c); }
+        for (auto c : as_buf(&x)) {
+            printf(" %hhx", c);
+        }
         printf("\n");
 #endif
     };
@@ -38,7 +40,8 @@ task<> run(co_context::socket sock) {
         offset &= ~(BLOCK_LEN - 1);
         co_await lazy::read(file_fd, as_buf(as_uint), offset);
         uint32_t hashcode = as_uint[0];
-        for (int i = 1; i < BLOCK_LEN / 4; ++i) hashcode ^= as_uint[i];
+        for (int i = 1; i < BLOCK_LEN / 4; ++i)
+            hashcode ^= as_uint[i];
         log("send hash", hashcode);
         co_await sock.send(as_buf(&hashcode), 0);
         // t_send = std::chrono::steady_clock::now();
@@ -55,7 +58,9 @@ task<> run(co_context::socket sock) {
     // std::chrono::duration<double, std::milli> t_internal = t_send - t_recv;
     // printf("Internal Time = %g ms\n", t_internal.count());
 
-    if (nr != 0) { fprintf(stderr, "short recv: %d\n", nr); }
+    if (nr != 0) {
+        fprintf(stderr, "short recv: %d\n", nr);
+    }
 }
 
 task<> server(uint16_t port, std::filesystem::path path) {

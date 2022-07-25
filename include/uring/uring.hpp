@@ -442,7 +442,9 @@ class [[nodiscard]] URing final {
                 flags = IORING_ENTER_GETEVENTS | data.getFlags;
                 isNeedEnter = true;
             }
-            if (data.submit && isSQRingNeedEnter(flags)) { isNeedEnter = true; }
+            if (data.submit && isSQRingNeedEnter(flags)) {
+                isNeedEnter = true;
+            }
             if (!isNeedEnter) return cqe;
 
             // TODO Upgrade for ring.int_flags & INT_FLAG_REG_RING

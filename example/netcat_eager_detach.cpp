@@ -64,7 +64,8 @@ co_context::task<> run(co_context::socket peer) {
     int nr = 0;
 
     while (true) {
-        for (int i = 0; i < 10; ++i) peer.eager_recv(buf, 0).detach();
+        for (int i = 0; i < 10; ++i)
+            peer.eager_recv(buf, 0).detach();
         std::this_thread::sleep_for(std::chrono::microseconds(1));
     }
 

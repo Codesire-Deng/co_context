@@ -22,7 +22,9 @@ co_context::generator<uint64_t> fib(int max) {
 } // namespace co_context::generator<uint64_t>fib(intmax)
 
 co_context::generator<int> other_generator(int i, int j) {
-    while (i != j) { co_yield i++; }
+    while (i != j) {
+        co_yield i++;
+    }
 }
 
 /////////////////////
@@ -126,7 +128,9 @@ co_context::generator<X &> lvalue_example() {
 // value_type = std::unique_ptr<int>
 // reference = std::unique_ptr<int>&&
 co_context::generator<std::unique_ptr<int> &&> unique_ints(const int high) {
-    for (auto i = 0; i < high; ++i) { co_yield std::make_unique<int>(i); }
+    for (auto i = 0; i < high; ++i) {
+        co_yield std::make_unique<int>(i);
+    }
 }
 
 // value_type = std::string_view
@@ -143,7 +147,9 @@ co_context::generator<std::string_view, std::string>
 strings(std::allocator_arg_t, Allocator) {
     co_yield {};
     co_yield "start";
-    for (auto sv : string_views()) { co_yield std::string{sv} + '!'; }
+    for (auto sv : string_views()) {
+        co_yield std::string{sv} + '!';
+    }
     co_yield "end";
 }
 
@@ -151,7 +157,9 @@ strings(std::allocator_arg_t, Allocator) {
 template<std::ranges::input_range R>
 std::vector<std::ranges::range_value_t<R>> to_vector(R &&r) {
     std::vector<std::ranges::range_value_t<R>> v;
-    for (auto &&x : r) { v.emplace_back(static_cast<decltype(x) &&>(x)); }
+    for (auto &&x : r) {
+        v.emplace_back(static_cast<decltype(x) &&>(x));
+    }
     return v;
 }
 
@@ -184,13 +192,16 @@ zip(Rs &&...rs) {
 
 void value_type_example() {
     std::vector<std::string_view> s1 = to_vector(string_views());
-    for (auto &s : s1) std::printf("\"%*s\"\n", (int)s.size(), s.data());
+    for (auto &s : s1)
+        std::printf("\"%*s\"\n", (int)s.size(), s.data());
 
     std::printf("\n");
 
     std::vector<std::string> s2 =
         to_vector(strings(std::allocator_arg, std::allocator<std::byte>{}));
-    for (auto &s : s2) { std::printf("\"%s\"\n", s.c_str()); }
+    for (auto &s : s2) {
+        std::printf("\"%s\"\n", s.c_str());
+    }
 
     std::printf("\n");
 
@@ -261,19 +272,27 @@ int main() {
 
     std::printf("\nby_value_example\n");
 
-    for (auto &&x : always_ref_example()) { std::printf("-> %i\n", x.id); }
+    for (auto &&x : always_ref_example()) {
+        std::printf("-> %i\n", x.id);
+    }
 
     std::printf("\nby_rvalue_ref_example\n");
 
-    for (auto &&x : xvalue_example()) { std::printf("-> %i\n", x.id); }
+    for (auto &&x : xvalue_example()) {
+        std::printf("-> %i\n", x.id);
+    }
 
     std::printf("\nby_const_ref_example\n");
 
-    for (auto &&x : const_lvalue_example()) { std::printf("-> %i\n", x.id); }
+    for (auto &&x : const_lvalue_example()) {
+        std::printf("-> %i\n", x.id);
+    }
 
     std::printf("\nby_lvalue_ref_example\n");
 
-    for (auto &&x : lvalue_example()) { std::printf("-> %i\n", x.id); }
+    for (auto &&x : lvalue_example()) {
+        std::printf("-> %i\n", x.id);
+    }
 
     std::printf("\nvalue_type example\n");
 
