@@ -3,7 +3,6 @@
 #include <co_context/utility/bit.hpp>
 #include <co_context/utility/as_atomic.hpp>
 #include <co_context/config.hpp>
-#include <co_context/log/log.hpp>
 
 namespace co_context {
 
@@ -106,7 +105,6 @@ struct spsc_cursor {
             return;
         }
         if constexpr (config::use_wait_and_notify) {
-            log::i("waiting 0\n");
             as_c_atomic(m_head).wait(head_full, std::memory_order_acquire);
         } else {
             while (head_full == load_raw_head()) {}
@@ -120,7 +118,6 @@ struct spsc_cursor {
             return;
         }
         if constexpr (config::use_wait_and_notify) {
-            log::i("waiting 1\n");
             as_c_atomic(m_tail).wait(tail_empty, std::memory_order_acquire);
         } else {
             while (tail_empty == load_raw_tail()) {}
