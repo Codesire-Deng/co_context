@@ -76,6 +76,9 @@ class [[nodiscard]] io_context final {
     // if there is at least one entry to submit to io_uring
     bool need_ring_submit = false;
 
+    // if there is at least one task newly spawned or forwarded
+    bool has_task_ready = false;
+
     // should io_context stop
     bool will_stop = false;
 

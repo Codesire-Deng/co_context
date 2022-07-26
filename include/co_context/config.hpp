@@ -78,8 +78,7 @@ namespace config {
 
     // ======================= io_context configuration =======================
     // Enabling this would significantly increase latency in multi-thread model.
-    inline constexpr bool use_wait_and_notify = false;
-    static_assert(!use_wait_and_notify || worker_threads_number != 0);
+    inline constexpr bool use_wait_and_notify = true;
 
     using swap_capacity_size_t = uint16_t;
     using cur_t = swap_capacity_size_t;

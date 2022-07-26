@@ -3,6 +3,7 @@
 #include <co_context/utility/bit.hpp>
 #include <co_context/utility/as_atomic.hpp>
 #include <co_context/config.hpp>
+#include <co_context/log/log.hpp>
 
 namespace co_context {
 
@@ -100,7 +101,12 @@ struct spsc_cursor {
 
     inline void wait_for_available() const noexcept {
         const T head_full = m_tail - capacity;
+        if constexpr (!need_thread_safe) {
+            assert(head_full != load_raw_head());
+            return;
+        }
         if constexpr (config::use_wait_and_notify) {
+            log::i("waiting 0\n");
             as_c_atomic(m_head).wait(head_full, std::memory_order_acquire);
         } else {
             while (head_full == load_raw_head()) {}
@@ -109,7 +115,12 @@ struct spsc_cursor {
 
     inline void wait_for_not_empty() const noexcept {
         const T tail_empty = m_head;
+        if constexpr (!need_thread_safe) {
+            assert(tail_empty != load_raw_tail());
+            return;
+        }
         if constexpr (config::use_wait_and_notify) {
+            log::i("waiting 1\n");
             as_c_atomic(m_tail).wait(tail_empty, std::memory_order_acquire);
         } else {
             while (tail_empty == load_raw_tail()) {}
@@ -132,14 +143,14 @@ struct spsc_cursor {
 
     inline void push_notify(T num = 1) noexcept {
         push(num);
-        if constexpr (config::use_wait_and_notify)
-            as_c_atomic(m_tail).notify_one();
+        if constexpr (need_thread_safe && config::use_wait_and_notify)
+            as_atomic(m_tail).notify_one(); 
     }
 
     inline void pop_notify(T num = 1) noexcept {
         pop(num);
-        if constexpr (config::use_wait_and_notify)
-            as_c_atomic(m_head).notify_one();
+        if constexpr (need_thread_safe && config::use_wait_and_notify)
+            as_atomic(m_head).notify_one();
     }
 };
 
