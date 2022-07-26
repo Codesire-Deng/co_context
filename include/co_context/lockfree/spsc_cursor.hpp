@@ -144,7 +144,7 @@ struct spsc_cursor {
     inline void push_notify(T num = 1) noexcept {
         push(num);
         if constexpr (need_thread_safe && config::use_wait_and_notify)
-            as_atomic(m_tail).notify_one(); 
+            as_atomic(m_tail).notify_one();
     }
 
     inline void pop_notify(T num = 1) noexcept {
