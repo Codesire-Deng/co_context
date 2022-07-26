@@ -501,7 +501,7 @@ static bool eager_io_need_awake(detail::task_info *io_info) {
  */
 inline void io_context::poll_completion() noexcept {
     // reap round
-    const liburingcxx::CQEntry *polling_cqe = ring.peekCQEntry();
+    const liburingcxx::CQEntry *const polling_cqe = ring.peekCQEntry();
     if (polling_cqe == nullptr) return;
 
     --requests_to_reap;
@@ -655,48 +655,49 @@ void io_context::co_spawn(std::coroutine_handle<> entrance) noexcept {
             }
         }}.detach();
 
-    while (!will_stop) [[likely]] {
-        if constexpr (config::worker_threads_number == 0) {
-            has_task_ready = false;
-            auto num = worker[0].number_to_schedule_relaxed();
-            log::v("worker run %u times...\n", num);
-            while (num--) {
-                worker[0].worker_run_once();
+    while (!will_stop)
+        [[likely]] {
+            if constexpr (config::worker_threads_number == 0) {
+                has_task_ready = false;
+                auto num = worker[0].number_to_schedule_relaxed();
+                log::v("worker run %u times...\n", num);
+                while (num--) {
+                    worker[0].worker_run_once();
+                }
             }
-        }
 
-        // if (try_clear_submit_overflow_buf()) {
-        // log::v("ctx poll_submission...\n");
-        if constexpr (config::submit_poll_rounds > 1)
-            for (uint8_t i = 0; i < config::submit_poll_rounds; ++i) {
-                if (!poll_submission()) break;
-            }
-        else
-            poll_submission();
-        // }
+            // if (try_clear_submit_overflow_buf()) {
+            // log::v("ctx poll_submission...\n");
+            if constexpr (config::submit_poll_rounds > 1)
+                for (uint8_t i = 0; i < config::submit_poll_rounds; ++i) {
+                    if (!poll_submission()) break;
+                }
+            else
+                poll_submission();
+            // }
 
-        if constexpr (!config::use_standalone_completion_poller) {
-            // TODO judge the memory order (relaxed may cause bugs)
-            // TODO consider reap_poll_rounds and reap_overflow_buf
-            if (requests_to_reap > 0) {
-                auto num = ring.CQReadyRelaxed();
+            if constexpr (!config::use_standalone_completion_poller) {
+                // TODO judge the memory order (relaxed may cause bugs)
+                // TODO consider reap_poll_rounds and reap_overflow_buf
+                if (requests_to_reap > 0) {
+                    auto num = ring.CQReadyRelaxed();
 
-                // io_context can block itself in the following situation
-                if constexpr (config::worker_threads_number == 0 && config::use_wait_and_notify) {
-                    if (num == 0 && !has_task_ready) [[unlikely]] {
-                        ring.waitCQEntry();
-                        num = ring.CQReadyRelaxed();
+                    // io_context can block itself in the following situation
+                    if constexpr (config::worker_threads_number == 0 && config::use_wait_and_notify) {
+                        if (num == 0 && !has_task_ready) [[unlikely]] {
+                            ring.waitCQEntry();
+                            num = ring.CQReadyRelaxed();
+                        }
+                    }
+
+                    // TODO enhance perf here: reuse the internal head-tail
+                    // infomation of the ring
+                    while (num--) {
+                        poll_completion();
                     }
                 }
-
-                // TODO enhance perf here: reuse the internal head-tail
-                // infomation of the ring
-                while (num--) {
-                    poll_completion();
-                }
             }
         }
-    }
 
     this->stop();
 }
