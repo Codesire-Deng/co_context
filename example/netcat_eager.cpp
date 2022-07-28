@@ -1,15 +1,4 @@
-// #include <mimalloc-new-delete.h>
-#include "co_context/io_context.hpp"
-#include <thread>
-
-#include <string.h>
-#include <unistd.h>
-
-#include "co_context/net/inet_address.hpp"
-#include "co_context/net/acceptor.hpp"
-#include "co_context/net/socket.hpp"
-#include "co_context/task.hpp"
-
+#include "co_context/net.hpp"
 #include <string_view>
 
 // TODO 性能受 swap_capacity 影响明显，需分析原因
@@ -89,7 +78,7 @@ int main(int argc, const char *argv[]) {
     }
 
     using namespace co_context;
-    io_context context{32768};
+    io_context context;
 
     int port = atoi(argv[2]);
     if (strcmp(argv[1], "-l") == 0) {

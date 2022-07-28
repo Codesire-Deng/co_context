@@ -1,6 +1,7 @@
 #pragma once
 
 #include <concepts>
+#include <bit>
 
 namespace co_context {
 

@@ -1,4 +1,3 @@
-// #include <mimalloc-new-delete.h>
 #include "co_context/io_context.hpp"
 #include "co_context/lazy_io.hpp"
 #include <filesystem>
@@ -59,7 +58,7 @@ int main(int argc, char *argv[]) {
     // file_size = argc == 4 ? atoll(argv[3]) : 60'000'000;
     file_size = argc == 4 ? atoll(argv[3]) : 15'000'000'000ULL;
 
-    co_context::io_context context{32768};
+    co_context::io_context context;
 
     const int concur = std::min<int>(MAX_ON_FLY, times);
     remain.store(times - concur);

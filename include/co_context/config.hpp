@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include "uring/io_uring.h"
+#include <bit>
 
 namespace co_context {
 
@@ -99,6 +100,9 @@ namespace config {
     inline constexpr swap_capacity_size_t swap_capacity = 16384;
     // inline constexpr swap_capacity_size_t swap_capacity = 32768;
     static_assert(swap_capacity % 4 == 0);
+
+    inline constexpr uint32_t default_io_uring_entries =
+        std::bit_ceil<uint32_t>(swap_capacity * 2U * workers_number);
 
     inline constexpr uint8_t submit_poll_rounds = 1;
 

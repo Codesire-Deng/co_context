@@ -3,8 +3,8 @@
 #include <cstddef>
 #include <iomanip>
 #include <iostream>
-#include "co_context/co/mutex.hpp"
 #include <random>
+#include "co_context/co/mutex.hpp"
 #include "co_context/co/semaphore.hpp"
 #include "co_context/io_context.hpp"
 #include "co_context/task.hpp"
@@ -93,7 +93,7 @@ task<> workerThread(unsigned id) {
 }
 
 int main() {
-    io_context ctx{32768};
+    io_context ctx;
 
     for (auto id{0U}; id != max_threads; ++id) {
         ctx.co_spawn(workerThread(id));

@@ -1,4 +1,3 @@
-// #include <mimalloc-new-delete.h>
 #include "co_context/io_context.hpp"
 #include <filesystem>
 #include <random>
@@ -58,7 +57,7 @@ int main(int argc, char *argv[]) {
     // file_size = argc == 4 ? atoll(argv[3]) : 60'000'000;
     file_size = argc == 4 ? atoll(argv[3]) : 15'000'000'000ULL;
 
-    volatile co_context::io_context context{32768};
+    volatile co_context::io_context context;
 
     const int concur = std::min<int>(threads, times);
     remain.store(times - concur);

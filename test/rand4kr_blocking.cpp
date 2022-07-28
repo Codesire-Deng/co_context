@@ -1,4 +1,3 @@
-// #include <mimalloc-new-delete.h>
 #include "co_context/io_context.hpp"
 #include "co_context/net/acceptor.hpp"
 #include "co_context/utility/buffer.hpp"
@@ -62,7 +61,7 @@ int main(int argc, char *argv[]) {
     times = atoi(argv[2]);
     file_size = argc == 4 ? atoll(argv[3]) : 1'000'000'000;
 
-    io_context context{32768};
+    io_context context;
 
     context.co_spawn([]() -> task<> {
         std::mt19937_64 rng(0);

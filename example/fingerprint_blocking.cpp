@@ -1,9 +1,4 @@
-// #include <mimalloc-new-delete.h>
-#include "co_context/io_context.hpp"
-#include "co_context/net/acceptor.hpp"
-#include "co_context/utility/buffer.hpp"
-#include "co_context/lazy_io.hpp"
-#include "co_context/eager_io.hpp"
+#include "co_context/all.hpp"
 #include <filesystem>
 #include <fcntl.h>
 
@@ -88,7 +83,7 @@ int main(int argc, char *argv[]) {
     }
 
     const int port = atoi(argv[1]);
-    io_context context{32768};
+    io_context context;
     context.co_spawn(server(port, argv[2]));
 
     context.run();
