@@ -235,6 +235,7 @@ namespace detail {
 } // namespace detail
 
 void io_context::forward_task(std::coroutine_handle<> handle) noexcept {
+    has_task_ready = true;
     // TODO optimize scheduling strategy
     if (try_find_reap_worker_relaxed()) [[likely]] {
         auto &cur = worker[r_cur].sharing.reap_cur;
@@ -372,13 +373,17 @@ void io_context::try_submit(detail::submit_info &info) noexcept {
     if (info.address == 0) [[likely]] {
         // submit to ring
         ++requests_to_reap;
-        log::v("ctx ring.submit(), requests_to_reap=%d...\n", requests_to_reap);
+        log::v(
+            "ring.appendSQEntry()"
+            " with requests_to_reap=%d...\n",
+            requests_to_reap
+        );
         need_ring_submit = true;
         ring.appendSQEntry(info.submit_sqe);
         auto *const victim_sqe = ring.getSQEntry();
         assert(victim_sqe != nullptr && "ring.getSQEntry() returns nullptr!");
         info.available_sqe = victim_sqe;
-        log::v("ctx ring.submit()...OK\n");
+        log::v("ring.appendSQEntry()...OK\n");
         return;
     } else {
         using task_type = task_info::task_type;
@@ -410,7 +415,9 @@ void io_context::try_submit(detail::submit_info &info) noexcept {
  */
 bool io_context::poll_submission() noexcept {
     // submit round
-    if (!try_find_submit_worker_relaxed()) { return false; }
+    if (!try_find_submit_worker_relaxed()) {
+        return false;
+    }
     auto &cur = worker[s_cur].sharing.submit_cur;
     auto &swap = worker[s_cur].sharing.submit_swap;
 
@@ -420,18 +427,20 @@ bool io_context::poll_submission() noexcept {
     auto tail{cur.load_raw_tail()};
     const auto submit_count = tail - head;
 
-    need_ring_submit = false;
-
     for (; head != tail; ++head) {
         const auto i{head & cur.mask};
         // log::d("ctx poll_submission at [%u][%u]\n", s_cur, i);
+        log::v("ctx try_submit(swap[%d])\n", i);
         try_submit(swap[i]); // always success (currently).
     }
 
     cur.pop_notify(submit_count);
     cur_next(s_cur);
 
-    if (need_ring_submit) { ring.submit(); }
+    if (need_ring_submit) {
+        ring.submit();
+        need_ring_submit = false;
+    }
 
     return true;
 }
@@ -601,14 +610,14 @@ void io_context::probe() const {
 }
 
 inline void io_context::make_thread_pool() {
-    log::v("ctx making thread pool\n");
+    log::v("ctx make_thread_pool()...\n");
 
     for (config::tid_t i = 0; i < config::worker_threads_number; ++i) {
         worker[i].host_thread =
             std::thread{&worker_meta::worker_run_loop, worker + i, i, this};
     }
 
-    log::v("ctx make_thread_pool end\n");
+    log::v("ctx make_thread_pool()...OK\n");
 }
 
 void io_context::co_spawn(task<void> &&entrance) noexcept {
@@ -640,40 +649,54 @@ void io_context::co_spawn(std::coroutine_handle<> entrance) noexcept {
             log::i("ctx completion_poller runs on %d\n", gettid());
             while (true) {
                 auto num = ring.CQReadyAcquire();
-                while (num--) { poll_completion(); }
+                while (num--) {
+                    poll_completion();
+                }
             }
         }}.detach();
 
     while (!will_stop) [[likely]] {
-            if constexpr (config::worker_threads_number == 0) {
-                auto num = worker[0].number_to_schedule_relaxed();
-                log::v("worker run %u times...\n", num);
-                while (num--) { worker[0].worker_run_once(); }
+        if constexpr (config::worker_threads_number == 0) {
+            has_task_ready = false;
+            auto num = worker[0].number_to_schedule_relaxed();
+            log::v("worker run %u times...\n", num);
+            while (num--) {
+                worker[0].worker_run_once();
             }
+        }
 
-            // if (try_clear_submit_overflow_buf()) {
-            // log::v("ctx poll_submission...\n");
-            if constexpr (config::submit_poll_rounds > 1)
-                for (uint8_t i = 0; i < config::submit_poll_rounds; ++i) {
-                    if (!poll_submission()) break;
+        // if (try_clear_submit_overflow_buf()) {
+        // log::v("ctx poll_submission...\n");
+        if constexpr (config::submit_poll_rounds > 1)
+            for (uint8_t i = 0; i < config::submit_poll_rounds; ++i) {
+                if (!poll_submission()) break;
+            }
+        else
+            poll_submission();
+        // }
+
+        if constexpr (!config::use_standalone_completion_poller) {
+            // TODO judge the memory order (relaxed may cause bugs)
+            // TODO consider reap_poll_rounds and reap_overflow_buf
+            if (requests_to_reap > 0) {
+                auto num = ring.CQReadyRelaxed();
+
+                // io_context can block itself in the following situation
+                if constexpr (config::worker_threads_number == 0 && config::use_wait_and_notify) {
+                    if (num == 0 && !has_task_ready) [[unlikely]] {
+                        ring.waitCQEntry();
+                        num = ring.CQReadyRelaxed();
+                    }
                 }
-            else
-                poll_submission();
-            // }
 
-            if constexpr (!config::use_standalone_completion_poller) {
-                // if (requests_to_reap > 1)
-                //     log::w("abnormal requests_to_reap=%d\n",
-                //     requests_to_reap);
-                // TODO judge the memory order (relaxed may cause bugs)
-                // TODO consider reap_poll_rounds and reap_overflow_buf
-                // log::v("ctx poll_completion...\n");
-                if (requests_to_reap > 0) {
-                    auto num = ring.CQReadyRelaxed();
-                    while (num--) { poll_completion(); }
+                // TODO enhance perf here: reuse the internal head-tail
+                // infomation of the ring
+                while (num--) {
+                    poll_completion();
                 }
             }
         }
+    }
 
     this->stop();
 }

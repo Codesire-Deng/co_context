@@ -16,7 +16,9 @@ constexpr int concur = 2;
 
 task<> workload() {
     int now = finish.fetch_add(1) + 1;
-    if (now > times) { printf("logic error!\n"); }
+    if (now > times) {
+        printf("logic error!\n");
+    }
     if (now == times) {
         printf("All done!\n");
         ::exit(0);
@@ -26,7 +28,9 @@ task<> workload() {
 }
 
 task<> gen_task() {
-    for (int i = 0; i < times / concur; ++i) { co_spawn(workload()); }
+    for (int i = 0; i < times / concur; ++i) {
+        co_spawn(workload());
+    }
     co_await eager::nop();
 }
 
@@ -39,9 +43,10 @@ int main(int argc, char *argv[]) {
     times = atoi(argv[1]);
     times -= times % concur;
 
-    io_context context{32768};
+    io_context context;
 
-    for (int i = 0; i < concur; ++i) context.co_spawn(gen_task());
+    for (int i = 0; i < concur; ++i)
+        context.co_spawn(gen_task());
 
     context.run();
 

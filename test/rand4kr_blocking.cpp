@@ -1,4 +1,3 @@
-// #include <mimalloc-new-delete.h>
 #include "co_context/io_context.hpp"
 #include "co_context/net/acceptor.hpp"
 #include "co_context/utility/buffer.hpp"
@@ -25,7 +24,9 @@ task<> run(size_t offset) {
     auto log = [](std::string_view tag, uint32_t x) {
 #ifndef NDEBUG
         printf("%s: %08x", tag.data(), x);
-        for (auto c : as_buf(&x)) { printf(" %hhx", c); }
+        for (auto c : as_buf(&x)) {
+            printf(" %hhx", c);
+        }
         printf("\n");
 #endif
     };
@@ -60,7 +61,7 @@ int main(int argc, char *argv[]) {
     times = atoi(argv[2]);
     file_size = argc == 4 ? atoll(argv[3]) : 1'000'000'000;
 
-    io_context context{32768};
+    io_context context;
 
     context.co_spawn([]() -> task<> {
         std::mt19937_64 rng(0);

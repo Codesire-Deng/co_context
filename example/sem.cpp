@@ -3,8 +3,8 @@
 #include <cstddef>
 #include <iomanip>
 #include <iostream>
-#include "co_context/co/mutex.hpp"
 #include <random>
+#include "co_context/co/mutex.hpp"
 #include "co_context/co/semaphore.hpp"
 #include "co_context/io_context.hpp"
 #include "co_context/task.hpp"
@@ -58,7 +58,9 @@ class alignas(128 /*std::hardware_destructive_interference_size*/) Guide {
     task<void> visualize(unsigned id, unsigned x_scale = 2) const {
         auto cout_n = [=](auto str, unsigned n) {
             n *= x_scale;
-            while (n-- > 0) { std::cout << str; }
+            while (n-- > 0) {
+                std::cout << str;
+            }
         };
         auto guard = co_await cout_mutex.lock_guard();
         std::cout << "#" << std::setw(2) << id << " ";
@@ -91,7 +93,7 @@ task<> workerThread(unsigned id) {
 }
 
 int main() {
-    io_context ctx{32768};
+    io_context ctx;
 
     for (auto id{0U}; id != max_threads; ++id) {
         ctx.co_spawn(workerThread(id));

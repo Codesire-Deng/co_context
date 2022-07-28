@@ -16,8 +16,11 @@ class io_context;
 namespace detail {
 
     struct worker_meta final {
-        enum class [[deprecated]] worker_state : uint8_t{
-            running, idle, blocked};
+        enum class [[deprecated]] worker_state : uint8_t {
+            running,
+            idle,
+            blocked
+        };
 
         using cur_t = config::cur_t;
 

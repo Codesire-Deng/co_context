@@ -62,7 +62,7 @@ task<> main_thread() {
 }
 
 int main() {
-    io_context ctx{32768};
+    io_context ctx;
     ctx.co_spawn(worker_thread());
     ctx.co_spawn(main_thread());
 

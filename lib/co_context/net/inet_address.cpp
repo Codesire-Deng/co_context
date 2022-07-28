@@ -134,7 +134,7 @@ std::vector<inet_address> inet_address::resolve_all(
     }
 
     assert(result != nullptr);
-    Defer guard{[result] {
+    defer guard{[result] {
         freeaddrinfo(result);
     }};
 

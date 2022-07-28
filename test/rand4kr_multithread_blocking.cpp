@@ -1,4 +1,3 @@
-// #include <mimalloc-new-delete.h>
 #include "co_context/io_context.hpp"
 #include <filesystem>
 #include <random>
@@ -26,7 +25,9 @@ restart:
     const size_t off = (rng() % file_size) & ~(BLOCK_LEN - 1);
     (void)buf_idx.fetch_add(1);
     int nr = ::pread(file_fd, buf[idx], BLOCK_LEN, off);
-    if (nr < 0) { perror("read err"); }
+    if (nr < 0) {
+        perror("read err");
+    }
 
     int ref = remain.fetch_sub(1);
     if (ref <= 0) [[unlikely]] {
@@ -56,16 +57,20 @@ int main(int argc, char *argv[]) {
     // file_size = argc == 4 ? atoll(argv[3]) : 60'000'000;
     file_size = argc == 4 ? atoll(argv[3]) : 15'000'000'000ULL;
 
-    volatile co_context::io_context context{32768};
+    volatile co_context::io_context context;
 
     const int concur = std::min<int>(threads, times);
     remain.store(times - concur);
 
     std::vector<std::thread> ths;
 
-    for (int i = 0; i < concur; ++i) { ths.emplace_back(run, i); }
+    for (int i = 0; i < concur; ++i) {
+        ths.emplace_back(run, i);
+    }
 
-    for (int i = 0; i < concur; ++i) { ths[i].join(); }
+    for (int i = 0; i < concur; ++i) {
+        ths[i].join();
+    }
 
     return 0;
 }

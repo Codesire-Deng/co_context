@@ -40,8 +40,9 @@ using _Rebind = typename std::allocator_traits<_Alloc>::template rebind_alloc<
     _Aligned_block>;
 
 template<class _Alloc>
-concept _Has_real_pointers = std::same_as<_Alloc, void> || std::is_pointer_v<
-    typename std::allocator_traits<_Alloc>::pointer>;
+concept _Has_real_pointers =
+    std::same_as<_Alloc, void>
+    || std::is_pointer_v<typename std::allocator_traits<_Alloc>::pointer>;
 
 template<class _Allocator = void>
 class _Promise_allocator { // statically specified allocator type
@@ -71,8 +72,9 @@ class _Promise_allocator { // statically specified allocator type
     }
 
   public:
-    static void *operator new(const size_t _Size
-    ) requires std::default_initializable<_Alloc> {
+    static void *operator new(const size_t _Size)
+        requires std::default_initializable<_Alloc>
+    {
         return _Allocate(_Alloc{}, _Size);
     }
 
@@ -288,27 +290,29 @@ class _Gen_promise_base {
     }
 
     // clang-format off
-        [[nodiscard]] auto yield_value(const std::remove_reference_t<_Yielded>& _Val)
-            noexcept(std::is_nothrow_constructible_v<std::remove_cvref_t<_Yielded>, const std::remove_reference_t<_Yielded>&>)
-            requires (std::is_rvalue_reference_v<_Yielded> &&
-                std::constructible_from<std::remove_cvref_t<_Yielded>, const std::remove_reference_t<_Yielded>&>) {
-        // clang-format on
+    [[nodiscard]] auto yield_value(const std::remove_reference_t<_Yielded>& _Val)
+        noexcept(std::is_nothrow_constructible_v<std::remove_cvref_t<_Yielded>, const std::remove_reference_t<_Yielded>&>)
+        requires (std::is_rvalue_reference_v<_Yielded> &&
+            std::constructible_from<std::remove_cvref_t<_Yielded>, const std::remove_reference_t<_Yielded>&>) {
         return _Element_awaiter{_Val};
     }
 
+    // clang-format on
+
     // clang-format off
-        template <class _Rty, class _Vty, class _Alloc, class _Unused>
-            requires std::same_as<_Gen_yield_t<_Gen_reference_t<_Rty, _Vty>>, _Yielded>
-        [[nodiscard]] auto yield_value(
-            ::co_context::ranges::elements_of<generator<_Rty, _Vty, _Alloc>&&, _Unused> _Elem) noexcept {
-        // clang-format on
+    template <class _Rty, class _Vty, class _Alloc, class _Unused>
+        requires std::same_as<_Gen_yield_t<_Gen_reference_t<_Rty, _Vty>>, _Yielded>
+    [[nodiscard]] auto yield_value(
+        ::co_context::ranges::elements_of<generator<_Rty, _Vty, _Alloc>&&, _Unused> _Elem) noexcept {
         return _Nested_awaitable<_Rty, _Vty, _Alloc>{std::move(_Elem.range)};
     }
 
+    // clang-format on
+
     // clang-format off
-        template <::std::ranges::input_range _Rng, class _Alloc>
-            requires std::convertible_to<::std::ranges::range_reference_t<_Rng>, _Yielded>
-        [[nodiscard]] auto yield_value(::co_context::ranges::elements_of<_Rng, _Alloc> _Elem) noexcept {
+    template <::std::ranges::input_range _Rng, class _Alloc>
+        requires std::convertible_to<::std::ranges::range_reference_t<_Rng>, _Yielded>
+    [[nodiscard]] auto yield_value(::co_context::ranges::elements_of<_Rng, _Alloc> _Elem) noexcept {
         // clang-format on
         using _Vty = ::std::ranges::range_value_t<_Rng>;
         return _Nested_awaitable<_Yielded, _Vty, _Alloc>{
@@ -356,8 +360,7 @@ class _Gen_promise_base {
             _Current._Ptr = ::std::addressof(_Val);
         }
 
-        constexpr void await_resume() const noexcept {
-        }
+        constexpr void await_resume() const noexcept {}
     };
 
     struct _Nest_info {
@@ -378,7 +381,9 @@ class _Gen_promise_base {
 #endif // __cpp_lib_is_pointer_interconvertible
 
             _Gen_promise_base &_Current = _Handle.promise();
-            if (!_Current._Info) { return ::std::noop_coroutine(); }
+            if (!_Current._Info) {
+                return ::std::noop_coroutine();
+            }
 
             std::coroutine_handle<_Gen_promise_base> _Cont =
                 _Current._Info->_Parent;
@@ -387,8 +392,7 @@ class _Gen_promise_base {
             return _Cont;
         }
 
-        void await_resume() noexcept {
-        }
+        void await_resume() noexcept {}
     };
 
     template<class _Rty, class _Vty, class _Alloc>
@@ -501,9 +505,8 @@ class generator
   private:
     using _Value = _Gen_value_t<_Rty, _Vty>;
     static_assert(
-        std::same_as<
-            std::remove_cvref_t<_Value>,
-            _Value> && std::is_object_v<_Value>,
+        std::same_as<std::remove_cvref_t<_Value>, _Value>
+            && std::is_object_v<_Value>,
         "generator's value type must be a cv-unqualified object type"
     );
 
@@ -547,11 +550,12 @@ class generator
 #endif // __cpp_lib_is_pointer_interconvertible
 
     generator(generator &&_That) noexcept
-        : _Coro(::std::exchange(_That._Coro, {})) {
-    }
+        : _Coro(::std::exchange(_That._Coro, {})) {}
 
     ~generator() {
-        if (_Coro) { _Coro.destroy(); }
+        if (_Coro) {
+            _Coro.destroy();
+        }
     }
 
     generator &operator=(generator _That) noexcept {
@@ -579,7 +583,6 @@ class generator
     explicit generator(
         _Gen_secret_tag, std::coroutine_handle<promise_type> _Coro_
     ) noexcept
-        : _Coro(_Coro_) {
-    }
+        : _Coro(_Coro_) {}
 };
 } // namespace co_context

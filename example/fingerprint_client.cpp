@@ -1,8 +1,4 @@
-// #include <mimalloc-new-delete.h>
-#include "co_context/io_context.hpp"
-#include "co_context/net/acceptor.hpp"
-#include "co_context/utility/buffer.hpp"
-#include "co_context/lazy_io.hpp"
+#include "co_context/all.hpp"
 #include <string_view>
 #include <filesystem>
 #include <fcntl.h>
@@ -25,7 +21,9 @@ task<> run(co_context::socket sock, const uint32_t offset) {
     auto log = [](std::string_view tag, uint32_t x) {
 #ifndef NDEBUG
         printf("%s: %08x", tag.data(), x);
-        for (auto c : as_buf(&x)) { printf(" %hhx", c); }
+        for (auto c : as_buf(&x)) {
+            printf(" %hhx", c);
+        }
         printf("\n");
 #endif
     };
@@ -76,7 +74,7 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    io_context context{32768};
+    io_context context;
 
     const int port = atoi(argv[2]);
     concurrency = atoi(argv[3]);

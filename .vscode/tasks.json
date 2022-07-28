@@ -14,8 +14,7 @@
                 "${command:cmake.buildType}",
                 "--target",
                 "${command:cmake.buildTargetName}",
-                "-j",
-                "16"
+                "-j"
             ],
             "group": {
                 "kind": "build",
@@ -27,8 +26,9 @@
             "presentation": {
                 "echo": true,
                 "reveal": "always",
+                "revealProblems": "onProblem",
                 "focus": true,
-                "panel": "shared",
+                "panel": "dedicated",
                 "showReuseMessage": true,
                 "clear": true
             }

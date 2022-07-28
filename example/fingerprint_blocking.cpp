@@ -1,9 +1,4 @@
-// #include <mimalloc-new-delete.h>
-#include "co_context/io_context.hpp"
-#include "co_context/net/acceptor.hpp"
-#include "co_context/utility/buffer.hpp"
-#include "co_context/lazy_io.hpp"
-#include "co_context/eager_io.hpp"
+#include "co_context/all.hpp"
 #include <filesystem>
 #include <fcntl.h>
 
@@ -23,7 +18,9 @@ task<> run(co_context::socket sock) {
     auto log = [](std::string_view tag, uint32_t x) {
 #ifndef NDEBUG
         printf("%s: %08x", tag.data(), x);
-        for (auto c : as_buf(&x)) { printf(" %hhx", c); }
+        for (auto c : as_buf(&x)) {
+            printf(" %hhx", c);
+        }
         printf("\n");
 #endif
     };
@@ -58,7 +55,9 @@ task<> run(co_context::socket sock) {
     // std::chrono::duration<double, std::milli> t_internal = t_send - t_recv;
     // printf("Internal Time = %g ms\n", t_internal.count());
 
-    if (nr != 0) { fprintf(stderr, "short recv: %d\n", nr); }
+    if (nr != 0) {
+        fprintf(stderr, "short recv: %d\n", nr);
+    }
 }
 
 task<> server(uint16_t port, std::filesystem::path path) {
@@ -84,7 +83,7 @@ int main(int argc, char *argv[]) {
     }
 
     const int port = atoi(argv[1]);
-    io_context context{32768};
+    io_context context;
     context.co_spawn(server(port, argv[2]));
 
     context.run();

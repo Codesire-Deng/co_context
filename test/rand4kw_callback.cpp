@@ -1,4 +1,3 @@
-// #include <mimalloc-new-delete.h>
 #include "co_context/io_context.hpp"
 #include "co_context/net/acceptor.hpp"
 #include "co_context/utility/buffer.hpp"
@@ -25,7 +24,9 @@ std::mt19937_64 rng(0);
 
 void gen(char (&buf)[BLOCK_LEN]) {
     static std::mt19937 rng(0);
-    for (int i = 0; i < BLOCK_LEN - 1; ++i) { buf[i] = rng() % 26 + 'a'; }
+    for (int i = 0; i < BLOCK_LEN - 1; ++i) {
+        buf[i] = rng() % 26 + 'a';
+    }
     buf[BLOCK_LEN - 1] = '\n';
 }
 
@@ -42,7 +43,9 @@ task<> run() {
     int nw = co_await lazy::write(file_fd, buf, off);
     // log::d("r4kw at [%u] fsync()\n", tid);
     // int res = co_await lazy::fsync(file_fd, IORING_FSYNC_DATASYNC);
-    if (nw < 0) { perror("write err"); }
+    if (nw < 0) {
+        perror("write err");
+    }
 
     int now = finish.fetch_add(1) + 1;
     if (now == times) [[unlikely]] {
@@ -79,7 +82,7 @@ int main(int argc, char *argv[]) {
     // file_size = argc == 4 ? atoll(argv[3]) : 60'000'000;
     file_size = argc == 4 ? atoll(argv[3]) : 1'000'000'000;
 
-    io_context context{32768};
+    io_context context;
 
     for (int i = 0; i < std::min(MAX_ON_FLY, times); ++i)
         context.co_spawn(run());

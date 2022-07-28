@@ -76,6 +76,9 @@ class [[nodiscard]] io_context final {
     // if there is at least one entry to submit to io_uring
     bool need_ring_submit = false;
 
+    // if there is at least one task newly spawned or forwarded
+    bool has_task_ready = false;
+
     // should io_context stop
     bool will_stop = false;
 
@@ -220,7 +223,7 @@ class [[nodiscard]] io_context final {
         init();
     }
 
-    io_context(unsigned io_uring_entries)
+    io_context(unsigned io_uring_entries = config::default_io_uring_entries)
         : ring(io_uring_entries), sqring_entries(io_uring_entries) {
         init();
     }

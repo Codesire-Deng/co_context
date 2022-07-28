@@ -1,6 +1,4 @@
-#include "co_context/io_context.hpp"
-#include "co_context/lazy_io.hpp"
-#include "co_context/net/acceptor.hpp"
+#include "co_context/net.hpp"
 
 using namespace co_context;
 
@@ -22,7 +20,7 @@ task<> server() {
 }
 
 int main() {
-    io_context ctx{32768};
+    io_context ctx;
     ctx.co_spawn(server());
     ctx.run();
     return 0;
