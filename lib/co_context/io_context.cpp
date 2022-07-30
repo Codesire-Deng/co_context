@@ -1,4 +1,6 @@
+#ifdef USE_MIMALLOC
 #include <mimalloc-new-delete.h>
+#endif
 #include "co_context/io_context.hpp"
 #include "co_context/utility/set_cpu_affinity.hpp"
 #include "co_context/co/semaphore.hpp"
