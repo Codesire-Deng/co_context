@@ -14,7 +14,7 @@ A coroutine framework aimed at high-concurrency io with reasonable latency, base
 
 ## Requirement
 
-1. [mimalloc](https://github.com/microsoft/mimalloc)  通常从包管理器安装即可。
+1. (Optional) [mimalloc](https://github.com/microsoft/mimalloc)  通常从包管理器安装即可。
 
 ## Example
 
