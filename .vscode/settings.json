@@ -87,7 +87,13 @@
         "fstream": "cpp",
         "future": "cpp",
         "source_location": "cpp",
-        "ranges": "cpp"
+        "ranges": "cpp",
+        "strstream": "cpp",
+        "cfenv": "cpp",
+        "forward_list": "cpp",
+        "executor": "cpp",
+        "io_context": "cpp",
+        "netfwd": "cpp"
     },
     "cmake.buildTask": true
 }

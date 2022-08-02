@@ -1,14 +1,9 @@
 #include <array>
-#include <chrono>
 #include <cstddef>
 #include <iomanip>
 #include <iostream>
-#include "co_context/co/mutex.hpp"
 #include <random>
-#include "co_context/co/condition_variable.hpp"
-#include "co_context/io_context.hpp"
-#include "co_context/task.hpp"
-#include "co_context/eager_io.hpp"
+#include "co_context/all.hpp"
 
 co_context::condition_variable cv;
 co_context::mutex cv_m; // This mutex is used for three purposes:
@@ -27,14 +22,15 @@ task<> waits() {
 }
 
 task<> signals() {
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    co_await timeout(std::chrono::seconds(1));
+
     {
         auto lk = co_await cv_m.lock_guard();
         std::cerr << "Notifying...\n";
     }
     cv.notify_all();
 
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    co_await timeout(std::chrono::seconds(1));
 
     {
         auto lk = co_await cv_m.lock_guard();
