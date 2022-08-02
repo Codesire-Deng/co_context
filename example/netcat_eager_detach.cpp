@@ -55,11 +55,10 @@ co_context::task<> run(co_context::socket peer) {
     while (true) {
         for (int i = 0; i < 10; ++i)
             peer.eager_recv(buf, 0).detach();
-        std::this_thread::sleep_for(std::chrono::microseconds(1));
+        co_await timeout(std::chrono::microseconds(1));
     }
 
     peer.eager_close().detach();
-    ::exit(0);
 }
 
 co_context::task<> server(uint16_t port) {

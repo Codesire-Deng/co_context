@@ -37,10 +37,7 @@ class alignas(128 /*std::hardware_destructive_interference_size*/) Guide {
         started_at = std::chrono::high_resolution_clock::now();
     }
 
-    task<void> initial_delay() {
-        co_await timeout(delay * time_tick);
-        // std::this_thread::sleep_for(delay * time_tick);
-    }
+    task<void> initial_delay() { co_await timeout(delay * time_tick); }
 
     task<void> occupy_sema() {
         wait_on_sema = static_cast<unsigned>(
@@ -52,7 +49,6 @@ class alignas(128 /*std::hardware_destructive_interference_size*/) Guide {
             / time_tick.count()
         );
         co_await timeout(occupy * time_tick);
-        // std::this_thread::sleep_for(occupy * time_tick);
     }
 
     task<void> visualize(unsigned id, unsigned x_scale = 2) const {

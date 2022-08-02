@@ -199,14 +199,6 @@ class [[nodiscard]] io_context final {
      */
     bool try_clear_reap_overflow_buf() noexcept;
 
-    /**
-     * @brief exit(0)
-     */
-    [[noreturn]] void stop() noexcept {
-        log::i("ctx stopped\n");
-        ::exit(0);
-    }
-
   private:
     void init() noexcept;
 
@@ -237,7 +229,7 @@ class [[nodiscard]] io_context final {
 
     void can_stop() noexcept { will_stop = true; }
 
-    [[noreturn]] void run();
+    void run();
 
     inline uring &io() noexcept { return ring; }
 
