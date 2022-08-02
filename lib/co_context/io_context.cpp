@@ -633,7 +633,7 @@ void io_context::co_spawn(std::coroutine_handle<> entrance) noexcept {
     forward_task(entrance);
 }
 
-[[noreturn]] void io_context::run() {
+void io_context::run() {
 #ifdef CO_CONTEXT_USE_CPU_AFFINITY
     detail::set_cpu_affinity(detail::this_thread.tid);
 #endif
@@ -680,7 +680,7 @@ void io_context::co_spawn(std::coroutine_handle<> entrance) noexcept {
         if constexpr (!config::use_standalone_completion_poller) {
             // TODO judge the memory order (relaxed may cause bugs)
             // TODO consider reap_poll_rounds and reap_overflow_buf
-            if (requests_to_reap > 0) {
+            if (requests_to_reap > 0) [[likely]] {
                 auto num = ring.CQReadyRelaxed();
 
                 // io_context can block itself in the following situation
@@ -688,6 +688,7 @@ void io_context::co_spawn(std::coroutine_handle<> entrance) noexcept {
                     if (num == 0 && !has_task_ready) [[unlikely]] {
                         ring.waitCQEntry();
                         num = ring.CQReadyRelaxed();
+                        assert(num > 0);
                     }
                 }
 
@@ -696,11 +697,15 @@ void io_context::co_spawn(std::coroutine_handle<> entrance) noexcept {
                 while (num--) {
                     poll_completion();
                 }
+            } else {
+                if constexpr (config::worker_threads_number == 0)
+                    if (!has_task_ready) [[unlikely]]
+                        will_stop = true;
             }
         }
     }
 
-    this->stop();
+    log::d("ctx stopped\n");
 }
 
 } // namespace co_context
