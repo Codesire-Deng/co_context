@@ -18,6 +18,7 @@
  */
 #pragma once
 
+#include <linux/version.h>
 #include <thread>
 #include <vector>
 #include <queue>
@@ -38,7 +39,17 @@ class io_context;
 
 class [[nodiscard]] io_context final {
   private:
-    using uring = liburingcxx::URing<config::io_uring_flags>;
+    using uring = liburingcxx::URing<
+        config::io_uring_flags
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
+        /**
+         * @note IORING_SETUP_COOP_TASKRUN is used because only one thread can
+         * access the ring
+         */
+        // PERF check IORING_SETUP_TASKRUN_FLAG
+        | IORING_SETUP_COOP_TASKRUN | IORING_SETUP_TASKRUN_FLAG
+#endif
+        >;
 
     using task_info = detail::task_info;
 
