@@ -1,17 +1,32 @@
 #include "co_context/net.hpp"
 #include <string_view>
+#include <fcntl.h>
+using namespace co_context;
+
+int nullfd;
+
+void log_error(int err) {
+    switch (err) {
+        case ECANCELED:
+            log::e("timeout!\n");
+            break;
+        default:
+            log::e("%s\n", strerror(err));
+            break;
+    }
+}
 
 co_context::task<> run(co_context::socket peer) {
     printf("run: Running\n");
-    using namespace co_context;
     char buf[8192];
     int nr = co_await peer.recv(buf);
 
     // 不断接收字节流
     while (nr > 0) {
-        nr = co_await (
-            lazy::write(STDOUT_FILENO, {buf, (size_t)nr}, 0) && peer.recv(buf)
-        );
+        int nw = co_await lazy::write(nullfd, {buf, (size_t)nr});
+        if (nw < 0) log_error(-nw);
+        nr = co_await (peer.recv(buf));
+        if (nr < 0) log_error(-nr);
     }
     ::exit(0);
 }
@@ -49,6 +64,9 @@ int main(int argc, const char *argv[]) {
         printf("Usage:\n  %s hostname port\n  %s -l port\n", argv[0], argv[0]);
         return 0;
     }
+
+    nullfd = ::open("/dev/null", O_WRONLY);
+    assert(nullfd >= 0);
 
     using namespace co_context;
     io_context context;

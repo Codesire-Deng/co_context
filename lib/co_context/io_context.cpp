@@ -384,6 +384,7 @@ void io_context::try_submit(detail::submit_info &info) noexcept {
         ring.appendSQEntry(info.submit_sqe);
         auto *const victim_sqe = ring.getSQEntry();
         assert(victim_sqe != nullptr && "ring.getSQEntry() returns nullptr!");
+        // log::e("victim_sqe OK\n");
         info.available_sqe = victim_sqe;
         log::v("ring.appendSQEntry()...OK\n");
         return;
@@ -565,6 +566,8 @@ bool io_context::try_clear_reap_overflow_buf() noexcept {
 }
 
 void io_context::init() noexcept {
+    // HACK new version of `uring` assume `ring_fd` must be registered.
+    ring.registerRingFd();
     // TODO support multiple io_context in one thread?
     detail::this_thread.ctx = this;
     detail::this_thread.worker = nullptr;

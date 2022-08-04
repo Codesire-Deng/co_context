@@ -521,12 +521,13 @@ inline namespace lazy {
     }
 
     inline detail::lazy_read
-    read(int fd, std::span<char> buf, uint64_t offset) noexcept {
+    read(int fd, std::span<char> buf, uint64_t offset = -1ULL) noexcept {
         return detail::lazy_read{fd, buf, offset};
     }
 
-    inline detail::lazy_readv
-    readv(int fd, std::span<const iovec> iovecs, uint64_t offset) noexcept {
+    inline detail::lazy_readv readv(
+        int fd, std::span<const iovec> iovecs, uint64_t offset = -1ULL
+    ) noexcept {
         return detail::lazy_readv{fd, iovecs, offset};
     }
 
@@ -537,12 +538,13 @@ inline namespace lazy {
     }
 
     inline detail::lazy_write
-    write(int fd, std::span<const char> buf, uint64_t offset) noexcept {
+    write(int fd, std::span<const char> buf, uint64_t offset = -1ULL) noexcept {
         return detail::lazy_write{fd, buf, offset};
     }
 
-    inline detail::lazy_writev
-    writev(int fd, std::span<const iovec> iovecs, uint64_t offset) noexcept {
+    inline detail::lazy_writev writev(
+        int fd, std::span<const iovec> iovecs, uint64_t offset = -1ULL
+    ) noexcept {
         return detail::lazy_writev{fd, iovecs, offset};
     }
 
