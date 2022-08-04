@@ -62,6 +62,10 @@ namespace detail {
             lazy_link_io &&lhs, lazy_link_io &&rhs
         ) noexcept;
 
+        friend lazy_link_io &&operator&&(
+            lazy_awaiter &&lhs, struct lazy_link_timeout &&rhs
+        ) noexcept;
+
         friend void set_link_awaiter(lazy_awaiter & awaiter) noexcept;
 
         lazy_awaiter() noexcept : io_info(task_info::task_type::lazy_sqe) {
@@ -472,6 +476,12 @@ namespace detail {
             this->last_io = &timed_io;
         }
     };
+
+    inline lazy_link_io &&
+    operator&&(lazy_awaiter &&lhs, struct lazy_link_timeout &&rhs) noexcept {
+        set_link_awaiter(lhs);
+        return std::move(rhs);
+    }
 
     struct lazy_yield {
         constexpr bool await_ready() const noexcept { return false; }
