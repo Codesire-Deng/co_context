@@ -20,20 +20,20 @@ A coroutine framework aimed at high-concurrency io with reasonable latency, base
 
 ### Basic usage
 
-创建一个 io_context，指定 io_uring 的循环队列大小：
+创建一个 `io_context`，用于运行协程：
 
 ```cpp
     using namespace co_context;
     io_context context;
 ```
 
-定义一个 socket 监听任务：
+定义一个 socket 监听协程：
 
 ```cpp
 task<> server(uint16_t port) {
     acceptor ac{inet_address{port}};
     for (int sockfd; (sockfd = co_await ac.accept()) >= 0;) {// 异步接受 client
-        co_spawn(run(co_context::socket{sockfd})); // 每个连接生成一个 worker 任务
+        co_spawn(session(co_context::socket{sockfd})); // 每个连接生成一个 worker 任务
     }
 }
 ```
@@ -41,15 +41,14 @@ task<> server(uint16_t port) {
 描述业务逻辑（以 netcat 为例）：
 
 ```cpp
-task<> run(co_context::socket peer) {
-    using namespace co_context;
+task<> session(co_context::socket sock) {
     char buf[8192];
-    int nr = 0;
-    // 不断接收字节流
-    while ((nr = co_await peer.recv(buf, 0)) > 0) { // 接收消息
-        // 打印到 stdout
-        int nw = co_await lazy::write(STDOUT_FILENO, {buf, (size_t)nr}, 0); 
-        if (nw < nr) break;
+    int nr = co_await sock.recv(buf);
+
+    // 不断接收字节流并打印到stdout
+    while (nr > 0) {
+        co_await lazy::write(STDOUT_FILENO, {buf, (size_t)nr});
+        nr = co_await sock.recv(buf);
     }
 }
 ```
@@ -67,9 +66,9 @@ int main(int argc, const char *argv[]) {
 
     int port = atoi(argv[2]);
     if (strcmp(argv[1], "-l") == 0) {
-        context.co_spawn(server(port)); // 创建一个监听任务
+        context.co_spawn(server(port)); // 创建一个监听协程
     } else {
-        context.co_spawn(client(argv[1], port));
+        context.co_spawn(client(argv[1], port)); // 直接连接
     }
 
     context.run(); // 启动 io_context（可选单线程或多线程）
@@ -95,14 +94,13 @@ task<> my_clock() {
 #### Network timeout
 
 ```cpp
-task<> run(co_context::socket peer) {
-    printf("run: Running\n");
+task<> session(co_context::socket peer) {
     char buf[8192];
-    int nr = co_await timeout(peer.recv(buf), 3s);
+    int nr = co_await timeout(peer.recv(buf), 3s); // 限时3秒
 
     while (nr > 0) {
-        co_await lazy::write(STDOUT_FILENO, {buf, (size_t)nr}, 0);
-        nr = co_await timeout(peer.recv(buf), 3s);
+        co_await lazy::write(STDOUT_FILENO, {buf, (size_t)nr});
+        nr = co_await timeout(peer.recv(buf), 3s); // 限时3秒
     }
 
     log_error(-nr);
@@ -126,7 +124,7 @@ void log_error(int err) {
 
 ```cpp
 nr = co_await (
-    lazy::write(STDOUT_FILENO, {buf, (size_t)nr}, 0)
+    lazy::write(STDOUT_FILENO, {buf, (size_t)nr})
     && peer.recv(buf)
 );
 ```
