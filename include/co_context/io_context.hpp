@@ -276,4 +276,9 @@ inline config::tid_t co_get_tid() noexcept {
     return detail::this_thread.tid;
 }
 
+inline auto &this_io_context() noexcept {
+    assert(detail::this_thread.ctx != nullptr);
+    return *detail::this_thread.ctx;
+}
+
 } // namespace co_context

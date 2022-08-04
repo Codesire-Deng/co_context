@@ -11,7 +11,11 @@ namespace detail {
 
     using CQEntry = ::liburingcxx::CQEntry;
 
+
     static_assert(sizeof(CQEntry) == sizeof(io_uring_cqe));
+    static_assert(sizeof(CQEntry) == 16);
+    static_assert(alignof(CQEntry) == 8);
+
 
     class CompletionQueue final {
       private:

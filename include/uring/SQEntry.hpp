@@ -60,11 +60,11 @@ class SQEntry final : private io_uring_sqe {
         this->addr = reinterpret_cast<uint64_t>(addr);
         this->len = len;
         this->rw_flags = 0;
-        // this->user_data = 0;
         this->buf_index = 0;
         this->personality = 0;
         this->file_index = 0;
-        this->__pad2[0] = this->__pad2[1] = 0;
+        this->addr3 = 0;
+        this->__pad2[0] = 0;
         return *this;
     }
 

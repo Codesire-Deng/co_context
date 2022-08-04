@@ -440,7 +440,7 @@ bool io_context::poll_submission() noexcept {
     cur.pop_notify(submit_count);
     cur_next(s_cur);
 
-    if (need_ring_submit) {
+    if (need_ring_submit) [[likely]] {
         ring.submit();
         need_ring_submit = false;
     }
@@ -514,8 +514,8 @@ inline void io_context::poll_completion() noexcept {
     const int32_t result = polling_cqe->getRes();
     [[maybe_unused]] const uint32_t flags = polling_cqe->getFlags();
 
-    if (config::log_level <= config::level::verbose && result < 0) {
-        log::v(
+    if (config::log_level <= config::level::debug && result < 0) {
+        log::d(
             "cqe reports error: user_data=%lx, result=%d, flags=%u\n"
             "message: %s\n",
             user_data, result, flags, strerror(-result)
