@@ -40,6 +40,7 @@
 #include "uring/syscall.hpp"
 #include "uring/detail/SQ.hpp"
 #include "uring/detail/CQ.hpp"
+#include "uring/detail/int_flags.h"
 
 struct statx;
 
@@ -77,7 +78,10 @@ class [[nodiscard]] URing final {
     int ring_fd;
 
     unsigned features;
-    // unsigned pad[3];
+    int enter_ring_fd;
+    __u8 int_flags;
+    __u8 pad[3];
+    unsigned pad2;
 
   public:
     /**
@@ -87,14 +91,20 @@ class [[nodiscard]] URing final {
      */
     unsigned submit() {
         const unsigned submitted = sq.flush();
-        unsigned enterFlags = 0;
+        // HACK this assumes app will use registered ring.
+        unsigned enterFlags = IORING_ENTER_REGISTERED_RING;
+        // unsigned enterFlags = 0;
 
         if (isSQRingNeedEnter(enterFlags)) {
             if constexpr (URingFlags & IORING_SETUP_IOPOLL)
                 enterFlags |= IORING_ENTER_GETEVENTS;
 
+            // HACK see above.
+            // if (this->int_flags & INT_FLAG_REG_RING)
+            //     enterFlags |= IORING_ENTER_REGISTERED_RING;
+
             const int consumedNum = detail::__sys_io_uring_enter(
-                ring_fd, submitted, 0, enterFlags, NULL
+                enter_ring_fd, submitted, 0, enterFlags, NULL
             );
 
             if (consumedNum < 0) [[unlikely]]
@@ -112,14 +122,20 @@ class [[nodiscard]] URing final {
      */
     unsigned submitAndWait(unsigned waitNum) {
         const unsigned submitted = sq.flush();
-        unsigned enterFlags = 0;
+        // HACK this assumes app will use registered ring.
+        unsigned enterFlags = IORING_ENTER_REGISTERED_RING;
+        // unsigned enterFlags = 0;
 
         if (waitNum || isSQRingNeedEnter(enterFlags)) {
             if (waitNum || (URingFlags & IORING_SETUP_IOPOLL))
                 enterFlags |= IORING_ENTER_GETEVENTS;
 
+            // HACK see above.
+            // if (this->int_flags & INT_FLAG_REG_RING)
+            //     enterFlags |= IORING_ENTER_REGISTERED_RING;
+
             const int consumedNum = detail::__sys_io_uring_enter(
-                ring_fd, submitted, waitNum, enterFlags, NULL
+                enter_ring_fd, submitted, waitNum, enterFlags, NULL
             );
 
             if (consumedNum < 0) [[unlikely]]
@@ -207,9 +223,15 @@ class [[nodiscard]] URing final {
     inline int SQRingWait() {
         if constexpr (!(URingFlags & IORING_SETUP_SQPOLL)) return 0;
         if (SQSpaceLeft()) return 0;
+
+        // HACK this assumes app will use registered ring.
+        // if (ring->int_flags & INT_FLAG_REG_RING)
+        //     flags |= IORING_ENTER_REGISTERED_RING;
         const int result = detail::__sys_io_uring_enter(
-            ring_fd, 0, 0, IORING_ENTER_SQ_WAIT, nullptr
+            this->enter_ring_fd, 0, 0,
+            IORING_ENTER_SQ_WAIT | IORING_ENTER_REGISTERED_RING, nullptr
         );
+
         if (result < 0)
             throw std::system_error{
                 errno, std::system_category(),
@@ -248,6 +270,41 @@ class [[nodiscard]] URing final {
         CQAdvance(1);
     }
 
+    int registerRingFd() noexcept {
+        struct io_uring_rsrc_update up = {
+            .offset = -1U,
+            .data = (uint64_t)this->ring_fd,
+        };
+
+        const int ret = detail::__sys_io_uring_register(
+            this->ring_fd, IORING_REGISTER_RING_FDS, &up, 1
+        );
+
+        if (ret == 1) {
+            this->enter_ring_fd = up.offset;
+            this->int_flags |= INT_FLAG_REG_RING;
+        }
+
+        return ret;
+    }
+
+    int UnregisterRingFd() noexcept {
+        struct io_uring_rsrc_update up = {
+            .offset = this->enter_ring_fd,
+        };
+
+        const int ret = detail::__sys_io_uring_register(
+            this->ring_fd, IORING_UNREGISTER_RING_FDS, &up, 1
+        );
+
+        if (ret == 1) {
+            this->enter_ring_fd = this->ring_fd;
+            this->int_flags &= ~INT_FLAG_REG_RING;
+        }
+
+        return ret;
+    }
+
   public:
     URing(unsigned entries, Params &params) {
         // override the params.flags
@@ -259,8 +316,9 @@ class [[nodiscard]] URing final {
 
         memset(this, 0, sizeof(*this));
         // this->flags = params.flags;
-        this->ring_fd = fd;
+        this->ring_fd = this->enter_ring_fd = fd;
         this->features = params.features;
+        this->int_flags = 0;
         try {
             mmapQueue(fd, params);
         } catch (...) {
@@ -447,10 +505,15 @@ class [[nodiscard]] URing final {
             }
             if (!isNeedEnter) return cqe;
 
+            // HACK this assumes app will use registered ring.
+            // if (this->int_flags & INT_FLAG_REG_RING)
+            //     flags |= IORING_ENTER_REGISTERED_RING;
+            flags |= IORING_ENTER_REGISTERED_RING;
+
             // TODO Upgrade for ring.int_flags & INT_FLAG_REG_RING
             const int result = detail::__sys_io_uring_enter2(
-                ring_fd, data.submit, data.waitNum, flags, (sigset_t *)data.arg,
-                data.size
+                enter_ring_fd, data.submit, data.waitNum, flags,
+                (sigset_t *)data.arg, data.size
             );
 
             if (result < 0)
