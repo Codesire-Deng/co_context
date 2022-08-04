@@ -13,6 +13,8 @@ namespace detail {
     using SQEntry = ::liburingcxx::SQEntry;
 
     static_assert(sizeof(SQEntry) == sizeof(io_uring_sqe));
+    static_assert(sizeof(SQEntry) == 64);
+    static_assert(alignof(SQEntry) == 8);
 
     class SubmissionQueue final {
       private:
@@ -71,7 +73,7 @@ namespace detail {
              * This _may_ look problematic, as we're not supposed to be reading
              * SQ->head without acquire semantics. When we're in SQPOLL mode,
              * the kernel submitter could be updating this right now. For
-             * non-SQPOLL, task<> itself does it, and there's no potential race.
+             * non-SQPOLL, task itself does it, and there's no potential race.
              * But even for SQPOLL, the load is going to be potentially
              * out-of-date the very instant it's done, regardless or whether or
              * not it's done atomically. Worst case, we're going to be
