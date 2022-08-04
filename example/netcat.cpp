@@ -1,61 +1,41 @@
 #include "co_context/net.hpp"
 #include <string_view>
-#include <fcntl.h>
 using namespace co_context;
+using Socket = co_context::socket;
 
-int nullfd;
-
-void log_error(int err) {
-    switch (err) {
-        case ECANCELED:
-            log::e("timeout!\n");
-            break;
-        default:
-            log::e("%s\n", strerror(err));
-            break;
-    }
-}
-
-co_context::task<> run(co_context::socket peer) {
-    printf("run: Running\n");
+task<> session(Socket sock) {
     char buf[8192];
-    int nr = co_await peer.recv(buf);
+    int nr = co_await sock.recv(buf);
 
-    // 不断接收字节流
+    // 不断接收字节流并打印到stdout
     while (nr > 0) {
-        int nw = co_await lazy::write(nullfd, {buf, (size_t)nr});
-        if (nw < 0) log_error(-nw);
-        nr = co_await (peer.recv(buf));
-        if (nr < 0) log_error(-nr);
+        nr = co_await (
+            lazy::write(STDOUT_FILENO, {buf, (size_t)nr}) && sock.recv(buf)
+        );
     }
-    ::exit(0);
 }
 
-co_context::task<> server(uint16_t port) {
-    using namespace co_context;
+task<> server(uint16_t port) {
     acceptor ac{inet_address{port}};
     // 不断接受 client，每个连接生成一个 worker 协程
     for (int sockfd; (sockfd = co_await ac.accept()) >= 0;) {
-        co_spawn(run(co_context::socket{sockfd}));
+        co_spawn(session(Socket{sockfd}));
     }
 }
 
-co_context::task<> client(std::string_view hostname, uint16_t port) {
-    using namespace co_context;
+task<> client(std::string_view hostname, uint16_t port) {
     inet_address addr;
     if (inet_address::resolve(hostname, port, addr)) {
-        co_context::socket sock{co_context::socket::create_tcp(addr.family())};
+        Socket sock{Socket::create_tcp(addr.family())};
         // 连接一个 server
         int res = co_await sock.connect(addr);
         if (res < 0) {
             printf("res=%d: %s\n", res, strerror(-res));
-            ::exit(0);
         }
         // 生成一个 worker 协程
-        co_spawn(run(std::move(sock)));
+        co_spawn(session(std::move(sock)));
     } else {
         printf("Unable to resolve %s\n", hostname.data());
-        ::exit(0);
     }
 }
 
@@ -65,10 +45,6 @@ int main(int argc, const char *argv[]) {
         return 0;
     }
 
-    nullfd = ::open("/dev/null", O_WRONLY);
-    assert(nullfd >= 0);
-
-    using namespace co_context;
     io_context context;
 
     int port = atoi(argv[2]);
