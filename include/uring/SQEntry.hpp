@@ -5,6 +5,7 @@
 #include <span>
 #include <sys/socket.h>
 // #include <sys/uio.h>
+#include <fcntl.h>
 #include "uring/compat.h"
 
 struct __kernel_timespec;
@@ -31,13 +32,47 @@ class SQEntry final : private io_uring_sqe {
 
     inline __u64 &fetchData() noexcept { return this->user_data; }
 
-    inline SQEntry &setFlags(uint8_t flags) noexcept {
+    inline SQEntry &resetFlags(uint8_t flags) noexcept {
         this->flags = flags;
+        return *this;
+    }
+
+    // fd is an index into the files array registered
+    inline SQEntry &setFixedFile() noexcept {
+        this->flags |= IOSQE_FIXED_FILE;
         return *this;
     }
 
     inline SQEntry &setLink() noexcept {
         this->flags |= IOSQE_IO_LINK;
+        return *this;
+    }
+
+    inline SQEntry &setHardLink() noexcept {
+        this->flags |= IOSQE_IO_HARDLINK;
+        return *this;
+    }
+
+    inline SQEntry &setDrain() noexcept {
+        this->flags |= IOSQE_IO_DRAIN;
+        return *this;
+    }
+
+    // Tell ring to do not try non-blocking IO
+    inline SQEntry &setAsync() noexcept {
+        this->flags |= IOSQE_ASYNC;
+        return *this;
+    }
+
+    inline SQEntry &setBufferSelect() noexcept {
+        this->flags |= IOSQE_BUFFER_SELECT;
+        return *this;
+    }
+
+    // see `man io_uring_enter`
+    // available since Linux 5.17
+    inline SQEntry &setCQESkip() noexcept {
+        this->flags |= IOSQE_CQE_SKIP_SUCCESS;
         return *this;
     }
 
@@ -76,6 +111,14 @@ class SQEntry final : private io_uring_sqe {
         );
     }
 
+    inline SQEntry &prepareReadv2(
+        int fd, std::span<const iovec> iovecs, __u64 offset, int flags
+    ) noexcept {
+        prepareReadv(fd, iovecs, offset);
+        this->rw_flags = flags;
+        return *this;
+    }
+
     inline SQEntry &prepareReadFixed(
         int fd, std::span<char> buf, uint64_t offset, uint16_t bufIndex
     ) noexcept {
@@ -90,6 +133,14 @@ class SQEntry final : private io_uring_sqe {
         return prepareRW(
             IORING_OP_WRITEV, fd, iovecs.data(), iovecs.size(), offset
         );
+    }
+
+    inline SQEntry &prepareWritev2(
+        int fd, std::span<const iovec> iovecs, uint64_t offset, int flags
+    ) noexcept {
+        prepareWritev(fd, iovecs, offset);
+        this->rw_flags = flags;
+        return *this;
     }
 
     inline SQEntry &prepareWriteFixed(
@@ -112,14 +163,27 @@ class SQEntry final : private io_uring_sqe {
 
     inline SQEntry &
     prepareRecvmsg(int fd, msghdr *msg, unsigned flags) noexcept {
-        return prepareRW(IORING_OP_RECVMSG, fd, msg, 1, 0);
+        prepareRW(IORING_OP_RECVMSG, fd, msg, 1, 0);
         this->msg_flags = flags;
+        return *this;
+    }
+
+    /**
+     * @brief same as recvmsg but generate multi-CQE, see
+     * `man io_uring_prep_recvmsg_multishot`
+     *
+     * available @since Linux 5.20
+     */
+    inline SQEntry &
+    prepareRecvmsgMultishot(int fd, msghdr *msg, unsigned flags) noexcept {
+        prepareRecvmsg(fd, msg, flags);
+        this->ioprio |= IORING_RECV_MULTISHOT;
         return *this;
     }
 
     inline SQEntry &
     prepareSendmsg(int fd, const msghdr *msg, unsigned flags) noexcept {
-        return prepareRW(IORING_OP_SENDMSG, fd, msg, 1, 0);
+        prepareRW(IORING_OP_SENDMSG, fd, msg, 1, 0);
         this->msg_flags = flags;
         return *this;
     }
@@ -208,15 +272,28 @@ class SQEntry final : private io_uring_sqe {
 
     inline SQEntry &
     prepareSend(int sockfd, std::span<const char> buf, int flags) noexcept {
-        return prepareRW(IORING_OP_SEND, sockfd, buf.data(), buf.size(), 0);
+        prepareRW(IORING_OP_SEND, sockfd, buf.data(), buf.size(), 0);
         this->msg_flags = (uint32_t)flags;
         return *this;
     }
 
     inline SQEntry &
     prepareRecv(int sockfd, std::span<char> buf, int flags) noexcept {
-        return prepareRW(IORING_OP_RECV, sockfd, buf.data(), buf.size(), 0);
+        prepareRW(IORING_OP_RECV, sockfd, buf.data(), buf.size(), 0);
         this->msg_flags = (uint32_t)flags;
+        return *this;
+    }
+
+    /**
+     * @brief same as recv but generate multi-CQE, see
+     * `man io_uring_prep_recv_multishot`
+     *
+     * available @since Linux 5.20
+     */
+    inline SQEntry &
+    prepareRecvMultishot(int sockfd, std::span<char> buf, int flags) noexcept {
+        prepareRecv(sockfd, buf, flags);
+        this->ioprio |= IORING_RECV_MULTISHOT;
         return *this;
     }
 
@@ -355,6 +432,10 @@ class SQEntry final : private io_uring_sqe {
         return *this;
     }
 
+    inline SQEntry &prepareMkdir(const char *path, mode_t mode) noexcept {
+        return prepareMkdirat(AT_FDCWD, path, mode);
+    }
+
     inline SQEntry &prepareSymlinkat(
         const char *target, int newdirfd, const char *linkpath
     ) noexcept {
@@ -363,6 +444,11 @@ class SQEntry final : private io_uring_sqe {
             (uint64_t)(uintptr_t)linkpath
         );
         return *this;
+    }
+
+    inline SQEntry &
+    prepareSymlink(const char *target, const char *linkpath) noexcept {
+        return prepareSymlinkat(target, AT_FDCWD, linkpath);
     }
 
     inline SQEntry &prepareLinkat(
@@ -377,6 +463,24 @@ class SQEntry final : private io_uring_sqe {
             (uint64_t)(uintptr_t)newpath
         );
         this->hardlink_flags = (uint32_t)flags;
+        return *this;
+    }
+
+    inline SQEntry &
+    prepareLink(const char *oldpath, const char *newpath, int flags) noexcept {
+        return prepareLinkat(AT_FDCWD, oldpath, AT_FDCWD, newpath, flags);
+    }
+
+    /**
+     * @brief send a CQE to another ring
+     *
+     * available @since Linux 5.18
+     */
+    inline SQEntry &prepareMsgRing(
+        int fd, unsigned int cqe_res, uint64_t cqe_user_data, unsigned int flags
+    ) noexcept {
+        prepareRW(IORING_OP_MSG_RING, fd, nullptr, cqe_res, cqe_user_data);
+        this->rw_flags = flags;
         return *this;
     }
 
