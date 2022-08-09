@@ -437,7 +437,7 @@ class _Gen_promise_base {
         }
 
         void await_resume() {
-            if (_Nested._Except) {
+            if (_Nested._Except) [[unlikely]] {
                 ::std::rethrow_exception(::std::move(_Nested._Except));
             }
         }

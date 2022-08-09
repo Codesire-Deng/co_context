@@ -233,7 +233,7 @@ class [[nodiscard]] URing final {
             IORING_ENTER_SQ_WAIT | IORING_ENTER_REGISTERED_RING, nullptr
         );
 
-        if (result < 0)
+        if (result < 0) [[unlikely]]
             throw std::system_error{
                 -result, std::system_category(),
                 "SQRingWait __sys_io_uring_enter"};
@@ -281,7 +281,7 @@ class [[nodiscard]] URing final {
             this->ring_fd, IORING_REGISTER_RING_FDS, &up, 1
         );
 
-        if (ret == 1) {
+        if (ret == 1) [[likely]] {
             this->enter_ring_fd = up.offset;
             this->int_flags |= INT_FLAG_REG_RING;
         } else if (ret < 0) {
@@ -301,7 +301,7 @@ class [[nodiscard]] URing final {
             this->ring_fd, IORING_UNREGISTER_RING_FDS, &up, 1
         );
 
-        if (ret == 1) {
+        if (ret == 1) [[likely]] {
             this->enter_ring_fd = this->ring_fd;
             this->int_flags &= ~INT_FLAG_REG_RING;
         } else if (ret < 0) {
@@ -524,10 +524,10 @@ class [[nodiscard]] URing final {
                 (sigset_t *)data.arg, data.size
             );
 
-            if (result < 0)
+            if (result < 0) [[unlikely]]
                 // TODO Reconsider whether to use exceptions
                 throw std::system_error{
-                    errno, std::system_category(), "getCQEntry_impl.2"};
+                    -result, std::system_category(), "getCQEntry_impl.2"};
             data.submit -= result;
             if (cqe != nullptr) return cqe;
             isLooped = true;
