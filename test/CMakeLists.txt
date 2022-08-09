@@ -1,4 +1,4 @@
-# for each "example/x.cpp", generate "x"
+# for each "test/x.cpp", generate target "x"
 file(GLOB_RECURSE all_tests *.cpp)
 foreach(v ${all_tests})
     string(REGEX MATCH "test/.*" relative_path ${v})

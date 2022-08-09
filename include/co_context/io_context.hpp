@@ -211,7 +211,7 @@ class [[nodiscard]] io_context final {
     bool try_clear_reap_overflow_buf() noexcept;
 
   private:
-    void init() noexcept;
+    void init();
 
     void make_thread_pool();
 
