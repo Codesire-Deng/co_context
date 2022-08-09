@@ -109,7 +109,7 @@ class [[nodiscard]] URing final {
 
             if (consumedNum < 0) [[unlikely]]
                 throw std::system_error{
-                    errno, std::system_category(), "submitAndWait"};
+                    -consumedNum, std::system_category(), "URing::submit"};
         }
 
         return submitted;
@@ -140,7 +140,8 @@ class [[nodiscard]] URing final {
 
             if (consumedNum < 0) [[unlikely]]
                 throw std::system_error{
-                    errno, std::system_category(), "submitAndWait"};
+                    -consumedNum, std::system_category(),
+                    "URing::submitAndWait"};
         }
 
         return submitted;
@@ -234,7 +235,7 @@ class [[nodiscard]] URing final {
 
         if (result < 0)
             throw std::system_error{
-                errno, std::system_category(),
+                -result, std::system_category(),
                 "SQRingWait __sys_io_uring_enter"};
         return result;
     }
@@ -270,7 +271,7 @@ class [[nodiscard]] URing final {
         CQAdvance(1);
     }
 
-    int registerRingFd() noexcept {
+    int registerRingFd() {
         struct io_uring_rsrc_update up = {
             .offset = -1U,
             .data = (uint64_t)this->ring_fd,
@@ -283,12 +284,15 @@ class [[nodiscard]] URing final {
         if (ret == 1) {
             this->enter_ring_fd = up.offset;
             this->int_flags |= INT_FLAG_REG_RING;
+        } else if (ret < 0) {
+            throw std::system_error{
+                -ret, std::system_category(), "URing::registerRingFd"};
         }
 
         return ret;
     }
 
-    int UnregisterRingFd() noexcept {
+    int UnregisterRingFd() {
         struct io_uring_rsrc_update up = {
             .offset = this->enter_ring_fd,
         };
@@ -300,6 +304,9 @@ class [[nodiscard]] URing final {
         if (ret == 1) {
             this->enter_ring_fd = this->ring_fd;
             this->int_flags &= ~INT_FLAG_REG_RING;
+        } else if (ret < 0) {
+            throw std::system_error{
+                -ret, std::system_category(), "URing::UnregisterRingFd"};
         }
 
         return ret;
@@ -312,7 +319,7 @@ class [[nodiscard]] URing final {
         const int fd = detail::__sys_io_uring_setup(entries, &params);
         if (fd < 0) [[unlikely]]
             throw std::system_error{
-                errno, std::system_category(), "__sys_io_uring_setup"};
+                -fd, std::system_category(), "URing()::__sys_io_uring_setup"};
 
         memset(this, 0, sizeof(*this));
         // this->flags = params.flags;
@@ -465,7 +472,8 @@ class [[nodiscard]] URing final {
                 if (ret.cqe->res < 0) [[unlikely]] {
                     // TODO Reconsider whether to use exceptions
                     throw std::system_error{
-                        ret.cqe->res, std::system_category(), "__peekCQEntry"};
+                        -ret.cqe->res, std::system_category(),
+                        "URing::__peekCQEntry"};
                 } else {
                     continue;
                 }

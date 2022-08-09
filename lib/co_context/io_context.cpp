@@ -565,7 +565,7 @@ bool io_context::try_clear_reap_overflow_buf() noexcept {
     return true;
 }
 
-void io_context::init() noexcept {
+void io_context::init() {
     // HACK new version of `uring` assume `ring_fd` must be registered.
     ring.registerRingFd();
     // TODO support multiple io_context in one thread?
