@@ -21,13 +21,11 @@ task<> session(Socket sock) {
 
     // 不断接收字节流并打印到stdout
     while (nr > 0) {
-        nr = co_await (
-            lazy::write(STDOUT_FILENO, {buf, (size_t)nr})
-            && timeout(sock.recv(buf), 3s)
-        );
+        co_await lazy::write(STDOUT_FILENO, {buf, (size_t)nr});
+        nr = co_await timeout(sock.recv(buf), 3s);
     }
 
-    log_error(-nr);
+    if (nr < 0) log_error(-nr);
 }
 
 task<> server(uint16_t port) {

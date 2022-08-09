@@ -10,6 +10,7 @@ constexpr uint16_t port = 6379;
 using Socket = co_context::socket;
 
 task<> send(Socket sock) {
+    // NOTE `getchar()` will block current thread
     while (getchar()) {
         for (int i = 0; i < times; ++i) {
             co_await sock.send(message);
