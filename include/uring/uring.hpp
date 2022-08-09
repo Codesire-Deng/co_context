@@ -32,6 +32,7 @@
 #include <time.h>
 #include <sched.h>
 #include <linux/swab.h>
+#include <linux/version.h>
 #include <system_error>
 #include <cassert>
 #include "uring/compat.h"
@@ -45,6 +46,20 @@
 struct statx;
 
 namespace liburingcxx {
+
+namespace config {
+
+    // HACK this assumes app will use registered ring.
+    constexpr bool using_register_ring_fd =
+        LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0);
+
+    constexpr unsigned default_enter_flags_registered_ring =
+        using_register_ring_fd ? IORING_ENTER_REGISTERED_RING : 0;
+
+    constexpr unsigned default_enter_flags =
+        default_enter_flags_registered_ring;
+
+};
 
 constexpr uint64_t LIBURING_UDATA_TIMEOUT = -1;
 
@@ -91,15 +106,13 @@ class [[nodiscard]] URing final {
      */
     unsigned submit() {
         const unsigned submitted = sq.flush();
-        // HACK this assumes app will use registered ring.
-        unsigned enterFlags = IORING_ENTER_REGISTERED_RING;
-        // unsigned enterFlags = 0;
+        unsigned enterFlags = config::default_enter_flags;
 
         if (isSQRingNeedEnter(enterFlags)) {
             if constexpr (URingFlags & IORING_SETUP_IOPOLL)
                 enterFlags |= IORING_ENTER_GETEVENTS;
 
-            // HACK see above.
+            // HACK see config::using_register_ring_fd.
             // if (this->int_flags & INT_FLAG_REG_RING)
             //     enterFlags |= IORING_ENTER_REGISTERED_RING;
 
@@ -122,15 +135,13 @@ class [[nodiscard]] URing final {
      */
     unsigned submitAndWait(unsigned waitNum) {
         const unsigned submitted = sq.flush();
-        // HACK this assumes app will use registered ring.
-        unsigned enterFlags = IORING_ENTER_REGISTERED_RING;
-        // unsigned enterFlags = 0;
+        unsigned enterFlags = config::default_enter_flags;
 
         if (waitNum || isSQRingNeedEnter(enterFlags)) {
             if (waitNum || (URingFlags & IORING_SETUP_IOPOLL))
                 enterFlags |= IORING_ENTER_GETEVENTS;
 
-            // HACK see above.
+            // HACK see config::default_enter_flags.
             // if (this->int_flags & INT_FLAG_REG_RING)
             //     enterFlags |= IORING_ENTER_REGISTERED_RING;
 
@@ -230,7 +241,8 @@ class [[nodiscard]] URing final {
         //     flags |= IORING_ENTER_REGISTERED_RING;
         const int result = detail::__sys_io_uring_enter(
             this->enter_ring_fd, 0, 0,
-            IORING_ENTER_SQ_WAIT | IORING_ENTER_REGISTERED_RING, nullptr
+            IORING_ENTER_SQ_WAIT | config::default_enter_flags_registered_ring,
+            nullptr
         );
 
         if (result < 0) [[unlikely]]
@@ -272,6 +284,8 @@ class [[nodiscard]] URing final {
     }
 
     int registerRingFd() {
+        assert(config::using_register_ring_fd && "kernel version < 5.18");
+
         struct io_uring_rsrc_update up = {
             .offset = -1U,
             .data = (uint64_t)this->ring_fd,
@@ -293,6 +307,8 @@ class [[nodiscard]] URing final {
     }
 
     int UnregisterRingFd() {
+        assert(config::using_register_ring_fd && "kernel version < 5.18");
+
         struct io_uring_rsrc_update up = {
             .offset = this->enter_ring_fd,
         };
@@ -516,7 +532,8 @@ class [[nodiscard]] URing final {
             // HACK this assumes app will use registered ring.
             // if (this->int_flags & INT_FLAG_REG_RING)
             //     flags |= IORING_ENTER_REGISTERED_RING;
-            flags |= IORING_ENTER_REGISTERED_RING;
+            if constexpr (config::using_register_ring_fd)
+                flags |= IORING_ENTER_REGISTERED_RING;
 
             // TODO Upgrade for ring.int_flags & INT_FLAG_REG_RING
             const int result = detail::__sys_io_uring_enter2(
