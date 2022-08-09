@@ -567,7 +567,9 @@ bool io_context::try_clear_reap_overflow_buf() noexcept {
 
 void io_context::init() {
     // HACK new version of `uring` assume `ring_fd` must be registered.
-    ring.registerRingFd();
+    if constexpr (liburingcxx::config::using_register_ring_fd)
+        ring.registerRingFd();
+        
     // TODO support multiple io_context in one thread?
     detail::this_thread.ctx = this;
     detail::this_thread.worker = nullptr;
