@@ -124,10 +124,12 @@ void log_error(int err) {
 
 ```cpp
 nr = co_await (
-    lazy::write(STDOUT_FILENO, {buf, (size_t)nr})
+    peer.send({buf, (size_t)nr})
     && peer.recv(buf)
 );
 ```
+
+此例子利用 link_io 大幅增强 echo_server 的性能
 
 ## 协程方案的局限场景
 
