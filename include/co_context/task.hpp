@@ -135,7 +135,7 @@ namespace detail {
         }
 
         void result() {
-            if (this->exception_ptr)
+            if (this->exception_ptr) [[unlikely]]
                 std::rethrow_exception(this->exception_ptr);
         }
 
@@ -236,7 +236,9 @@ class [[nodiscard("Did you forget to co_await?")]] task {
             using awaiter_base::awaiter_base;
 
             decltype(auto) await_resume() {
-                if (!this->handle) throw std::logic_error("broken_promise");
+                // if (!this->handle) [[unlikely]]
+                //     throw std::logic_error("broken_promise");
+                assert(this->handle && "broken_promise");
 
                 return this->handle.promise().result();
             }
@@ -254,7 +256,9 @@ class [[nodiscard("Did you forget to co_await?")]] task {
             using awaiter_base::awaiter_base;
 
             decltype(auto) await_resume() {
-                if (!this->handle) throw std::logic_error("broken_promise");
+                // if (!this->handle) [[unlikely]]
+                //     throw std::logic_error("broken_promise");
+                assert(this->handle && "broken_promise");
 
                 return std::move(this->handle.promise()).result();
             }
