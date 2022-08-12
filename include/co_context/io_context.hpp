@@ -268,7 +268,7 @@ inline void co_spawn(task<void> &&entrance) noexcept {
     entrance.detach();
 }
 
-inline void co_context_stop() noexcept {
+inline void io_context_stop() noexcept {
     detail::this_thread.ctx->can_stop();
 }
 

@@ -34,7 +34,7 @@ restart:
     if (ref <= 0) [[unlikely]] {
         if (ref == 0) {
             printf("All done\n");
-            co_context_stop();
+            io_context_stop();
             ::close(file_fd);
             ::exit(0);
         }
