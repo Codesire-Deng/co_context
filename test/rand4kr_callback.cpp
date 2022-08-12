@@ -44,7 +44,7 @@ task<> run() {
 
     if (remain.fetch_sub(1) == 0) [[unlikely]] {
         printf("All done\n");
-        co_context_stop();
+        io_context_stop();
         ::close(file_fd);
         ::exit(0);
     } else [[likely]] {

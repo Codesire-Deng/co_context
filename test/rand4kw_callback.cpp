@@ -50,7 +50,7 @@ task<> run() {
     int now = finish.fetch_add(1) + 1;
     if (now == times) [[unlikely]] {
         printf("All done\n");
-        co_context_stop();
+        io_context_stop();
         ::close(file_fd);
         ::exit(0);
     } else if (idx + 1 < times) [[likely]] {

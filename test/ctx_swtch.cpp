@@ -21,7 +21,7 @@ task<> run() {
             "Avg. switch time = %3.3f ns.\n",
             duration.count() / total_switch * 1000
         );
-        co_context_stop();
+        this_io_context().can_stop();
     }
 }
 
