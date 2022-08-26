@@ -16,6 +16,7 @@ A coroutine framework aimed at high-concurrency io with reasonable latency, base
 
 1. \[Optional\] [mimalloc](https://github.com/microsoft/mimalloc)  从包管理器或源代码安装。
 2. Linux 内核版本 >= 5.6，建议 >= 5.11，越新越好。
+    - 由于开发环境是 Linux 5.19，因此可能在低版本内核下出现兼容性错误。如遇问题，请将报错发到[issue](https://github.com/Codesire-Deng/co_context/issues)或B站私信[@等疾风](https://space.bilibili.com/35186937)，非常感谢！
 
 ## Example
 
