@@ -7,5 +7,7 @@ foreach(v ${all_examples})
     string(REGEX REPLACE ".cpp" "" target_name ${target_name})
 
     add_executable(${target_name} ${v} $<TARGET_OBJECTS:co_context>)
-    target_link_libraries(${target_name} PUBLIC mimalloc)
+    if (mi_version)
+        target_link_libraries(${target_name} PUBLIC mimalloc)
+    endif()
 endforeach()
