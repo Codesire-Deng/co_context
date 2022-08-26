@@ -153,6 +153,12 @@ nr = co_await (
 5. 在一个本地测试中（R7-5800X 桌面端），**跨线程**的协程切换的平均延迟为 37 ns，代码于 [test/ctx_swtch.cpp](test/ctx_swtch.cpp)。
 6. 协程自身的缓存不友好问题（主要由 `operator new` 引起），需要借助其他工具来解决，例如 [mimalloc](https://github.com/microsoft/mimalloc)。
 
+## 关于 docker
+
+用 VS Code 打开本项目，VS Code Remote 插件可根据`.devcontainer`文件夹创建合适的docker环境。如果你暂时没有 Linux 环境，可以使用 docker 替代。
+
+- 注意：若宿主机具有 Linux 内核，**docker 将继承宿主机的 Linux 内核版本**。 因此，docker 无法解决 Linux 内核版本过低的问题。
+
 ---
 
 <details>
