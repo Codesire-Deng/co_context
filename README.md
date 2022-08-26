@@ -18,6 +18,12 @@ A coroutine framework aimed at high-concurrency io with reasonable latency, base
 2. Linux 内核版本 >= 5.6，建议 >= 5.11，越新越好。
     - 由于开发环境是 Linux 5.19，因此可能在低版本内核下出现兼容性错误。如遇问题，请将报错发到[issue](https://github.com/Codesire-Deng/co_context/issues)或B站私信[@等疾风](https://space.bilibili.com/35186937)，非常感谢！
 
+## 关于 docker
+
+用 VS Code 打开本项目，VS Code Remote 插件可根据`.devcontainer`文件夹创建合适的 docker 环境。如果你暂时没有 Linux 环境，可以使用 docker 替代。
+
+- 注意：**docker 将继承宿主机的 Linux 内核版本**。 因此，docker 无法解决 Linux 内核版本过低的问题。
+
 ## Example
 
 ### Basic usage
@@ -152,12 +158,6 @@ nr = co_await (
 5. 在一个本地测试中（I7-8550U 移动端），**单线程**的协程切换的平均延迟为 9.4 ns，代码于 [test/ctx_swtch.cpp](test/ctx_swtch.cpp)。
 5. 在一个本地测试中（R7-5800X 桌面端），**跨线程**的协程切换的平均延迟为 37 ns，代码于 [test/ctx_swtch.cpp](test/ctx_swtch.cpp)。
 6. 协程自身的缓存不友好问题（主要由 `operator new` 引起），需要借助其他工具来解决，例如 [mimalloc](https://github.com/microsoft/mimalloc)。
-
-## 关于 docker
-
-用 VS Code 打开本项目，VS Code Remote 插件可根据`.devcontainer`文件夹创建合适的docker环境。如果你暂时没有 Linux 环境，可以使用 docker 替代。
-
-- 注意：若宿主机具有 Linux 内核，**docker 将继承宿主机的 Linux 内核版本**。 因此，docker 无法解决 Linux 内核版本过低的问题。
 
 ---
 
