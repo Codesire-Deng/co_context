@@ -95,6 +95,7 @@ namespace detail {
             std::construct_at(
                 std::addressof(value), std::forward<Value>(result)
             );
+            state = value_state::value;
         }
 
         // get the lvalue ref
