@@ -3,11 +3,11 @@
 using namespace co_context;
 using Socket = co_context::socket;
 
-task<> session(Socket sock) {
+// 不断接收字节流并打印到stdout
+task<> recv_session(Socket sock) {
     char buf[8192];
     int nr = co_await sock.recv(buf);
 
-    // 不断接收字节流并打印到stdout
     while (nr > 0) {
         nr = co_await (
             lazy::write(STDOUT_FILENO, {buf, (size_t)nr}) && sock.recv(buf)
@@ -15,11 +15,22 @@ task<> session(Socket sock) {
     }
 }
 
+// 将键盘输入发送给对方
+task<> send_session(Socket sock) {
+    char buf[10];
+    int nr = co_await lazy::read(STDIN_FILENO, buf);
+
+    while (nr > 0) {
+        nr = co_await (sock.send({buf, (size_t)nr}) && lazy::read(STDIN_FILENO, buf));
+    }
+}
+
 task<> server(uint16_t port) {
     acceptor ac{inet_address{port}};
-    // 不断接受 client，每个连接生成一个 worker 协程
+    // 不断接受 client，每个连接生成 session 协程
     for (int sockfd; (sockfd = co_await ac.accept()) >= 0;) {
-        co_spawn(session(Socket{sockfd}));
+        co_spawn(recv_session(Socket{sockfd}));
+        co_spawn(send_session(Socket{sockfd}));
     }
 }
 
@@ -32,8 +43,9 @@ task<> client(std::string_view hostname, uint16_t port) {
         if (res < 0) {
             printf("res=%d: %s\n", res, strerror(-res));
         }
-        // 生成一个 worker 协程
-        co_spawn(session(std::move(sock)));
+        // 生成 session 协程
+        co_spawn(recv_session(Socket{sock.fd()}));
+        co_spawn(send_session(Socket{sock.fd()}));
     } else {
         printf("Unable to resolve %s\n", hostname.data());
     }
