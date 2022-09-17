@@ -78,7 +78,7 @@ struct URingParams final : io_uring_params {
     }
 };
 
-template<unsigned URingFlags>
+template<unsigned uring_flags>
 class [[nodiscard]] URing final {
   public:
     using Params = URingParams;
@@ -89,7 +89,7 @@ class [[nodiscard]] URing final {
 
     SubmissionQueue sq;
     CompletionQueue cq;
-    // unsigned flags; // is now URingFlags
+    // unsigned flags; // is now uring_flags
     int ring_fd;
 
     unsigned features;
@@ -109,7 +109,7 @@ class [[nodiscard]] URing final {
         unsigned enterFlags = config::default_enter_flags;
 
         if (isSQRingNeedEnter(enterFlags)) {
-            if constexpr (URingFlags & IORING_SETUP_IOPOLL)
+            if constexpr (uring_flags & IORING_SETUP_IOPOLL)
                 enterFlags |= IORING_ENTER_GETEVENTS;
 
             // HACK see config::using_register_ring_fd.
@@ -138,7 +138,7 @@ class [[nodiscard]] URing final {
         unsigned enterFlags = config::default_enter_flags;
 
         if (waitNum || isSQRingNeedEnter(enterFlags)) {
-            if (waitNum || (URingFlags & IORING_SETUP_IOPOLL))
+            if (waitNum || (uring_flags & IORING_SETUP_IOPOLL))
                 enterFlags |= IORING_ENTER_GETEVENTS;
 
             // HACK see config::default_enter_flags.
@@ -168,7 +168,7 @@ class [[nodiscard]] URing final {
          * ready. We don't need the load acquire for non-SQPOLL since then we
          * drive updates.
          */
-        if constexpr (URingFlags & IORING_SETUP_SQPOLL)
+        if constexpr (uring_flags & IORING_SETUP_SQPOLL)
             return sq.sqe_tail - io_uring_smp_load_acquire(sq.khead);
         /* always use real head, to avoid losing sync for short submit */
         else
@@ -188,7 +188,7 @@ class [[nodiscard]] URing final {
         return sq.ring_entries;
     }
 
-    inline const SQEntry *__getSqes() const noexcept { return sq.sqes; }
+    inline const sq_entry *__getSqes() const noexcept { return sq.sqes; }
 
     /**
      * @brief Return an sqe to fill. User must later call submit().
@@ -197,14 +197,14 @@ class [[nodiscard]] URing final {
      * io_uring_submit() when it's ready to tell the kernel about it. The caller
      * may call this function multiple times before calling submit().
      *
-     * @return SQEntry* Returns a vacant sqe, or nullptr if we're full.
+     * @return sq_entry* Returns a vacant sqe, or nullptr if we're full.
      */
-    inline SQEntry *getSQEntry() noexcept {
+    inline sq_entry *getSQEntry() noexcept {
         // const unsigned int head = io_uring_smp_load_acquire(sq.khead);
         // const unsigned int next = sq.sqe_tail + 1;
-        // SQEntry *sqe = nullptr;
+        // sq_entry *sqe = nullptr;
         // if (next - head <= sq.ring_entries) {
-        //     sqe = reinterpret_cast<SQEntry *>(
+        //     sqe = reinterpret_cast<sq_entry *>(
         //         sq.sqes + (sq.sqe_tail & sq.ring_mask)
         //     );
         //     sq.sqe_tail = next;
@@ -217,7 +217,7 @@ class [[nodiscard]] URing final {
      *
      * @param sqe
      */
-    inline void appendSQEntry(const SQEntry *sqe) noexcept {
+    inline void appendSQEntry(const sq_entry *sqe) noexcept {
         sq.appendSQEntry(sqe);
     }
 
@@ -233,7 +233,7 @@ class [[nodiscard]] URing final {
      * @return what I don't know
      */
     inline int SQRingWait() {
-        if constexpr (!(URingFlags & IORING_SETUP_SQPOLL)) return 0;
+        if constexpr (!(uring_flags & IORING_SETUP_SQPOLL)) return 0;
         if (SQSpaceLeft()) return 0;
 
         // HACK this assumes app will use registered ring.
@@ -260,25 +260,25 @@ class [[nodiscard]] URing final {
         return io_uring_smp_load_acquire(cq.ktail) - *cq.khead;
     }
 
-    inline CQEntry *waitCQEntry() {
+    inline cq_entry *waitCQEntry() {
         auto [cqe, availableNum] = __peekCQEntry();
         if (cqe != nullptr) return cqe;
 
         return waitCQEntryNum(1);
     }
 
-    inline CQEntry *peekCQEntry() {
+    inline cq_entry *peekCQEntry() {
         auto [cqe, availableNum] = __peekCQEntry();
         if (cqe != nullptr) return cqe;
 
         return waitCQEntryNum(0);
     }
 
-    inline CQEntry *waitCQEntryNum(unsigned num) {
+    inline cq_entry *waitCQEntryNum(unsigned num) {
         return getCQEntry(/* submit */ 0, num, /* sigmask */ nullptr);
     }
 
-    inline void SeenCQEntry(const CQEntry *cqe) noexcept {
+    inline void SeenCQEntry(const cq_entry *cqe) noexcept {
         assert(cqe != nullptr);
         CQAdvance(1);
     }
@@ -331,7 +331,7 @@ class [[nodiscard]] URing final {
   public:
     URing(unsigned entries, Params &params) {
         // override the params.flags
-        params.flags = URingFlags;
+        params.flags = uring_flags;
         const int fd = detail::__sys_io_uring_setup(entries, &params);
         if (fd < 0) [[unlikely]]
             throw std::system_error{
@@ -352,7 +352,7 @@ class [[nodiscard]] URing final {
 
     URing(unsigned entries, Params &&params) : URing(entries, params) {}
 
-    URing(unsigned entries) : URing(entries, Params{URingFlags}) {}
+    URing(unsigned entries) : URing(entries, Params{uring_flags}) {}
 
     /**
      * ban all copying or moving
@@ -409,7 +409,7 @@ class [[nodiscard]] URing final {
         sq.setOffset(p.sq_off);
 
         const size_t sqes_size = p.sq_entries * sizeof(io_uring_sqe);
-        sq.sqes = reinterpret_cast<SQEntry *>(mmap(
+        sq.sqes = reinterpret_cast<sq_entry *>(mmap(
             0, sqes_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE, fd,
             IORING_OFF_SQES
         ));
@@ -430,7 +430,7 @@ class [[nodiscard]] URing final {
 
     inline constexpr bool isSQRingNeedEnter(unsigned &enterFlags
     ) const noexcept {
-        if constexpr (!(URingFlags & IORING_SETUP_SQPOLL)) return true;
+        if constexpr (!(uring_flags & IORING_SETUP_SQPOLL)) return true;
 
         /*
          * Ensure the kernel can see the store to the SQ tail before we read
@@ -456,7 +456,7 @@ class [[nodiscard]] URing final {
     }
 
     inline bool isCQRingNeedEnter() const noexcept {
-        if constexpr (URingFlags & IORING_SETUP_IOPOLL) return true;
+        if constexpr (uring_flags & IORING_SETUP_IOPOLL) return true;
         return isCQRingNeedFlush();
     }
 
@@ -467,7 +467,7 @@ class [[nodiscard]] URing final {
 
     auto __peekCQEntry() {
         struct ReturnType {
-            CQEntry *cqe;
+            cq_entry *cqe;
             unsigned availableNum;
         } ret;
 
@@ -501,7 +501,7 @@ class [[nodiscard]] URing final {
         return ret;
     }
 
-    CQEntry *getCQEntry(detail::CQEGetter &data) {
+    cq_entry *getCQEntry(detail::CQEGetter &data) {
         bool isLooped = false;
         while (true) {
             bool isNeedEnter = false;
@@ -551,7 +551,7 @@ class [[nodiscard]] URing final {
         }
     }
 
-    inline CQEntry *
+    inline cq_entry *
     getCQEntry(unsigned submit, unsigned waitNum, sigset_t *sigmask) {
         detail::CQEGetter data{
             .submit = submit,

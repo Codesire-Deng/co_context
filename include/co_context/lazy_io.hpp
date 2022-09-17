@@ -42,7 +42,7 @@ namespace detail {
       protected:
         friend class lazy_link_io;
         friend struct lazy_link_timeout;
-        liburingcxx::SQEntry *sqe;
+        liburingcxx::sq_entry *sqe;
         task_info io_info;
 
         inline void submit() noexcept {
@@ -83,7 +83,7 @@ namespace detail {
 #endif
     };
 
-    inline void set_link_sqe(liburingcxx::SQEntry *sqe) noexcept {
+    inline void set_link_sqe(liburingcxx::sq_entry *sqe) noexcept {
         sqe->setLink();
         sqe->fetchData() |= __u64(task_info::task_type::lazy_link_sqe);
     }

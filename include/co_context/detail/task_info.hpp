@@ -4,15 +4,13 @@
 
 #include "co_context/log/log.hpp"
 
-namespace liburingcxx {
-class SQEntry;
-class CQEntry;
-}
+// TODO Delete me
+// #include "uring/io_uring.h"
+// #include "uring/cq_entry.hpp"
 
-namespace liburingcxx {
-class SQEntry;
-class CQEntry;
-}
+// namespace liburingcxx {
+// class sq_entry;
+// }
 
 namespace co_context {
 
@@ -21,8 +19,8 @@ class condition_variable;
 
 namespace detail {
 
-    using liburingcxx::SQEntry;
-    using liburingcxx::CQEntry;
+    // using liburingcxx::sq_entry;
+    // using liburingcxx::cq_entry;
 
     struct [[nodiscard]] task_info {
         union {
@@ -32,7 +30,7 @@ namespace detail {
         };
 
         union {
-            // CQEntry *cqe;
+            // cq_entry *cqe;
             int32_t result;
             // counting_semaphore *sem;
             // condition_variable *cv;

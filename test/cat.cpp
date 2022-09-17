@@ -66,7 +66,7 @@ void submitReadRequest(URing &ring, const std::filesystem::path path) {
     }
 
     // submit the read request
-    liburingcxx::SQEntry &sqe = *ring.getSQEntry();
+    liburingcxx::sq_entry &sqe = *ring.getSQEntry();
     sqe.prepareReadv(file_fd, std::span{fi->iovecs, blocks}, 0)
         .setData(reinterpret_cast<uint64_t>(fi));
 
@@ -77,10 +77,10 @@ void submitReadRequest(URing &ring, const std::filesystem::path path) {
 
 void waitResultAndPrint(URing &ring) {
     // get a result from the ring
-    liburingcxx::CQEntry &cqe = *ring.waitCQEntry();
+    liburingcxx::cq_entry &cqe = *ring.waitCQEntry();
 
     // get the according data
-    FileInfo *fi = reinterpret_cast<FileInfo *>(cqe.getData());
+    FileInfo *fi = reinterpret_cast<FileInfo *>(cqe.user_data);
 
     // print the data to console
     const int blocks = countBlocks(fi->size, BLOCK_SZ);

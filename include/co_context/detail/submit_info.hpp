@@ -1,8 +1,10 @@
 #pragma once
 
+#include <cstdint>
+
 namespace liburingcxx {
 
-class SQEntry;
+class sq_entry;
 
 } // namespace liburingcxx
 
@@ -22,8 +24,8 @@ namespace detail {
         };
 
         union {
-            liburingcxx::SQEntry *available_sqe;
-            liburingcxx::SQEntry *submit_sqe;
+            liburingcxx::sq_entry *available_sqe;
+            liburingcxx::sq_entry *submit_sqe;
         };
     };
 

@@ -1,19 +1,19 @@
 #pragma once
 
-#include "uring/CQEntry.hpp"
+#include "uring/cq_entry.hpp"
 
 namespace liburingcxx {
 
-template<unsigned URingFlags>
+template<unsigned uring_flags>
 class URing;
 
 namespace detail {
 
-    using CQEntry = ::liburingcxx::CQEntry;
+    using cq_entry = ::liburingcxx::cq_entry;
 
-    static_assert(sizeof(CQEntry) == sizeof(io_uring_cqe));
-    static_assert(sizeof(CQEntry) == 16);
-    static_assert(alignof(CQEntry) == 8);
+    static_assert(sizeof(cq_entry) == sizeof(io_uring_cqe));
+    static_assert(sizeof(cq_entry) == 16);
+    static_assert(alignof(cq_entry) == 8);
 
     class CompletionQueue final {
       private:
@@ -23,7 +23,7 @@ namespace detail {
         unsigned ring_entries;
         unsigned *kflags;
         unsigned *koverflow;
-        CQEntry *cqes;
+        cq_entry *cqes;
 
         size_t ring_sz;
         void *ring_ptr;
@@ -38,11 +38,11 @@ namespace detail {
             if (off.flags)
                 kflags = (unsigned *)((uintptr_t)ring_ptr + off.flags);
             koverflow = (unsigned *)((uintptr_t)ring_ptr + off.overflow);
-            cqes = (CQEntry *)((uintptr_t)ring_ptr + off.cqes);
+            cqes = (cq_entry *)((uintptr_t)ring_ptr + off.cqes);
         }
 
       public:
-        template<unsigned URingFlags>
+        template<unsigned uring_flags>
         friend class ::liburingcxx::URing;
         CompletionQueue() noexcept = default;
         ~CompletionQueue() noexcept = default;

@@ -1,11 +1,12 @@
 #pragma once
 
 #include <coroutine>
+#include <cstdint>
 #include <co_context/utility/bit.hpp>
 
 namespace liburingcxx {
 
-class SQEntry;
+class sq_entry;
 
 } // namespace liburingcxx
 
