@@ -449,15 +449,15 @@ void server_loop(int server_socket) {
 
     add_accept_request(server_socket, &client_addr, &client_addr_len);
 
-    liburingcxx::CQEntry *cqe;
+    liburingcxx::cq_entry *cqe;
     while (1) {
         cqe = ring.waitCQEntry();
-        struct request *req = (struct request *)cqe->getData();
+        struct request *req = (struct request *)cqe->user_data;
         // if (ret < 0) fatal_error("io_uring_wait_cqe");
-        if (cqe->getRes() < 0) {
+        if (cqe->res < 0) {
             fprintf(
                 stderr, "Async request failed: %s for event: %d\n",
-                strerror(-cqe->getRes()), req->event_type
+                strerror(-cqe->res), req->event_type
             );
             exit(1);
         }
@@ -467,11 +467,11 @@ void server_loop(int server_socket) {
                 add_accept_request(
                     server_socket, &client_addr, &client_addr_len
                 );
-                add_read_request(cqe->getRes());
+                add_read_request(cqe->res);
                 free(req);
                 break;
             case EVENT_TYPE_READ:
-                if (!cqe->getRes()) {
+                if (!cqe->res) {
                     fprintf(stderr, "Empty request!\n");
                     break;
                 }

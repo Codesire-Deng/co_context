@@ -60,7 +60,7 @@ namespace detail {
         }
 
       protected:
-        liburingcxx::SQEntry *sqe;
+        liburingcxx::sq_entry *sqe;
         task_info *shared_io_info;
 
         // PERF memory allocation

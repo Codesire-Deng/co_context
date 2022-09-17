@@ -1,20 +1,20 @@
 #pragma once
 
 #include <numeric>
-#include "uring/SQEntry.hpp"
+#include "uring/sq_entry.hpp"
 
 namespace liburingcxx {
 
-template<unsigned URingFlags>
+template<unsigned uring_flags>
 class URing;
 
 namespace detail {
 
-    using SQEntry = ::liburingcxx::SQEntry;
+    using sq_entry = ::liburingcxx::sq_entry;
 
-    static_assert(sizeof(SQEntry) == sizeof(io_uring_sqe));
-    static_assert(sizeof(SQEntry) == 64);
-    static_assert(alignof(SQEntry) == 8);
+    static_assert(sizeof(sq_entry) == sizeof(io_uring_sqe));
+    static_assert(sizeof(sq_entry) == 64);
+    static_assert(alignof(sq_entry) == 8);
 
     class SubmissionQueue final {
       private:
@@ -29,7 +29,7 @@ namespace detail {
         unsigned *kflags;
         unsigned *kdropped;
         unsigned *array;
-        SQEntry *sqes;
+        sq_entry *sqes;
         size_t ring_sz;
         void *ring_ptr;
 
@@ -84,7 +84,7 @@ namespace detail {
             return sqe_tail - *khead;
         }
 
-        [[nodiscard]] inline SQEntry *getSQEntry() noexcept {
+        [[nodiscard]] inline sq_entry *getSQEntry() noexcept {
             const unsigned int head = io_uring_smp_load_acquire(khead);
             if (sqe_free_head - head < ring_entries) [[likely]] {
                 return &sqes[array[sqe_free_head++ & ring_mask]];
@@ -93,13 +93,13 @@ namespace detail {
             }
         }
 
-        inline void appendSQEntry(const SQEntry *const sqe) noexcept {
+        inline void appendSQEntry(const sq_entry *const sqe) noexcept {
             array[sqe_tail++ & ring_mask] = sqe - sqes;
             assert(sqe_tail - *khead <= ring_entries);
         }
 
       public:
-        template<unsigned URingFlags>
+        template<unsigned uring_flags>
         friend class ::liburingcxx::URing;
         SubmissionQueue() noexcept = default;
         ~SubmissionQueue() noexcept = default;

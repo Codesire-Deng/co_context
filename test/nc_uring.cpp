@@ -36,16 +36,16 @@ void handle_peer() {
 void event_loop() {
     while (true) {
         auto cqe = ring.waitCQEntry();
-        if (cqe->getRes() < 0) {
+        if (cqe->res < 0) {
             fprintf(
-                stderr, "Async request failed: %s\n", strerror(-cqe->getRes())
+                stderr, "Async request failed: %s\n", strerror(-cqe->res)
             );
-            printf("flag = %u\n", cqe->getFlags());
+            printf("flag = %u\n", cqe->flags);
             exit(1);
         }
-        res = cqe->getRes();
+        res = cqe->res;
 
-        reinterpret_cast<void (*)()>(cqe->getData())();
+        reinterpret_cast<void (*)()>(cqe->user_data)();
     }
 }
 

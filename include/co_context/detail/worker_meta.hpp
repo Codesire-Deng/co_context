@@ -53,7 +53,7 @@ namespace detail {
         std::queue<submit_info> submit_overflow_buf;
         */
 
-        liburingcxx::SQEntry *get_free_sqe() noexcept;
+        liburingcxx::sq_entry *get_free_sqe() noexcept;
 
         [[deprecated]] void swap_last_two_sqes() noexcept;
 

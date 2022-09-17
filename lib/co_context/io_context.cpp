@@ -46,7 +46,7 @@ namespace detail {
         log::i("worker[%u] runs on %u\n", this->tid, gettid());
     }
 
-    liburingcxx::SQEntry *worker_meta::get_free_sqe() noexcept {
+    liburingcxx::sq_entry *worker_meta::get_free_sqe() noexcept {
         // may acquire the cur.head
         auto &swap = this->sharing.submit_swap;
         const auto &cur = this->sharing.submit_cur;
@@ -504,15 +504,15 @@ static bool eager_io_need_awake(detail::task_info *io_info) {
  */
 inline void io_context::poll_completion() noexcept {
     // reap round
-    const liburingcxx::CQEntry *const polling_cqe = ring.peekCQEntry();
+    const liburingcxx::cq_entry *const polling_cqe = ring.peekCQEntry();
     if (polling_cqe == nullptr) return;
 
     --requests_to_reap;
     log::v("ctx poll_completion found, remaining=%d\n", requests_to_reap);
 
-    const uint64_t user_data = polling_cqe->getData();
-    const int32_t result = polling_cqe->getRes();
-    [[maybe_unused]] const uint32_t flags = polling_cqe->getFlags();
+    const uint64_t user_data = polling_cqe->user_data;
+    const int32_t result = polling_cqe->res;
+    [[maybe_unused]] const uint32_t flags = polling_cqe->flags;
 
     if (config::log_level <= config::level::debug && result < 0) {
         log::d(
