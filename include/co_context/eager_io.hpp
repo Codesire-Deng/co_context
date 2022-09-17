@@ -1,6 +1,7 @@
 #pragma once
 
 #include "uring/uring.hpp"
+#include "co_context/detail/task_info.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/detail/worker_meta.hpp"
 #include "co_context/utility/as_atomic.hpp"

@@ -3,6 +3,7 @@
 #include <coroutine>
 #include <concepts>
 #include <cassert>
+#include <memory>
 
 namespace co_context {
 
