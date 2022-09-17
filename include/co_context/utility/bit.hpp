@@ -2,6 +2,7 @@
 
 #include <concepts>
 #include <bit>
+#include <cstdint>
 
 namespace co_context {
 

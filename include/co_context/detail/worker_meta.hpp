@@ -4,6 +4,7 @@
 #include "co_context/detail/swap_zone.hpp"
 #include "co_context/detail/submit_info.hpp"
 #include "co_context/detail/reap_info.hpp"
+#include "co_context/detail/thread_meta.hpp"
 #include "co_context/task.hpp"
 #include "co_context/log/log.hpp"
 #include <thread>
