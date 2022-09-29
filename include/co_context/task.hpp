@@ -75,7 +75,7 @@ namespace detail {
                     value.~T();
                     break;
                 case value_state::exception:
-                    ex_ptr.~exception_ptr();
+                    exception_ptr.~exception_ptr();
                     [[fallthrough]];
                 default:
                     break;
@@ -85,7 +85,7 @@ namespace detail {
         task<T> get_return_object() noexcept;
 
         void unhandled_exception() noexcept {
-            ex_ptr = std::current_exception();
+            exception_ptr = std::current_exception();
             state = value_state::exception;
         }
 
@@ -102,7 +102,7 @@ namespace detail {
         // get the lvalue ref
         T &result() & {
             if (state == value_state::exception) [[unlikely]]
-                std::rethrow_exception(ex_ptr);
+                std::rethrow_exception(exception_ptr);
             assert(state == value_state::value);
             return value;
         }
@@ -110,7 +110,7 @@ namespace detail {
         // get the prvalue
         T &&result() && {
             if (state == value_state::exception) [[unlikely]]
-                std::rethrow_exception(ex_ptr);
+                std::rethrow_exception(exception_ptr);
             assert(state == value_state::value);
             return std::move(value);
         }
@@ -118,7 +118,7 @@ namespace detail {
       private:
         union {
             T value;
-            std::exception_ptr ex_ptr;
+            std::exception_ptr exception_ptr;
         };
         enum class value_state : uint8_t { mono, value, exception } state;
     };
