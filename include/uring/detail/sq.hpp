@@ -6,7 +6,7 @@
 namespace liburingcxx {
 
 template<unsigned uring_flags>
-class URing;
+class uring;
 
 namespace detail {
 
@@ -16,11 +16,11 @@ namespace detail {
     static_assert(sizeof(sq_entry) == 64);
     static_assert(alignof(sq_entry) == 8);
 
-    class SubmissionQueue final {
+    class submission_queue final {
       private:
-        unsigned sqe_head;      // memset to 0 during URing()
-        unsigned sqe_tail;      // memset to 0 during URing()
-        unsigned sqe_free_head; // memset to 0 during URing()
+        unsigned sqe_head;      // memset to 0 during uring()
+        unsigned sqe_tail;      // memset to 0 during uring()
+        unsigned sqe_free_head; // memset to 0 during uring()
 
         unsigned *khead;
         unsigned *ktail;
@@ -34,7 +34,7 @@ namespace detail {
         void *ring_ptr;
 
       private:
-        void setOffset(const io_sqring_offsets &off) noexcept {
+        void set_offset(const io_sqring_offsets &off) noexcept {
             khead = (unsigned *)((uintptr_t)ring_ptr + off.head);
             ktail = (unsigned *)((uintptr_t)ring_ptr + off.tail);
             ring_mask = *(unsigned *)((uintptr_t)ring_ptr + off.ring_mask);
@@ -43,10 +43,9 @@ namespace detail {
             kflags = (unsigned *)((uintptr_t)ring_ptr + off.flags);
             kdropped = (unsigned *)((uintptr_t)ring_ptr + off.dropped);
             array = (unsigned *)((uintptr_t)ring_ptr + off.array);
-            initFreeQueue();
         }
 
-        void initFreeQueue() noexcept {
+        void init_free_queue() noexcept {
             std::iota(array, array + ring_entries, 0);
         }
 
@@ -84,7 +83,7 @@ namespace detail {
             return sqe_tail - *khead;
         }
 
-        [[nodiscard]] inline sq_entry *getSQEntry() noexcept {
+        [[nodiscard]] inline sq_entry *get_sq_entry() noexcept {
             const unsigned int head = io_uring_smp_load_acquire(khead);
             if (sqe_free_head - head < ring_entries) [[likely]] {
                 return &sqes[array[sqe_free_head++ & ring_mask]];
@@ -93,21 +92,21 @@ namespace detail {
             }
         }
 
-        inline void appendSQEntry(const sq_entry *const sqe) noexcept {
+        inline void append_sq_entry(const sq_entry *const sqe) noexcept {
             array[sqe_tail++ & ring_mask] = sqe - sqes;
             assert(sqe_tail - *khead <= ring_entries);
         }
 
       public:
         template<unsigned uring_flags>
-        friend class ::liburingcxx::URing;
-        SubmissionQueue() noexcept = default;
-        ~SubmissionQueue() noexcept = default;
+        friend class ::liburingcxx::uring;
+        submission_queue() noexcept = default;
+        ~submission_queue() noexcept = default;
     };
 
-    // char (*____)[sizeof(SubmissionQueue)] = 1;
+    // char (*____)[sizeof(submission_queue)] = 1;
 
-    static_assert(sizeof(SubmissionQueue) == 88);
+    static_assert(sizeof(submission_queue) == 88);
 
 } // namespace detail
 

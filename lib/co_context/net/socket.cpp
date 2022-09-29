@@ -28,7 +28,7 @@ socket &socket::set_reuse_addr(bool on) {
     int optval = on;
     if (::setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval)
         < 0) {
-        perror("socket::setReuseAddr");
+        perror("socket::set_reuse_addr");
     }
     return *this;
 }

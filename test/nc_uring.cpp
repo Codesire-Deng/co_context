@@ -2,10 +2,9 @@
 #include "co_context/net/acceptor.hpp"
 
 using namespace std;
-using namespace liburingcxx;
 using namespace co_context;
 
-using uring = liburingcxx::URing<0>;
+using uring = liburingcxx::uring<0>;
 
 uring ring{8};
 
@@ -26,16 +25,16 @@ void handle_recv() {
 
 void handle_peer() {
     peer = res;
-    auto sqe = ring.getSQEntry();
-    sqe->prepareRecv(peer, recv_buf, 0);
-    sqe->setData((uintptr_t)handle_recv);
-    ring.appendSQEntry(sqe);
+    auto sqe = ring.get_sq_entry();
+    sqe->prepare_recv(peer, recv_buf, 0);
+    sqe->set_data((uintptr_t)handle_recv);
+    ring.append_sq_entry(sqe);
     ring.submit();
 }
 
 void event_loop() {
     while (true) {
-        auto cqe = ring.waitCQEntry();
+        auto cqe = ring.wait_cq_entry();
         if (cqe->res < 0) {
             fprintf(
                 stderr, "Async request failed: %s\n", strerror(-cqe->res)
@@ -51,10 +50,10 @@ void event_loop() {
 
 void server(uint16_t port) {
     acceptor ac{inet_address{port}};
-    auto sqe = ring.getSQEntry();
-    sqe->prepareAccept(ac.listen_fd(), nullptr, nullptr, 0);
-    sqe->setData((uintptr_t)handle_peer);
-    ring.appendSQEntry(sqe);
+    auto sqe = ring.get_sq_entry();
+    sqe->prepare_accept(ac.listen_fd(), nullptr, nullptr, 0);
+    sqe->set_data((uintptr_t)handle_peer);
+    ring.append_sq_entry(sqe);
     ring.submit();
 
     event_loop();
@@ -65,10 +64,10 @@ void client(std::string_view hostname, uint16_t port) {
     if (inet_address::resolve(hostname, port, addr)) {
         co_context::socket sock{co_context::socket::create_tcp(addr.family())};
         // 连接一个 server
-        auto sqe = ring.getSQEntry();
-        sqe->prepareConnect(sock.fd(), addr.get_sockaddr(), addr.length());
-        sqe->setData((uintptr_t)handle_peer);
-        ring.appendSQEntry(sqe);
+        auto sqe = ring.get_sq_entry();
+        sqe->prepare_connect(sock.fd(), addr.get_sockaddr(), addr.length());
+        sqe->set_data((uintptr_t)handle_peer);
+        ring.append_sq_entry(sqe);
         ring.submit();
     } else {
         printf("Unable to resolve %s\n", hostname.data());

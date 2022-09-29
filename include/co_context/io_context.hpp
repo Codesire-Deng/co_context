@@ -39,7 +39,7 @@ class io_context;
 
 class [[nodiscard]] io_context final {
   private:
-    using uring = liburingcxx::URing<
+    using uring = liburingcxx::uring<
         config::io_uring_flags
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
         /**
@@ -220,7 +220,7 @@ class [[nodiscard]] io_context final {
     friend void co_spawn(task<void> &&entrance) noexcept;
 
   public:
-    io_context(unsigned io_uring_entries, uring::Params &io_uring_params)
+    io_context(unsigned io_uring_entries, uring::params &io_uring_params)
         : ring(io_uring_entries, io_uring_params)
         , sqring_entries(io_uring_entries) {
         init();
@@ -231,7 +231,7 @@ class [[nodiscard]] io_context final {
         init();
     }
 
-    io_context(unsigned io_uring_entries, uring::Params &&io_uring_params)
+    io_context(unsigned io_uring_entries, uring::params &&io_uring_params)
         : io_context(io_uring_entries, io_uring_params) {}
 
     void probe() const;
