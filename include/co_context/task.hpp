@@ -21,13 +21,13 @@ namespace detail {
     /**
      * @brief Define the behavior of all tasks.
      *
-     * final_suspend: yes, and return to father
+     * final_suspend: yes, and return to parent
      */
     class task_promise_base {
         friend struct final_awaiter;
 
         /**
-         * @brief current task<> is finished therefore resume the father
+         * @brief current task<> is finished therefore resume the parent
          */
         struct final_awaiter {
             constexpr bool await_ready() const noexcept { return false; }
@@ -35,7 +35,7 @@ namespace detail {
             template<std::derived_from<task_promise_base> Promise>
             std::coroutine_handle<>
             await_suspend(std::coroutine_handle<Promise> current) noexcept {
-                return current.promise().fa_coro;
+                return current.promise().parent_coro;
             }
 
             // Won't be resumed anyway
@@ -51,12 +51,12 @@ namespace detail {
 
         inline constexpr final_awaiter final_suspend() noexcept { return {}; }
 
-        inline void set_father(std::coroutine_handle<> continuation) noexcept {
-            fa_coro = continuation;
+        inline void set_parent(std::coroutine_handle<> continuation) noexcept {
+            parent_coro = continuation;
         }
 
       private:
-        std::coroutine_handle<> fa_coro{std::noop_coroutine()};
+        std::coroutine_handle<> parent_coro{std::noop_coroutine()};
     };
 
     /**
@@ -192,7 +192,7 @@ class [[nodiscard("Did you forget to co_await?")]] task {
 
         std::coroutine_handle<>
         await_suspend(std::coroutine_handle<> awaiting_coro) noexcept {
-            handle.promise().set_father(awaiting_coro);
+            handle.promise().set_parent(awaiting_coro);
             return handle;
         }
     };
