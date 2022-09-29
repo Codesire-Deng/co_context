@@ -5,7 +5,7 @@
 namespace liburingcxx {
 
 template<unsigned uring_flags>
-class URing;
+class uring;
 
 namespace detail {
 
@@ -15,7 +15,7 @@ namespace detail {
     static_assert(sizeof(cq_entry) == 16);
     static_assert(alignof(cq_entry) == 8);
 
-    class CompletionQueue final {
+    class completion_queue final {
       private:
         unsigned *khead;
         unsigned *ktail;
@@ -29,7 +29,7 @@ namespace detail {
         void *ring_ptr;
 
       private:
-        void setOffset(const io_cqring_offsets &off) noexcept {
+        void set_offset(const io_cqring_offsets &off) noexcept {
             khead = (unsigned *)((uintptr_t)ring_ptr + off.head);
             ktail = (unsigned *)((uintptr_t)ring_ptr + off.tail);
             ring_mask = *(unsigned *)((uintptr_t)ring_ptr + off.ring_mask);
@@ -43,14 +43,14 @@ namespace detail {
 
       public:
         template<unsigned uring_flags>
-        friend class ::liburingcxx::URing;
-        CompletionQueue() noexcept = default;
-        ~CompletionQueue() noexcept = default;
+        friend class ::liburingcxx::uring;
+        completion_queue() noexcept = default;
+        ~completion_queue() noexcept = default;
     };
 
-    struct CQEGetter {
+    struct cq_entry_getter {
         unsigned submit;
-        unsigned waitNum;
+        unsigned wait_num;
         unsigned getFlags;
         int size;
         void *arg;

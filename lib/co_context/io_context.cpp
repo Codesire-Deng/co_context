@@ -376,17 +376,17 @@ void io_context::try_submit(detail::submit_info &info) noexcept {
         // submit to ring
         ++requests_to_reap;
         log::v(
-            "ring.appendSQEntry()"
+            "ring.append_sq_entry()"
             " with requests_to_reap=%d...\n",
             requests_to_reap
         );
         need_ring_submit = true;
-        ring.appendSQEntry(info.submit_sqe);
-        auto *const victim_sqe = ring.getSQEntry();
-        assert(victim_sqe != nullptr && "ring.getSQEntry() returns nullptr!");
+        ring.append_sq_entry(info.submit_sqe);
+        auto *const victim_sqe = ring.get_sq_entry();
+        assert(victim_sqe != nullptr && "ring.get_sq_entry() returns nullptr!");
         // log::e("victim_sqe OK\n");
         info.available_sqe = victim_sqe;
-        log::v("ring.appendSQEntry()...OK\n");
+        log::v("ring.append_sq_entry()...OK\n");
         return;
     } else {
         using task_type = task_info::task_type;
@@ -504,7 +504,7 @@ static bool eager_io_need_awake(detail::task_info *io_info) {
  */
 inline void io_context::poll_completion() noexcept {
     // reap round
-    const liburingcxx::cq_entry *const polling_cqe = ring.peekCQEntry();
+    const liburingcxx::cq_entry *const polling_cqe = ring.peek_cq_entry();
     if (polling_cqe == nullptr) return;
 
     --requests_to_reap;
@@ -522,7 +522,7 @@ inline void io_context::poll_completion() noexcept {
         );
     }
 
-    ring.SeenCQEntry(polling_cqe);
+    ring.seen_cq_entry(polling_cqe);
     assert(flags != detail::reap_info::co_spawn_flag);
 
     using task_type = task_info::task_type;
@@ -568,7 +568,7 @@ bool io_context::try_clear_reap_overflow_buf() noexcept {
 void io_context::init() {
     // HACK new version of `uring` assume `ring_fd` must be registered.
     if constexpr (liburingcxx::config::using_register_ring_fd)
-        ring.registerRingFd();
+        ring.register_ring_fd();
         
     // TODO support multiple io_context in one thread?
     detail::this_thread.ctx = this;
@@ -576,7 +576,7 @@ void io_context::init() {
     detail::this_thread.tid = std::thread::hardware_concurrency() - 1;
     // assert(submit_overflow_buf.empty());
     assert(reap_overflow_buf.empty());
-    assert(this->sqring_entries == ring.getSQRingEntries());
+    assert(this->sqring_entries == ring.get_sq_ring_entries());
 
     {
         const unsigned actual_sqring_size = this->sqring_entries;
@@ -596,7 +596,7 @@ void io_context::init() {
     for (unsigned i = 0; i < config::workers_number; ++i) {
         for (unsigned j = 0; j < config::swap_capacity; ++j) {
             worker[i].sharing.submit_swap[j] = detail::submit_info{
-                .address = 0UL, .available_sqe = ring.getSQEntry()};
+                .address = 0UL, .available_sqe = ring.get_sq_entry()};
         }
     }
     // probe();
@@ -655,7 +655,7 @@ void io_context::run() {
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
             log::i("ctx completion_poller runs on %d\n", gettid());
             while (true) {
-                auto num = ring.CQReadyAcquire();
+                auto num = ring.cq_ready_acquire();
                 while (num--) {
                     poll_completion();
                 }
@@ -686,13 +686,13 @@ void io_context::run() {
             // TODO judge the memory order (relaxed may cause bugs)
             // TODO consider reap_poll_rounds and reap_overflow_buf
             if (requests_to_reap > 0) [[likely]] {
-                auto num = ring.CQReadyRelaxed();
+                auto num = ring.cq_ready_relaxed();
 
                 // io_context can block itself in the following situation
                 if constexpr (config::worker_threads_number == 0 && config::use_wait_and_notify) {
                     if (num == 0 && !has_task_ready) [[unlikely]] {
-                        ring.waitCQEntry();
-                        num = ring.CQReadyRelaxed();
+                        ring.wait_cq_entry();
+                        num = ring.cq_ready_relaxed();
                         assert(num > 0);
                     }
                 }

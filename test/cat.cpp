@@ -25,7 +25,7 @@
 
 constexpr unsigned BLOCK_SZ = 1024;
 
-struct FileInfo {
+struct file_info {
     size_t size;
     iovec iovecs[];
 };
@@ -39,9 +39,9 @@ void output(std::string_view s) noexcept {
         putchar(c);
 }
 
-using URing = liburingcxx::URing<0>;
+using uring = liburingcxx::uring<0>;
 
-void submitReadRequest(URing &ring, const std::filesystem::path path) {
+void submit_readRequest(uring &ring, const std::filesystem::path path) {
     // open the file
     int file_fd = open(path.c_str(), O_RDONLY);
     if (file_fd < 0) {
@@ -51,7 +51,7 @@ void submitReadRequest(URing &ring, const std::filesystem::path path) {
     // calculate the file size then malloc iovecs
     const size_t file_size = std::filesystem::file_size(path);
     const unsigned blocks = countBlocks(file_size, BLOCK_SZ);
-    FileInfo *fi = (FileInfo *)malloc(sizeof(*fi) + (blocks * sizeof(iovec)));
+    file_info *fi = (file_info *)malloc(sizeof(*fi) + (blocks * sizeof(iovec)));
     fi->size = file_size;
 
     // malloc buffers (to later let the ring fill them asynchronously)
@@ -66,21 +66,21 @@ void submitReadRequest(URing &ring, const std::filesystem::path path) {
     }
 
     // submit the read request
-    liburingcxx::sq_entry &sqe = *ring.getSQEntry();
-    sqe.prepareReadv(file_fd, std::span{fi->iovecs, blocks}, 0)
-        .setData(reinterpret_cast<uint64_t>(fi));
+    liburingcxx::sq_entry &sqe = *ring.get_sq_entry();
+    sqe.prepare_readv(file_fd, std::span{fi->iovecs, blocks}, 0)
+        .set_data(reinterpret_cast<uint64_t>(fi));
 
     // Must be called after any request (except for polling mode)
-    ring.appendSQEntry(&sqe);
+    ring.append_sq_entry(&sqe);
     ring.submit();
 }
 
-void waitResultAndPrint(URing &ring) {
+void wait_resultAndPrint(uring &ring) {
     // get a result from the ring
-    liburingcxx::cq_entry &cqe = *ring.waitCQEntry();
+    liburingcxx::cq_entry &cqe = *ring.wait_cq_entry();
 
     // get the according data
-    FileInfo *fi = reinterpret_cast<FileInfo *>(cqe.user_data);
+    file_info *fi = reinterpret_cast<file_info *>(cqe.user_data);
 
     // print the data to console
     const int blocks = countBlocks(fi->size, BLOCK_SZ);
@@ -89,7 +89,7 @@ void waitResultAndPrint(URing &ring) {
     }
 
     // Must be called after consuming a cqe
-    ring.SeenCQEntry(&cqe);
+    ring.seen_cq_entry(&cqe);
 }
 
 int main(int argc, char *argv[]) {
@@ -100,14 +100,14 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    URing ring{4};
+    uring ring{4};
 
     for (int i = 1; i < argc; ++i) {
         try {
             // put read request into the ring
-            submitReadRequest(ring, argv[i]);
+            submit_readRequest(ring, argv[i]);
             // get string from the ring, and output to console
-            waitResultAndPrint(ring);
+            wait_resultAndPrint(ring);
         } catch (const std::system_error &e) {
             cerr << e.what() << "\n" << e.code() << "\n";
         } catch (const std::exception &e) {

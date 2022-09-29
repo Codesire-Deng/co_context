@@ -30,9 +30,9 @@ struct request {
     struct iovec iov[];
 };
 
-using URing = liburingcxx::URing<0>;
+using uring = liburingcxx::uring<0>;
 
-URing ring{QUEUE_DEPTH};
+uring ring{QUEUE_DEPTH};
 
 const char *unimplemented_content =
     "HTTP/1.0 400 Bad Request\r\n"
@@ -175,23 +175,23 @@ int add_accept_request(
     struct sockaddr_in *client_addr,
     socklen_t *client_addr_len
 ) {
-    auto &sqe = *ring.getSQEntry();
-    sqe.prepareAccept(
+    auto &sqe = *ring.get_sq_entry();
+    sqe.prepare_accept(
         server_socket, reinterpret_cast<sockaddr *>(client_addr),
         client_addr_len, 0
     );
 
     struct request *req = (request *)malloc(sizeof(*req));
     req->event_type = EVENT_TYPE_ACCEPT;
-    sqe.setData((uint64_t)req);
-    ring.appendSQEntry(&sqe);
+    sqe.set_data((uint64_t)req);
+    ring.append_sq_entry(&sqe);
     ring.submit();
 
     return 0;
 }
 
 int add_read_request(int client_socket) {
-    auto &sqe = *ring.getSQEntry();
+    auto &sqe = *ring.get_sq_entry();
     struct request *req =
         (request *)malloc(sizeof(*req) + sizeof(struct iovec));
     req->iov[0].iov_base = malloc(READ_SZ);
@@ -200,19 +200,19 @@ int add_read_request(int client_socket) {
     req->client_socket = client_socket;
     memset(req->iov[0].iov_base, 0, READ_SZ);
     /* Linux kernel 5.5 has support for readv, but not for recv() or read() */
-    sqe.prepareReadv(client_socket, {req->iov, 1}, 0);
-    sqe.setData((uint64_t)req);
-    ring.appendSQEntry(&sqe);
+    sqe.prepare_readv(client_socket, {req->iov, 1}, 0);
+    sqe.set_data((uint64_t)req);
+    ring.append_sq_entry(&sqe);
     ring.submit();
     return 0;
 }
 
 int add_write_request(struct request *req) {
-    auto &sqe = *ring.getSQEntry();
+    auto &sqe = *ring.get_sq_entry();
     req->event_type = EVENT_TYPE_WRITE;
-    sqe.prepareWritev(req->client_socket, {req->iov, req->iovec_count}, 0);
-    sqe.setData((uint64_t)req);
-    ring.appendSQEntry(&sqe);
+    sqe.prepare_writev(req->client_socket, {req->iov, req->iovec_count}, 0);
+    sqe.set_data((uint64_t)req);
+    ring.append_sq_entry(&sqe);
     ring.submit();
     return 0;
 }
@@ -451,7 +451,7 @@ void server_loop(int server_socket) {
 
     liburingcxx::cq_entry *cqe;
     while (1) {
-        cqe = ring.waitCQEntry();
+        cqe = ring.wait_cq_entry();
         struct request *req = (struct request *)cqe->user_data;
         // if (ret < 0) fatal_error("io_uring_wait_cqe");
         if (cqe->res < 0) {
@@ -488,7 +488,7 @@ void server_loop(int server_socket) {
                 break;
         }
         /* Mark this request as processed */
-        ring.SeenCQEntry(cqe);
+        ring.seen_cq_entry(cqe);
     }
 }
 
