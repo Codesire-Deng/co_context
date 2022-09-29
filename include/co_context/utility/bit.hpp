@@ -12,12 +12,12 @@ consteval T bit_top() noexcept {
 }
 
 template<std::integral T>
-constexpr T lowbit(T x) noexcept {
+inline constexpr T lowbit(T x) noexcept {
     return x & (-x);
 }
 
 template<std::integral T>
-constexpr T is_pow_of_two(T x) noexcept {
+inline constexpr bool is_pow_of_two(T x) noexcept {
     return lowbit(x) == x;
 }
 
