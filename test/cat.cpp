@@ -77,10 +77,11 @@ void submit_readRequest(uring &ring, const std::filesystem::path path) {
 
 void wait_resultAndPrint(uring &ring) {
     // get a result from the ring
-    liburingcxx::cq_entry &cqe = *ring.wait_cq_entry();
+    liburingcxx::cq_entry *cqe;
+    int err = ring.wait_cq_entry(cqe);
 
     // get the according data
-    file_info *fi = reinterpret_cast<file_info *>(cqe.user_data);
+    file_info *fi = reinterpret_cast<file_info *>(cqe->user_data);
 
     // print the data to console
     const int blocks = countBlocks(fi->size, BLOCK_SZ);
@@ -89,7 +90,7 @@ void wait_resultAndPrint(uring &ring) {
     }
 
     // Must be called after consuming a cqe
-    ring.seen_cq_entry(&cqe);
+    ring.seen_cq_entry(cqe);
 }
 
 int main(int argc, char *argv[]) {

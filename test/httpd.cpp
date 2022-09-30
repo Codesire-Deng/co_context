@@ -451,7 +451,7 @@ void server_loop(int server_socket) {
 
     liburingcxx::cq_entry *cqe;
     while (1) {
-        cqe = ring.wait_cq_entry();
+        int err = ring.wait_cq_entry(cqe);
         struct request *req = (struct request *)cqe->user_data;
         // if (ret < 0) fatal_error("io_uring_wait_cqe");
         if (cqe->res < 0) {
