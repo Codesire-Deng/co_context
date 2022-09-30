@@ -25,20 +25,20 @@
 #include <sys/uio.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
-#include <cerrno>
-#include <signal.h>
-#include <stdbool.h>
-#include <inttypes.h>
-#include <time.h>
 #include <sched.h>
 #include <linux/swab.h>
 #include <linux/version.h>
-#include <system_error>
 #include <cassert>
+#include <cerrno>
+#include <csignal>
+#include <cinttypes>
+#include <ctime>
+#include <system_error>
 #include "uring/compat.h"
 #include "uring/io_uring.h"
 #include "uring/barrier.h"
 #include "uring/syscall.hpp"
+#include "uring/buf_ring.hpp"
 #include "uring/detail/sq.hpp"
 #include "uring/detail/cq.hpp"
 #include "uring/detail/int_flags.h"
@@ -446,6 +446,11 @@ class [[nodiscard]] uring final {
     inline void cq_advance(unsigned num) noexcept {
         assert(num > 0 && "cq_advance: num must be positive.");
         io_uring_smp_store_release(cq.khead, *cq.khead + num);
+    }
+
+    inline void buf_ring_cq_advance(buf_ring &br, unsigned count) noexcept {
+        br.tail += count;
+        cq_advance(count);
     }
 
     auto __peek_cq_entry() {
