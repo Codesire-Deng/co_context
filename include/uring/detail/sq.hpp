@@ -61,7 +61,7 @@ namespace detail {
                  * Fill in sqes that we have queued up, adding them to the
                  * kernel ring
                  */
-                sqe_head = sqe_tail;
+                sqe_head = sqe_tail; // Here is the only usage of sqe_head.
                 /*
                  * Ensure that the kernel sees the SQE updates before it sees
                  * the tail update.
@@ -83,10 +83,58 @@ namespace detail {
             return sqe_tail - *khead;
         }
 
+        /**
+         * @brief Returns number of unconsumed (if SQPOLL) or unsubmitted
+         * entries exist in the SQ ring
+         */
+        template<unsigned uring_flags>
+        inline unsigned pending() const noexcept {
+            /*
+             * Without a barrier, we could miss an update and think the SQ
+             * wasn't ready. We don't need the load acquire for non-SQPOLL since
+             * then we drive updates.
+             */
+            if constexpr (uring_flags & IORING_SETUP_SQPOLL)
+                return sqe_tail - io_uring_smp_load_acquire(khead);
+            /* always use real head, to avoid losing sync for short submit */
+            else
+                return sqe_tail - *khead;
+        }
+
+        /**
+         * @brief Return an sqe to fill. User must later call submit().
+         *
+         * @return sq_entry* Returns a vacant sqe, or nullptr if we're full.
+         *
+         * @details Return an sqe to fill. Application must later call
+         * io_uring_submit() when it's ready to tell the kernel about it. The
+         * caller may call this function multiple times before calling submit().
+         *
+         * ┌----> khead ----> sqe_tail(*ktail) ----> sqe_free_head ----┐
+         * |                                                           |
+         * └-----------------------------------------------------------┘
+         * The sqes from khead(included) to sqe_tail(not included) are submitted
+         * and using by kernel.
+         *
+         * The sqes from sqe_tail(included) to sqe_free_head(not included) are
+         * using by application and not submitted.
+         *
+         * The sqes from sqe_free_head(included) to khead(not included) are all
+         * free and available for application.
+         */
+        template<unsigned uring_flags>
         [[nodiscard]] inline sq_entry *get_sq_entry() noexcept {
-            const unsigned int head = io_uring_smp_load_acquire(khead);
+            constexpr int shift =
+                bool(uring_flags & IORING_SETUP_SQE128) ? 1 : 0;
+
+            unsigned int head;
+            if constexpr (!(uring_flags & IORING_SETUP_SQPOLL))
+                head = IO_URING_READ_ONCE(*khead);
+            else
+                head = io_uring_smp_load_acquire(khead);
+
             if (sqe_free_head - head < ring_entries) [[likely]] {
-                return &sqes[array[sqe_free_head++ & ring_mask]];
+                return &sqes[(array[sqe_free_head++ & ring_mask]) << shift];
             } else {
                 return nullptr;
             }
