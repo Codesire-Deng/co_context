@@ -449,7 +449,7 @@ void server_loop(int server_socket) {
 
     add_accept_request(server_socket, &client_addr, &client_addr_len);
 
-    liburingcxx::cq_entry *cqe;
+    const liburingcxx::cq_entry *cqe;
     while (1) {
         int err = ring.wait_cq_entry(cqe);
         struct request *req = (struct request *)cqe->user_data;

@@ -117,7 +117,7 @@ class [[nodiscard]] uring final {
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
     int submit_and_wait_timeout(
-        cq_entry *(&cqe),
+        const cq_entry *(&cqe),
         unsigned wait_num,
         const __kernel_timespec &ts,
         sigset_t *sigmask
@@ -238,7 +238,7 @@ class [[nodiscard]] uring final {
      * Return an IO completion, waiting for it if necessary. Returns 0 with
      * cqe_ptr filled in on success, -errno on failure.
      */
-    inline int wait_cq_entry(cq_entry *(&cqe_ptr)) {
+    inline int wait_cq_entry(const cq_entry *(&cqe_ptr)) {
         auto [cqe, available_num, err] = __peek_cq_entry();
         if (!err && cqe != nullptr) {
             cqe_ptr = cqe;
@@ -252,7 +252,7 @@ class [[nodiscard]] uring final {
      * Return an IO completion, if one is readily available. Returns 0 with
      * cqe_ptr filled in on success, -errno on failure.
      */
-    inline int peek_cq_entry(cq_entry *(&cqe_ptr)) {
+    inline int peek_cq_entry(const cq_entry *(&cqe_ptr)) {
         auto [cqe, available_num, err] = __peek_cq_entry();
         if (!err && cqe != nullptr) {
             cqe_ptr = cqe;
@@ -266,7 +266,7 @@ class [[nodiscard]] uring final {
      * Fill in an array of IO completions up to count, if any are available.
      * Returns the amount of IO completions filled.
      */
-    unsigned peek_batch_cq_entries(std::span<cq_entry *> cqes) {
+    unsigned peek_batch_cq_entries(std::span<const cq_entry *> cqes) {
         bool overflow_checked = false;
         constexpr int shift = bool(uring_flags & IORING_SETUP_CQE32) ? 1 : 0;
 
@@ -295,7 +295,7 @@ class [[nodiscard]] uring final {
     }
 
     inline int
-    wait_cq_entry_num(cq_entry *(&cqe_ptr), unsigned wait_num) {
+    wait_cq_entry_num(const cq_entry *(&cqe_ptr), unsigned wait_num) {
         return get_cq_entry(
             cqe_ptr, /* submit */ 0, wait_num, /* sigmask */ nullptr
         );
@@ -306,7 +306,7 @@ class [[nodiscard]] uring final {
      * Kernel version 5.11 or newer is required!
      */
     inline int wait_cq_entries(
-        cq_entry *(&cqe_ptr),
+        const cq_entry *(&cqe_ptr),
         unsigned wait_num,
         const __kernel_timespec &ts,
         sigset_t *sigmask
@@ -544,7 +544,7 @@ class [[nodiscard]] uring final {
      */
     auto __peek_cq_entry() noexcept {
         struct return_type {
-            cq_entry *cqe;
+            const cq_entry *cqe;
             unsigned available_num;
             int err = 0;
         } ret;
@@ -578,7 +578,7 @@ class [[nodiscard]] uring final {
     }
 
     int get_cq_entry(
-        cq_entry *(&cqe_ptr), detail::cq_entry_getter &data
+        const cq_entry *(&cqe_ptr), detail::cq_entry_getter &data
     ) noexcept {
         for (bool is_looped = false; true;) {
             bool is_need_enter = false;
@@ -636,7 +636,7 @@ class [[nodiscard]] uring final {
     }
 
     inline int get_cq_entry(
-        cq_entry *(&cqe_ptr),
+        const cq_entry *(&cqe_ptr),
         unsigned submit,
         unsigned wait_num,
         sigset_t *sigmask
@@ -656,7 +656,7 @@ class [[nodiscard]] uring final {
      * more efficiently than queueing an internal timeout command.
      */
     inline int wait_cq_entries_new(
-        cq_entry *(&cqe_ptr),
+        const cq_entry *(&cqe_ptr),
         unsigned wait_num,
         const __kernel_timespec &ts,
         sigset_t *sigmask
