@@ -55,6 +55,7 @@ namespace detail {
          * @return unsigned number of pending items in the SQ ring, for the
          * shared ring.
          */
+        template<unsigned uring_flags>
         unsigned flush() noexcept {
             if (sqe_tail != sqe_head) [[likely]] {
                 /*
@@ -66,7 +67,10 @@ namespace detail {
                  * Ensure that the kernel sees the SQE updates before it sees
                  * the tail update.
                  */
-                io_uring_smp_store_release(ktail, sqe_tail);
+                if constexpr (!(uring_flags & IORING_SETUP_SQPOLL))
+                    io_uring_smp_store_release(ktail, sqe_tail);
+                else
+                    IO_URING_WRITE_ONCE(*ktail, sqe_tail);
             }
             /*
              * This _may_ look problematic, as we're not supposed to be reading

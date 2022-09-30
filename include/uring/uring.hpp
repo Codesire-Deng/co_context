@@ -104,63 +104,39 @@ class [[nodiscard]] uring final {
      *
      * @return unsigned number of sqes submitted
      */
-    unsigned submit() {
-        const unsigned submitted = sq.flush();
-        unsigned enter_flags = config::default_enter_flags;
-
-        if (is_sq_ring_need_enter(enter_flags)) {
-            if constexpr (uring_flags & IORING_SETUP_IOPOLL)
-                enter_flags |= IORING_ENTER_GETEVENTS;
-
-            // HACK see config::using_register_ring_fd.
-            // if (this->int_flags & INT_FLAG_REG_RING)
-            //     enter_flags |= IORING_ENTER_REGISTERED_RING;
-
-            const int consumed_num = detail::__sys_io_uring_enter(
-                enter_ring_fd, submitted, 0, enter_flags, NULL
-            );
-
-            if (consumed_num < 0) [[unlikely]]
-                throw std::system_error{
-                    -consumed_num, std::system_category(), "uring::submit"};
-        }
-
-        return submitted;
-    }
+    inline int submit() noexcept { return submit_and_wait(0); }
 
     /**
      * @brief Submit sqes acquired from io_uring_get_sqe() to the kernel.
      *
      * @return unsigned number of sqes submitted
      */
-    unsigned submit_and_wait(unsigned wait_num) {
-        const unsigned submitted = sq.flush();
-        unsigned enter_flags = config::default_enter_flags;
+    inline int submit_and_wait(unsigned wait_num) noexcept {
+        return __submit(sq.template flush<uring_flags>(), wait_num, false);
+    }
 
-        if (wait_num || is_sq_ring_need_enter(enter_flags)) {
-            if (wait_num || (uring_flags & IORING_SETUP_IOPOLL))
-                enter_flags |= IORING_ENTER_GETEVENTS;
-
-            // HACK see config::default_enter_flags.
-            // if (this->int_flags & INT_FLAG_REG_RING)
-            //     enter_flags |= IORING_ENTER_REGISTERED_RING;
-
-            const int consumed_num = detail::__sys_io_uring_enter(
-                enter_ring_fd, submitted, wait_num, enter_flags, NULL
-            );
-
+    /*
+    int submit_and_wait(unsigned wait_num) {
             if (consumed_num < 0) [[unlikely]]
                 throw std::system_error{
                     -consumed_num, std::system_category(),
                     "uring::submit_and_wait"};
-        }
+    }
+    */
 
-        return submitted;
+    inline int submit_and_get_events(unsigned wait_num) noexcept {
+        return __submit(sq.template flush<uring_flags>(), 0, true);
+    }
+
+    int get_events() noexcept {
+        constexpr int flags = IORING_ENTER_GETEVENTS
+                              | config::default_enter_flags_registered_ring;
+        return __sys_io_uring_enter(this->enter_ring_fd, 0, 0, flags, nullptr);
     }
 
     /**
-     * @brief Returns number of unconsumed (if SQPOLL) or unsubmitted entries
-     * exist in the SQ ring
+     * @brief Returns number of unconsumed (if SQPOLL) or unsubmitted
+     * entries exist in the SQ ring
      */
     inline unsigned sq_pending() const noexcept {
         return sq.template pending<uring_flags>();
@@ -221,7 +197,7 @@ class [[nodiscard]] uring final {
         // HACK this assumes app will use registered ring.
         // if (ring->int_flags & INT_FLAG_REG_RING)
         //     flags |= IORING_ENTER_REGISTERED_RING;
-        const int result = detail::__sys_io_uring_enter(
+        const int result = __sys_io_uring_enter(
             this->enter_ring_fd, 0, 0,
             IORING_ENTER_SQ_WAIT | config::default_enter_flags_registered_ring,
             nullptr
@@ -256,6 +232,38 @@ class [[nodiscard]] uring final {
         return wait_cq_entry_num(0);
     }
 
+    /*
+     * Fill in an array of IO completions up to count, if any are available.
+     * Returns the amount of IO completions filled.
+     */
+    unsigned peek_batch_cq_entries(std::span<cq_entry *> cqes) {
+        bool overflow_checked = false;
+        constexpr int shift = bool(uring_flags & IORING_SETUP_CQE32) ? 1 : 0;
+
+    again:
+        unsigned ready = cq_ready_acquire();
+        if (ready != 0) {
+            unsigned head = *cq.khead;
+            const unsigned mask = cq.ring_mask;
+            const unsigned count = std::min<unsigned>(cqes.size(), ready);
+            const unsigned last = head + count;
+            for (int i = 0; head != last; ++head, ++i)
+                cqes[i] = cq.cqes + ((head & mask) << shift);
+
+            return count;
+        }
+
+        if (overflow_checked) return 0;
+
+        if (is_cq_ring_need_flush()) {
+            get_events();
+            overflow_checked = true;
+            goto again;
+        }
+
+        return 0;
+    }
+
     inline cq_entry *wait_cq_entry_num(unsigned num) {
         return get_cq_entry(/* submit */ 0, num, /* sigmask */ nullptr);
     }
@@ -273,7 +281,7 @@ class [[nodiscard]] uring final {
             .data = (uint64_t)this->ring_fd,
         };
 
-        const int ret = detail::__sys_io_uring_register(
+        const int ret = __sys_io_uring_register(
             this->ring_fd, IORING_REGISTER_RING_FDS, &up, 1
         );
 
@@ -295,7 +303,7 @@ class [[nodiscard]] uring final {
             .offset = this->enter_ring_fd,
         };
 
-        const int ret = detail::__sys_io_uring_register(
+        const int ret = __sys_io_uring_register(
             this->ring_fd, IORING_UNREGISTER_RING_FDS, &up, 1
         );
 
@@ -314,7 +322,7 @@ class [[nodiscard]] uring final {
     uring(unsigned entries, params &params) {
         // override the params.flags
         params.flags = uring_flags;
-        const int fd = detail::__sys_io_uring_setup(entries, &params);
+        const int fd = __sys_io_uring_setup(entries, &params);
         if (fd < 0) [[unlikely]]
             throw std::system_error{
                 -fd, std::system_category(), "uring()::__sys_io_uring_setup"};
@@ -328,7 +336,7 @@ class [[nodiscard]] uring final {
             mmap_queue(fd, params);
             this->sq.init_free_queue();
         } catch (...) {
-            close(fd);
+            __sys_close(fd);
             std::rethrow_exception(std::current_exception());
         }
     }
@@ -346,12 +354,39 @@ class [[nodiscard]] uring final {
     uring &operator=(uring &&) = delete;
 
     ~uring() noexcept {
-        munmap(sq.sqes, sq.ring_entries * sizeof(io_uring_sqe));
+        __sys_munmap(sq.sqes, sq.ring_entries * sizeof(io_uring_sqe));
         unmap_rings();
-        close(ring_fd);
+        __sys_close(ring_fd);
     }
 
   private:
+    /*
+     * Submit sqes acquired from get_sq_entry() to the kernel.
+     *
+     * Returns number of sqes submitted
+     */
+    int
+    __submit(unsigned submitted, unsigned wait_num, bool getevents) noexcept {
+        bool is_cq_need_enter =
+            getevents || wait_num || is_cq_ring_need_enter();
+        unsigned flags = config::default_enter_flags_registered_ring;
+
+        if (is_sq_ring_need_enter(submitted, flags) || is_cq_need_enter) {
+            if (is_cq_need_enter) flags |= IORING_ENTER_GETEVENTS;
+            // HACK see config::default_enter_flags.
+            // if (this->int_flags & INT_FLAG_REG_RING)
+            //     flags |= IORING_ENTER_REGISTERED_RING;
+
+            const int consumed_num = __sys_io_uring_enter(
+                this->enter_ring_fd, submitted, wait_num, flags, nullptr
+            );
+
+            return consumed_num;
+        } else {
+            return submitted;
+        }
+    }
+
     /**
      * @brief Create mapping from kernel to SQ and CQ.
      *
@@ -365,7 +400,7 @@ class [[nodiscard]] uring final {
         if (p.features & IORING_FEAT_SINGLE_MMAP)
             sq.ring_sz = cq.ring_sz = std::max(sq.ring_sz, cq.ring_sz);
 
-        sq.ring_ptr = mmap(
+        sq.ring_ptr = __sys_mmap(
             nullptr, sq.ring_sz, PROT_READ | PROT_WRITE,
             MAP_SHARED | MAP_POPULATE, fd, IORING_OFF_SQ_RING
         );
@@ -376,7 +411,7 @@ class [[nodiscard]] uring final {
         if (p.features & IORING_FEAT_SINGLE_MMAP) {
             cq.ring_ptr = sq.ring_ptr;
         } else {
-            cq.ring_ptr = mmap(
+            cq.ring_ptr = __sys_mmap(
                 nullptr, cq.ring_sz, PROT_READ | PROT_WRITE,
                 MAP_SHARED | MAP_POPULATE, fd, IORING_OFF_CQ_RING
             );
@@ -392,7 +427,7 @@ class [[nodiscard]] uring final {
         sq.set_offset(p.sq_off);
 
         const size_t sqes_size = p.sq_entries * sizeof(io_uring_sqe);
-        sq.sqes = reinterpret_cast<sq_entry *>(mmap(
+        sq.sqes = reinterpret_cast<sq_entry *>(__sys_mmap(
             0, sqes_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE, fd,
             IORING_OFF_SQES
         ));
@@ -406,13 +441,16 @@ class [[nodiscard]] uring final {
     }
 
     inline void unmap_rings() noexcept {
-        munmap(sq.ring_ptr, sq.ring_sz);
+        __sys_munmap(sq.ring_ptr, sq.ring_sz);
         if (cq.ring_ptr && cq.ring_ptr != sq.ring_ptr)
-            munmap(cq.ring_ptr, cq.ring_sz);
+            __sys_munmap(cq.ring_ptr, cq.ring_sz);
     }
 
-    inline constexpr bool is_sq_ring_need_enter(unsigned &enter_flags
+    inline constexpr bool is_sq_ring_need_enter(
+        unsigned submit, unsigned &enter_flags
     ) const noexcept {
+        if (submit == 0) return false;
+
         if constexpr (!(uring_flags & IORING_SETUP_SQPOLL)) return true;
 
         /*
@@ -420,9 +458,7 @@ class [[nodiscard]] uring final {
          * the flags.
          * See https://github.com/axboe/liburing/issues/541
          */
-        // PERF memory order
-        // BUG
-        // std::atomic_thread_fence(std::memory_order_seq_cst);
+        io_uring_smp_mb();
 
         if (IO_URING_READ_ONCE(*sq.kflags) & IORING_SQ_NEED_WAKEUP)
             [[unlikely]] {
@@ -439,8 +475,10 @@ class [[nodiscard]] uring final {
     }
 
     inline bool is_cq_ring_need_enter() const noexcept {
-        if constexpr (uring_flags & IORING_SETUP_IOPOLL) return true;
-        return is_cq_ring_need_flush();
+        if constexpr (uring_flags & IORING_SETUP_IOPOLL)
+            return true;
+        else
+            return is_cq_ring_need_flush();
     }
 
     inline void cq_advance(unsigned num) noexcept {
@@ -453,12 +491,16 @@ class [[nodiscard]] uring final {
         cq_advance(count);
     }
 
+    /*
+     * Internal helper, don't use directly in applications.
+     */
     auto __peek_cq_entry() {
         struct ReturnType {
             cq_entry *cqe;
             unsigned available_num;
         } ret;
 
+        constexpr int shift = bool(uring_flags & IORING_SETUP_CQE32) ? 1 : 0;
         const unsigned mask = cq.ring_mask;
 
         while (true) {
@@ -469,7 +511,7 @@ class [[nodiscard]] uring final {
             ret.available_num = tail - head;
             if (ret.available_num == 0) return ret;
 
-            ret.cqe = cq.cqes + (head & mask);
+            ret.cqe = cq.cqes + ((head & mask) << shift);
             if (!(this->features & IORING_FEAT_EXT_ARG)
                 && ret.cqe->user_data == LIBURING_UDATA_TIMEOUT) [[unlikely]] {
                 cq_advance(1);
@@ -512,7 +554,7 @@ class [[nodiscard]] uring final {
                 flags = IORING_ENTER_GETEVENTS | data.getFlags;
                 is_need_enter = true;
             }
-            if (data.submit && is_sq_ring_need_enter(flags)) {
+            if (is_sq_ring_need_enter(data.submit, flags)) {
                 is_need_enter = true;
             }
             if (!is_need_enter) return cqe;
@@ -524,7 +566,7 @@ class [[nodiscard]] uring final {
                 flags |= IORING_ENTER_REGISTERED_RING;
 
             // TODO Upgrade for ring.int_flags & INT_FLAG_REG_RING
-            const int result = detail::__sys_io_uring_enter2(
+            const int result = __sys_io_uring_enter2(
                 enter_ring_fd, data.submit, data.wait_num, flags,
                 (sigset_t *)data.arg, data.size
             );
