@@ -163,16 +163,7 @@ class [[nodiscard]] uring final {
      * exist in the SQ ring
      */
     inline unsigned sq_pending() const noexcept {
-        /*
-         * Without a barrier, we could miss an update and think the SQ wasn't
-         * ready. We don't need the load acquire for non-SQPOLL since then we
-         * drive updates.
-         */
-        if constexpr (uring_flags & IORING_SETUP_SQPOLL)
-            return sq.sqe_tail - io_uring_smp_load_acquire(sq.khead);
-        /* always use real head, to avoid losing sync for short submit */
-        else
-            return sq.sqe_tail - *sq.khead;
+        return sq.template pending<uring_flags>();
     }
 
     /**
@@ -199,17 +190,8 @@ class [[nodiscard]] uring final {
      *
      * @return sq_entry* Returns a vacant sqe, or nullptr if we're full.
      */
-    inline sq_entry *get_sq_entry() noexcept {
-        // const unsigned int head = io_uring_smp_load_acquire(sq.khead);
-        // const unsigned int next = sq.sqe_tail + 1;
-        // sq_entry *sqe = nullptr;
-        // if (next - head <= sq.ring_entries) {
-        //     sqe = reinterpret_cast<sq_entry *>(
-        //         sq.sqes + (sq.sqe_tail & sq.ring_mask)
-        //     );
-        //     sq.sqe_tail = next;
-        // }
-        return sq.get_sq_entry();
+    [[nodiscard]] inline sq_entry *get_sq_entry() noexcept {
+        return sq.template get_sq_entry<uring_flags>();
     }
 
     /**
