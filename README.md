@@ -20,12 +20,7 @@ A coroutine framework aimed at high-concurrency io with reasonable latency, base
    - 或参考[这个网页](https://askubuntu.com/questions/390995/help-locating-linux-version-h)
 3. Linux 内核版本 >= 5.6，建议 >= 5.11，越新越好。
     - 由于开发环境是 Linux 5.19，因此可能在低版本内核下出现兼容性错误。如遇问题，请将报错发到[issue](https://github.com/Codesire-Deng/co_context/issues)或B站私信[@等疾风](https://space.bilibili.com/35186937)，非常感谢！
-
-## 关于 docker
-
-用 VS Code 打开本项目，VS Code Remote 插件可根据`.devcontainer`文件夹创建合适的 docker 环境。如果你暂时没有 Linux 环境，可以使用 docker 替代。
-
-- 注意：**docker 将继承宿主机的 Linux 内核版本**。 因此，docker 无法解决 Linux 内核版本过低的问题。
+    - **docker 将继承宿主机的 Linux 内核版本**。 因此，docker 无法解决 Linux 内核版本过低的问题。
 
 ## Example
 
