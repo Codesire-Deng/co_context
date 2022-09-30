@@ -115,14 +115,30 @@ class [[nodiscard]] uring final {
         return __submit(sq.template flush<uring_flags>(), wait_num, false);
     }
 
-    /*
-    int submit_and_wait(unsigned wait_num) {
-            if (consumed_num < 0) [[unlikely]]
-                throw std::system_error{
-                    -consumed_num, std::system_category(),
-                    "uring::submit_and_wait"};
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
+    int submit_and_wait_timeout(
+        cq_entry *(&cqe),
+        unsigned wait_num,
+        const __kernel_timespec &ts,
+        sigset_t *sigmask
+    ) {
+        assert(this->features & IORING_FEAT_EXT_ARG);
+
+        io_uring_getevents_arg arg = {
+            .sigmask = (unsigned long)sigmask,
+            .sigmask_sz = _NSIG / 8,
+            .ts = (unsigned long)(&ts)};
+
+        detail::cq_entry_getter data = {
+            .submit = sq.template flush<uring_flags>(),
+            .wait_num = wait_num,
+            .get_flags = IORING_ENTER_EXT_ARG,
+            .sz = sizeof(arg),
+            .arg = &arg};
+
+        return get_cq_entry(cqe, data);
     }
-    */
+#endif
 
     inline int submit_and_get_events(unsigned wait_num) noexcept {
         return __submit(sq.template flush<uring_flags>(), 0, true);
@@ -218,18 +234,32 @@ class [[nodiscard]] uring final {
         return io_uring_smp_load_acquire(cq.ktail) - *cq.khead;
     }
 
-    inline cq_entry *wait_cq_entry() {
-        auto [cqe, available_num] = __peek_cq_entry();
-        if (cqe != nullptr) return cqe;
+    /*
+     * Return an IO completion, waiting for it if necessary. Returns 0 with
+     * cqe_ptr filled in on success, -errno on failure.
+     */
+    inline int wait_cq_entry(cq_entry *(&cqe_ptr)) {
+        auto [cqe, available_num, err] = __peek_cq_entry();
+        if (!err && cqe != nullptr) {
+            cqe_ptr = cqe;
+            return 0;
+        }
 
-        return wait_cq_entry_num(1);
+        return wait_cq_entry_num(cqe_ptr, 1);
     }
 
-    inline cq_entry *peek_cq_entry() {
-        auto [cqe, available_num] = __peek_cq_entry();
-        if (cqe != nullptr) return cqe;
+    /*
+     * Return an IO completion, if one is readily available. Returns 0 with
+     * cqe_ptr filled in on success, -errno on failure.
+     */
+    inline int peek_cq_entry(cq_entry *(&cqe_ptr)) {
+        auto [cqe, available_num, err] = __peek_cq_entry();
+        if (!err && cqe != nullptr) {
+            cqe_ptr = cqe;
+            return 0;
+        }
 
-        return wait_cq_entry_num(0);
+        return wait_cq_entry_num(cqe_ptr, 0);
     }
 
     /*
@@ -264,9 +294,27 @@ class [[nodiscard]] uring final {
         return 0;
     }
 
-    inline cq_entry *wait_cq_entry_num(unsigned num) {
-        return get_cq_entry(/* submit */ 0, num, /* sigmask */ nullptr);
+    inline int
+    wait_cq_entry_num(cq_entry *(&cqe_ptr), unsigned wait_num) {
+        return get_cq_entry(
+            cqe_ptr, /* submit */ 0, wait_num, /* sigmask */ nullptr
+        );
     }
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
+    /**
+     * Kernel version 5.11 or newer is required!
+     */
+    inline int wait_cq_entries(
+        cq_entry *(&cqe_ptr),
+        unsigned wait_num,
+        const __kernel_timespec &ts,
+        sigset_t *sigmask
+    ) {
+        assert(this->features & IORING_FEAT_EXT_ARG);
+        return wait_cq_entries_new(cqe_ptr, wait_num, ts, sigmask);
+    }
+#endif
 
     inline void seen_cq_entry(const cq_entry *cqe) noexcept {
         assert(cqe != nullptr);
@@ -494,10 +542,11 @@ class [[nodiscard]] uring final {
     /*
      * Internal helper, don't use directly in applications.
      */
-    auto __peek_cq_entry() {
-        struct ReturnType {
+    auto __peek_cq_entry() noexcept {
+        struct return_type {
             cq_entry *cqe;
             unsigned available_num;
+            int err = 0;
         } ret;
 
         constexpr int shift = bool(uring_flags & IORING_SETUP_CQE32) ? 1 : 0;
@@ -509,20 +558,17 @@ class [[nodiscard]] uring final {
 
             ret.cqe = nullptr;
             ret.available_num = tail - head;
-            if (ret.available_num == 0) return ret;
+            if (ret.available_num == 0) break;
 
             ret.cqe = cq.cqes + ((head & mask) << shift);
             if (!(this->features & IORING_FEAT_EXT_ARG)
                 && ret.cqe->user_data == LIBURING_UDATA_TIMEOUT) [[unlikely]] {
-                cq_advance(1);
                 if (ret.cqe->res < 0) [[unlikely]] {
-                    // TODO Reconsider whether to use exceptions
-                    throw std::system_error{
-                        -ret.cqe->res, std::system_category(),
-                        "uring::__peek_cq_entry"};
-                } else {
-                    continue;
+                    ret.err = ret.cqe->res;
                 }
+                cq_advance(1);
+                if (ret.err == 0) continue;
+                ret.cqe = nullptr;
             }
 
             break;
@@ -531,23 +577,32 @@ class [[nodiscard]] uring final {
         return ret;
     }
 
-    cq_entry *get_cq_entry(detail::cq_entry_getter &data) {
-        bool is_looped = false;
-        while (true) {
+    int get_cq_entry(
+        cq_entry *(&cqe_ptr), detail::cq_entry_getter &data
+    ) noexcept {
+        for (bool is_looped = false; true;) {
             bool is_need_enter = false;
             unsigned flags = 0;
 
-            auto [cqe, available_num] = __peek_cq_entry();
+            auto [cqe, available_num, err] = __peek_cq_entry();
+
+            auto end_up = [&]() -> int {
+                cqe_ptr = cqe;
+                return err;
+            };
+
+            if (err) return end_up();
+
             if (cqe == nullptr && data.wait_num == 0 && data.submit == 0) {
                 /*
                  * If we already looped once, we already entererd
                  * the kernel. Since there's nothing to submit or
                  * wait for, don't keep retrying.
                  */
-                if (is_looped || !is_cq_ring_need_enter()) return nullptr;
-                // TODO Reconsider whether to use exceptions
-                // throw std::system_error{
-                //     EAGAIN, std::system_category(), "get_cq_entry_impl.1"};
+                if (is_looped || !is_cq_ring_need_enter()) {
+                    err = -EAGAIN;
+                    return end_up();
+                }
                 is_need_enter = true;
             }
             if (data.wait_num > available_num || is_need_enter) {
@@ -557,7 +612,7 @@ class [[nodiscard]] uring final {
             if (is_sq_ring_need_enter(data.submit, flags)) {
                 is_need_enter = true;
             }
-            if (!is_need_enter) return cqe;
+            if (!is_need_enter) return end_up();
 
             // HACK this assumes app will use registered ring.
             // if (this->int_flags & INT_FLAG_REG_RING)
@@ -565,32 +620,61 @@ class [[nodiscard]] uring final {
             if constexpr (config::using_register_ring_fd)
                 flags |= IORING_ENTER_REGISTERED_RING;
 
-            // TODO Upgrade for ring.int_flags & INT_FLAG_REG_RING
             const int result = __sys_io_uring_enter2(
                 enter_ring_fd, data.submit, data.wait_num, flags,
                 (sigset_t *)data.arg, data.size
             );
 
-            if (result < 0) [[unlikely]]
-                // TODO Reconsider whether to use exceptions
-                throw std::system_error{
-                    -result, std::system_category(), "get_cq_entry_impl.2"};
+            if (result < 0) [[unlikely]] {
+                err = -result;
+                return end_up();
+            }
             data.submit -= result;
-            if (cqe != nullptr) return cqe;
+            if (cqe != nullptr) return end_up();
             is_looped = true;
         }
     }
 
-    inline cq_entry *
-    get_cq_entry(unsigned submit, unsigned wait_num, sigset_t *sigmask) {
+    inline int get_cq_entry(
+        cq_entry *(&cqe_ptr),
+        unsigned submit,
+        unsigned wait_num,
+        sigset_t *sigmask
+    ) {
         detail::cq_entry_getter data{
             .submit = submit,
             .wait_num = wait_num,
             .getFlags = 0,
             .size = _NSIG / 8,
             .arg = sigmask};
-        return get_cq_entry(data);
+        return get_cq_entry(cqe_ptr, data);
     }
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
+    /*
+     * If we have kernel support for IORING_ENTER_EXT_ARG, then we can use that
+     * more efficiently than queueing an internal timeout command.
+     */
+    inline int wait_cq_entries_new(
+        cq_entry *(&cqe_ptr),
+        unsigned wait_num,
+        const __kernel_timespec &ts,
+        sigset_t *sigmask
+    ) {
+        io_uring_getevents_arg arg = {
+            .sigmask = (unsigned long)sigmask,
+            .sigmask_sz = _NSIG / 8,
+            .ts = (unsigned long)(&ts)};
+
+        detail::cq_entry_getter data = {
+            .wait_num = wait_num,
+            .get_flags = IORING_ENTER_EXT_ARG,
+            .sz = sizeof(arg),
+            .arg = &arg};
+
+        return get_cq_entry(cqe_ptr, data);
+    }
+#endif
 };
 
 } // namespace liburingcxx
