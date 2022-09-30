@@ -30,7 +30,7 @@ namespace detail {
         };
 
         union {
-            // cq_entry *cqe;
+            // const cq_entry *cqe;
             int32_t result;
             // counting_semaphore *sem;
             // condition_variable *cv;

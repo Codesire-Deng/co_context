@@ -505,7 +505,7 @@ static bool eager_io_need_awake(detail::task_info *io_info) {
  */
 inline void io_context::poll_completion() noexcept {
     // reap round
-    liburingcxx::cq_entry *polling_cqe;
+    const liburingcxx::cq_entry *polling_cqe;
     ring.peek_cq_entry(polling_cqe);
     if (polling_cqe == nullptr) return;
 
@@ -694,7 +694,7 @@ void io_context::run() {
                     // io_context can block itself in the following situation
                     if constexpr (config::worker_threads_number == 0 && config::use_wait_and_notify) {
                         if (num == 0 && !has_task_ready) [[unlikely]] {
-                            liburingcxx::cq_entry* _;
+                            const liburingcxx::cq_entry *_;
                             ring.wait_cq_entry(_);
                             num = ring.cq_ready_relaxed();
                             assert(num > 0);

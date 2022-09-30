@@ -77,7 +77,7 @@ void submit_readRequest(uring &ring, const std::filesystem::path path) {
 
 void wait_resultAndPrint(uring &ring) {
     // get a result from the ring
-    liburingcxx::cq_entry *cqe;
+    const liburingcxx::cq_entry *cqe;
     int err = ring.wait_cq_entry(cqe);
 
     // get the according data
