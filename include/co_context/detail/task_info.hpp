@@ -4,14 +4,6 @@
 
 #include "co_context/log/log.hpp"
 
-// TODO Delete me
-// #include "uring/io_uring.h"
-// #include "uring/cq_entry.hpp"
-
-// namespace liburingcxx {
-// class sq_entry;
-// }
-
 namespace co_context {
 
 class counting_semaphore;
