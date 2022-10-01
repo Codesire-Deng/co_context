@@ -64,7 +64,7 @@ task<> run() {
 }
 
 int main(int argc, char *argv[]) {
-    memset(zero, 'x', sizeof(zero));
+    std::memset(zero, 'x', sizeof(zero));
     gen(buf);
 
     finish.store(0);

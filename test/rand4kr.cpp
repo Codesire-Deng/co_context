@@ -70,7 +70,7 @@ task<> run(size_t offset) {
 }
 
 int main(int argc, char *argv[]) {
-    memset(zero, 'x', sizeof(zero));
+    std::memset(zero, 'x', sizeof(zero));
 
     finish.store(0);
     if (argc < 3) {

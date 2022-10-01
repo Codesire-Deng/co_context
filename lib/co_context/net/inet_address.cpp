@@ -34,7 +34,7 @@ inet_address::inet_address(uint16_t port, bool isIpv6) noexcept {
     static_assert(offsetof(inet_address, addr) == 0, "addr offset 0");
 
     if (isIpv6) {
-        memset(&addr6, 0, sizeof(addr6));
+        std::memset(&addr6, 0, sizeof(addr6));
         addr6.sin6_family = AF_INET6;
         if constexpr (config::loopback_only)
             addr6.sin6_addr = in6addr_loopback;
@@ -42,7 +42,7 @@ inet_address::inet_address(uint16_t port, bool isIpv6) noexcept {
             addr6.sin6_addr = in6addr_any;
         addr6.sin6_port = htons(port);
     } else {
-        memset(&addr, 0, sizeof(addr));
+        std::memset(&addr, 0, sizeof(addr));
         addr.sin_family = AF_INET;
         if constexpr (config::loopback_only)
             addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
@@ -106,7 +106,7 @@ bool inet_address::resolve(
     std::string_view hostname, uint16_t port, inet_address &out
 ) {
     ::addrinfo hints;
-    memset(&hints, 0, sizeof(hints));
+    std::memset(&hints, 0, sizeof(hints));
     hints.ai_flags |= AI_ADDRCONFIG; // for connect. see getaddrinfo(3)
     auto addrs = resolve_all(hostname, port, &hints);
 
