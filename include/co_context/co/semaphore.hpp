@@ -37,9 +37,9 @@ class counting_semaphore final {
 
   public:
     explicit counting_semaphore(T desired) noexcept
-        : counter(desired)
-        , awaiting(nullptr)
+        : awaiting(nullptr)
         , to_resume(nullptr)
+        , counter(desired)
         , awaken_task(task_info::task_type::semaphore_release) {
         // awaken_task.sem = this; // deprecated
         as_atomic(awaken_task.update).store(0, std::memory_order_relaxed);
