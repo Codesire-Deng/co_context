@@ -389,7 +389,6 @@ void io_context::try_submit(detail::submit_info &info) noexcept {
         log::v("ring.append_sq_entry()...OK\n");
         return;
     } else {
-        using task_type = task_info::task_type;
         using submit_type = detail::submit_type;
         task_info *const io_info = detail::raw_task_info_ptr(info.address);
 
