@@ -14,7 +14,7 @@ namespace co_context {
  */
 inet_address::inet_address(std::string_view ip, uint16_t port) noexcept {
     reset_port(port);
-    int res = 0;
+    [[maybe_unused]] int res = 0;
     if (ip.find(':') == ip.npos) {
         res = ::inet_pton(AF_INET, ip.data(), &addr.sin_addr);
         addr.sin_family = AF_INET;
