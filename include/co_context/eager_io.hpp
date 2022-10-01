@@ -491,7 +491,8 @@ namespace eager {
         int flags,
         uint32_t file_index
     ) noexcept {
-        return detail::eager_accept_direct{fd, addr, addrlen, flags, file_index};
+        return detail::eager_accept_direct{
+            fd, addr, addrlen, flags, file_index};
     }
 
     inline detail::eager_recv

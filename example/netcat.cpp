@@ -21,7 +21,9 @@ task<> send_session(Socket sock) {
     int nr = co_await lazy::read(STDIN_FILENO, buf);
 
     while (nr > 0) {
-        nr = co_await (sock.send({buf, (size_t)nr}) && lazy::read(STDIN_FILENO, buf));
+        nr = co_await (
+            sock.send({buf, (size_t)nr}) && lazy::read(STDIN_FILENO, buf)
+        );
     }
 }
 
