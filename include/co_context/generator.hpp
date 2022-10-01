@@ -80,7 +80,6 @@ class _Promise_allocator { // statically specified allocator type
 
     template<class _Alloc2, class... _Args>
         requires std::convertible_to<const _Alloc2 &, _Allocator>
-
     static void *operator new(
         const size_t _Size,
         std::allocator_arg_t,
@@ -94,7 +93,6 @@ class _Promise_allocator { // statically specified allocator type
 
     template<class _This, class _Alloc2, class... _Args>
         requires std::convertible_to<const _Alloc2 &, _Allocator>
-
     static void *operator new(
         const size_t _Size,
         const _This &,
