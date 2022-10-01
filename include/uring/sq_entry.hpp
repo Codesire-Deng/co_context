@@ -255,8 +255,9 @@ class sq_entry final : private io_uring_sqe {
         return *this;
     }
 
-    inline sq_entry &
-    prepare_link_timeout(struct __kernel_timespec *ts, unsigned flags) noexcept {
+    inline sq_entry &prepare_link_timeout(
+        struct __kernel_timespec *ts, unsigned flags
+    ) noexcept {
         prepare_rw(IORING_OP_LINK_TIMEOUT, -1, ts, 1, 0);
         this->timeout_flags = flags;
         return *this;
@@ -291,8 +292,9 @@ class sq_entry final : private io_uring_sqe {
      *
      * available @since Linux 5.20
      */
-    inline sq_entry &
-    prepare_recv_multishot(int sockfd, std::span<char> buf, int flags) noexcept {
+    inline sq_entry &prepare_recv_multishot(
+        int sockfd, std::span<char> buf, int flags
+    ) noexcept {
         prepare_recv(sockfd, buf, flags);
         this->ioprio |= IORING_RECV_MULTISHOT;
         return *this;
@@ -358,7 +360,8 @@ class sq_entry final : private io_uring_sqe {
     inline sq_entry &prepare_openat2_direct(
         int dfd, const char *path, struct open_how *how, unsigned file_index
     ) noexcept {
-        return prepare_openat2(dfd, path, how).set_target_fixed_file(file_index);
+        return prepare_openat2(dfd, path, how)
+            .set_target_fixed_file(file_index);
     }
 
     inline sq_entry &prepare_provide_buffers(
@@ -512,7 +515,9 @@ class sq_entry final : private io_uring_sqe {
         unsigned int nbytes,
         unsigned int splice_flags
     ) noexcept {
-        prepare_rw(IORING_OP_SPLICE, fd_out, nullptr, nbytes, (uint64_t)off_out);
+        prepare_rw(
+            IORING_OP_SPLICE, fd_out, nullptr, nbytes, (uint64_t)off_out
+        );
         this->splice_off_in = (uint64_t)off_in;
         this->splice_flags = splice_flags;
         this->splice_fd_in = fd_in;
