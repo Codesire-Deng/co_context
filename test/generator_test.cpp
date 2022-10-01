@@ -313,6 +313,6 @@ int main() {
 
     stateful_alloc_example(std::allocator_arg, stateful_allocator<double>{42});
 
-    member_coro m;
+    [[maybe_unused]] member_coro m;
     assert(*m.f().begin() == 42);
 }
