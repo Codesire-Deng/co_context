@@ -41,7 +41,7 @@ class [[nodiscard]] io_context final {
   private:
     using uring = liburingcxx::uring<
         config::io_uring_flags
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 19)
         /**
          * @note IORING_SETUP_COOP_TASKRUN is used because only one thread can
          * access the ring

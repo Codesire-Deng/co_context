@@ -15,11 +15,9 @@ A coroutine framework aimed at high-concurrency io with reasonable latency, base
 ## Requirement
 
 1. [Optional] [mimalloc](https://github.com/microsoft/mimalloc)  从包管理器或源代码安装。
-2. `linux-headers` 系列头文件
-   - 可从包管理器安装：`sudo apt-get install linux-headers-$(uname -r)`
-   - 或参考[这个网页](https://askubuntu.com/questions/390995/help-locating-linux-version-h)
-3. Linux 内核版本 >= 5.6，建议 >= 5.11，越新越好。
-    - 由于开发环境是 Linux 5.19，因此可能在低版本内核下出现兼容性错误。如遇问题，请将报错发到[issue](https://github.com/Codesire-Deng/co_context/issues)或B站私信[@等疾风](https://space.bilibili.com/35186937)，非常感谢！
+2. Linux 内核版本 >= 5.6，建议 >= 5.11，越新越好。
+    - 运行 `uname -r` 即可查看你的内核版本。
+    - 由于开发环境是 Linux 5.19，在其他版本下可能出现兼容性错误。如遇问题，请将报错发到[issue](https://github.com/Codesire-Deng/co_context/issues)或B站私信[@等疾风](https://space.bilibili.com/35186937)，非常感谢！
     - **docker 将继承宿主机的 Linux 内核版本**。 因此，docker 无法解决 Linux 内核版本过低的问题。
 
 ## Example
