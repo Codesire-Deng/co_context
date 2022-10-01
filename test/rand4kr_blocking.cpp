@@ -21,7 +21,7 @@ constexpr size_t BLOCK_LEN = 4096;
 task<> run(size_t offset) {
     char buf[BLOCK_LEN];
 
-    auto log = [](std::string_view tag, uint32_t x) {
+    [[maybe_unused]] auto log = [](std::string_view tag, uint32_t x) {
 #ifndef NDEBUG
         printf("%s: %08x", tag.data(), x);
         for (auto c : as_buf(&x)) {
@@ -31,7 +31,7 @@ task<> run(size_t offset) {
 #endif
     };
 
-    int nr;
+    [[maybe_unused]] int nr;
     // nr = co_await lazy::read(file_fd, buf, offset);
     nr = ::pread(file_fd, buf, BLOCK_LEN, offset);
     // buf[15] = '\0';

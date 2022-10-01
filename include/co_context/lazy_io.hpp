@@ -467,7 +467,6 @@ namespace detail {
             unsigned int flags
         ) noexcept
             : timer(duration, flags) {
-            auto &worker = *detail::this_thread.worker;
             // Mark timed_io as normal task type, and set sqe link.
             timed_io.sqe->set_link();
             // Mark timer as lazy_link_sqe task type, and without sqe link.

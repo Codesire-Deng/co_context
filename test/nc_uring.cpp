@@ -35,7 +35,7 @@ void handle_peer() {
 void event_loop() {
     while (true) {
         const liburingcxx::cq_entry *cqe;
-        int err = ring.wait_cq_entry(cqe);
+        [[maybe_unused]] int err = ring.wait_cq_entry(cqe);
         if (cqe->res < 0) {
             fprintf(stderr, "Async request failed: %s\n", strerror(-cqe->res));
             printf("flag = %u\n", cqe->flags);

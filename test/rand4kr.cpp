@@ -25,7 +25,7 @@ char zero[BLOCK_LEN];
 
 void gen(char (&buf)[BLOCK_LEN]) {
     static std::mt19937 rng(0);
-    for (int i = 0; i < BLOCK_LEN - 1; ++i) {
+    for (unsigned i = 0; i < BLOCK_LEN - 1; ++i) {
         buf[i] = rng() % 26 + 'a';
     }
     buf[BLOCK_LEN - 1] = '\n';
@@ -34,7 +34,7 @@ void gen(char (&buf)[BLOCK_LEN]) {
 task<> run(size_t offset) {
     char buf[BLOCK_LEN];
 
-    auto log = [](std::string_view tag, uint32_t x) {
+    [[maybe_unused]] auto log = [](std::string_view tag, uint32_t x) {
 #ifndef NDEBUG
         printf("%s: %08x", tag.data(), x);
         for (auto c : as_buf(&x)) {

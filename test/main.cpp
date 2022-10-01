@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
             const size_t file_size = std::filesystem::file_size(path);
 
             for (size_t offset = 0; offset < file_size;) {
-                const size_t to_read =
+                [[maybe_unused]] const size_t to_read =
                     std::min<size_t>(buf_size, file_size - offset);
                 int res = ::read(file_fd, buf, buf_size);
                 [[maybe_unused]] int nr = ::write(output_fd, buf, res);

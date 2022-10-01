@@ -55,7 +55,7 @@ void submit_readRequest(uring &ring, const std::filesystem::path path) {
     fi->size = file_size;
 
     // malloc buffers (to later let the ring fill them asynchronously)
-    for (size_t rest = file_size, offset = 0, i = 0; rest != 0; ++i) {
+    for (size_t rest = file_size, i = 0; rest != 0; ++i) {
         size_t to_read = std::min<size_t>(rest, BLOCK_SZ);
         fi->iovecs[i].iov_len = to_read;
         if (posix_memalign(&fi->iovecs[i].iov_base, BLOCK_SZ, BLOCK_SZ) != 0) {
@@ -78,7 +78,7 @@ void submit_readRequest(uring &ring, const std::filesystem::path path) {
 void wait_resultAndPrint(uring &ring) {
     // get a result from the ring
     const liburingcxx::cq_entry *cqe;
-    int err = ring.wait_cq_entry(cqe);
+    [[maybe_unused]] int err = ring.wait_cq_entry(cqe);
 
     // get the according data
     file_info *fi = reinterpret_cast<file_info *>(cqe->user_data);
