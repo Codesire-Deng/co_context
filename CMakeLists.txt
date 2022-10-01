@@ -10,12 +10,15 @@ if (NOT CMAKE_BUILD_TYPE)
     message("Setting default build type to Release")
 endif()
 
-project(co_context VERSION 0.4.0 LANGUAGES C CXX)
+project(co_context VERSION 0.5.0 LANGUAGES C CXX)
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+
     if (${CMAKE_BUILD_TYPE} MATCHES Debug)
         message("Enable -fsanitize for gcc")
-        set(CMAKE_CXX_FLAGS "-fsanitize=undefined,address,leak -fno-omit-frame-pointer")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=undefined,address,leak -fno-omit-frame-pointer")
     else()
         message(${CMAKE_BUILD_TYPE})
         message("Disable -fsanitize for gcc")
