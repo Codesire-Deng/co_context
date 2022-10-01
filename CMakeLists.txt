@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.20.0)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 17)
-option(USE_MIMALLOC "Use mimalloc version 2.0 or above" OFF)
+option(FORCE_TO_USE_MIMALLOC "Force the use of mimalloc version 2.0 or above" OFF)
 
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -35,7 +35,7 @@ endif()
 
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
-if (USE_MIMALLOC)
+if (FORCE_TO_USE_MIMALLOC)
     find_package(mimalloc 2.0 REQUIRED)
 else()
     find_package(mimalloc QUIET)
