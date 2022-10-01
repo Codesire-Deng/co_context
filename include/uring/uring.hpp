@@ -27,7 +27,6 @@
 #include <sys/mman.h>
 #include <sched.h>
 #include <linux/swab.h>
-#include <linux/version.h>
 #include <cassert>
 #include <cerrno>
 #include <csignal>
@@ -42,6 +41,7 @@
 #include "uring/detail/sq.hpp"
 #include "uring/detail/cq.hpp"
 #include "uring/detail/int_flags.h"
+#include "uring/utility/kernel_version.hpp"
 
 struct statx;
 
@@ -50,8 +50,7 @@ namespace liburingcxx {
 namespace config {
 
     // HACK this assumes app will use registered ring.
-    constexpr bool using_register_ring_fd =
-        LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0);
+    constexpr bool using_register_ring_fd = is_kernel_reach(5, 18);
 
     constexpr unsigned default_enter_flags_registered_ring =
         using_register_ring_fd ? IORING_ENTER_REGISTERED_RING : 0;
@@ -103,7 +102,7 @@ class [[nodiscard]] uring final {
 
     int submit_and_wait(unsigned wait_num) noexcept;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 11)
     int submit_and_wait_timeout(
         const cq_entry *(&cqe),
         unsigned wait_num,
@@ -141,7 +140,7 @@ class [[nodiscard]] uring final {
     int
     wait_cq_entry_num(const cq_entry *(&cqe_ptr), unsigned wait_num) noexcept;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 11)
     int wait_cq_entries(
         const cq_entry *(&cqe_ptr),
         unsigned wait_num,
@@ -205,7 +204,7 @@ class [[nodiscard]] uring final {
         sigset_t *sigmask
     ) noexcept;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 11)
     int wait_cq_entries_new(
         const cq_entry *(&cqe_ptr),
         unsigned wait_num,
@@ -240,7 +239,7 @@ inline int uring<uring_flags>::submit_and_wait(unsigned wait_num) noexcept {
     return __submit(sq.template flush<uring_flags>(), wait_num, false);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 11)
 template<unsigned uring_flags>
 inline int uring<uring_flags>::submit_and_wait_timeout(
     const cq_entry *(&cqe),
@@ -451,7 +450,7 @@ inline int uring<uring_flags>::wait_cq_entry_num(
     );
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 11)
 /**
  * Kernel version 5.11 or newer is required!
  */
@@ -805,7 +804,7 @@ inline int uring<uring_flags>::__get_cq_entry(
     return _get_cq_entry(cqe_ptr, data);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 11)
 /*
  * If we have kernel support for IORING_ENTER_EXT_ARG, then we can use that
  * more efficiently than queueing an internal timeout command.
