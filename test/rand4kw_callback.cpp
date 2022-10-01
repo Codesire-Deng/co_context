@@ -12,11 +12,11 @@ using namespace co_context;
 
 int file_fd;
 size_t file_size;
-int times;
-std::atomic_int alive, finish;
+unsigned times;
+std::atomic_uint alive, finish;
 
 constexpr size_t BLOCK_LEN = 4096;
-constexpr int MAX_ON_FLY = 12; // 3 worker thread
+constexpr unsigned MAX_ON_FLY = 12; // 3 worker thread
 // constexpr int MAX_ON_FLY = 2; // 1 worker thread
 char zero[BLOCK_LEN];
 char buf[BLOCK_LEN];
@@ -24,7 +24,7 @@ std::mt19937_64 rng(0);
 
 void gen(char (&buf)[BLOCK_LEN]) {
     static std::mt19937 rng(0);
-    for (int i = 0; i < BLOCK_LEN - 1; ++i) {
+    for (size_t i = 0; i < BLOCK_LEN - 1; ++i) {
         buf[i] = rng() % 26 + 'a';
     }
     buf[BLOCK_LEN - 1] = '\n';
@@ -47,7 +47,7 @@ task<> run() {
         perror("write err");
     }
 
-    int now = finish.fetch_add(1) + 1;
+    unsigned now = finish.fetch_add(1) + 1;
     if (now == times) [[unlikely]] {
         printf("All done\n");
         io_context_stop();
@@ -84,7 +84,7 @@ int main(int argc, char *argv[]) {
 
     io_context context;
 
-    for (int i = 0; i < std::min(MAX_ON_FLY, times); ++i)
+    for (unsigned i = 0; i < std::min(MAX_ON_FLY, times); ++i)
         context.co_spawn(run());
 
     context.run();

@@ -451,7 +451,7 @@ void server_loop(int server_socket) {
 
     const liburingcxx::cq_entry *cqe;
     while (1) {
-        int err = ring.wait_cq_entry(cqe);
+        [[maybe_unused]] int err = ring.wait_cq_entry(cqe);
         struct request *req = (struct request *)cqe->user_data;
         // if (ret < 0) fatal_error("io_uring_wait_cqe");
         if (cqe->res < 0) {
@@ -480,7 +480,7 @@ void server_loop(int server_socket) {
                 free(req);
                 break;
             case EVENT_TYPE_WRITE:
-                for (int i = 0; i < req->iovec_count; i++) {
+                for (unsigned i = 0; i < req->iovec_count; i++) {
                     free(req->iov[i].iov_base);
                 }
                 close(req->client_socket);
