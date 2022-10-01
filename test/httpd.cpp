@@ -154,7 +154,7 @@ int setup_listening_socket(int port) {
     if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0)
         fatal_error("setsockopt(SO_REUSEADDR)");
 
-    memset(&srv_addr, 0, sizeof(srv_addr));
+    std::memset(&srv_addr, 0, sizeof(srv_addr));
     srv_addr.sin_family = AF_INET;
     srv_addr.sin_port = htons(port);
     srv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -198,7 +198,7 @@ int add_read_request(int client_socket) {
     req->iov[0].iov_len = READ_SZ;
     req->event_type = EVENT_TYPE_READ;
     req->client_socket = client_socket;
-    memset(req->iov[0].iov_base, 0, READ_SZ);
+    std::memset(req->iov[0].iov_base, 0, READ_SZ);
     /* Linux kernel 5.5 has support for readv, but not for recv() or read() */
     sqe.prepare_readv(client_socket, {req->iov, 1}, 0);
     sqe.set_data((uint64_t)req);
