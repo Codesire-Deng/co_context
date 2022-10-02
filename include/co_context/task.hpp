@@ -18,29 +18,57 @@ template<typename T>
 class task;
 
 namespace detail {
+    template<typename T>
+    class task_promise_base;
+
+    /**
+     * @brief current task<> is finished therefore resume the parent
+     */
+    template<typename T>
+    struct task_final_awaiter {
+        constexpr bool await_ready() const noexcept { return false; }
+
+        template<std::derived_from<task_promise_base<T>> Promise>
+        std::coroutine_handle<>
+        await_suspend(std::coroutine_handle<Promise> current) noexcept {
+            return current.promise().parent_coro;
+        }
+
+        // Won't be resumed anyway
+        constexpr void await_resume() const noexcept {}
+    };
+
+    /**
+     * @brief current task<> is finished therefore resume the parent
+     */
+    template<>
+    struct task_final_awaiter<void> {
+        constexpr bool await_ready() const noexcept { return false; }
+
+        template<std::derived_from<task_promise_base<void>> Promise>
+        std::coroutine_handle<>
+        await_suspend(std::coroutine_handle<Promise> current) noexcept {
+            auto &promise = current.promise();
+
+            std::coroutine_handle<> continuation = promise.parent_coro;
+
+            if (promise.is_detached_flag == uintptr_t(-1ULL)) current.destroy();
+
+            return continuation;
+        }
+
+        // Won't be resumed anyway
+        constexpr void await_resume() const noexcept {}
+    };
+
     /**
      * @brief Define the behavior of all tasks.
      *
      * final_suspend: yes, and return to parent
      */
+    template<typename T>
     class task_promise_base {
-        friend struct final_awaiter;
-
-        /**
-         * @brief current task<> is finished therefore resume the parent
-         */
-        struct final_awaiter {
-            constexpr bool await_ready() const noexcept { return false; }
-
-            template<std::derived_from<task_promise_base> Promise>
-            std::coroutine_handle<>
-            await_suspend(std::coroutine_handle<Promise> current) noexcept {
-                return current.promise().parent_coro;
-            }
-
-            // Won't be resumed anyway
-            constexpr void await_resume() const noexcept {}
-        };
+        friend struct task_final_awaiter<T>;
 
       public:
         task_promise_base() noexcept = default;
@@ -49,7 +77,9 @@ namespace detail {
             return {};
         }
 
-        inline constexpr final_awaiter final_suspend() noexcept { return {}; }
+        inline constexpr task_final_awaiter<T> final_suspend() noexcept {
+            return {};
+        }
 
         inline void set_parent(std::coroutine_handle<> continuation) noexcept {
             parent_coro = continuation;
@@ -65,7 +95,7 @@ namespace detail {
      * @tparam T the type of the final result
      */
     template<typename T>
-    class task_promise final : public task_promise_base {
+    class task_promise final : public task_promise_base<T> {
       public:
         task_promise() noexcept : state(value_state::mono){};
 
@@ -124,9 +154,14 @@ namespace detail {
     };
 
     template<>
-    class task_promise<void> final : public task_promise_base {
+    class task_promise<void> final : public task_promise_base<void> {
+        friend struct task_final_awaiter<void>;
+        friend class task<void>;
+
       public:
-        task_promise() noexcept = default;
+        task_promise() noexcept : exception_ptr(nullptr){};
+
+        ~task_promise() noexcept {};
 
         task<void> get_return_object() noexcept;
 
@@ -142,11 +177,14 @@ namespace detail {
         }
 
       private:
-        std::exception_ptr exception_ptr;
+        union {
+            uintptr_t is_detached_flag; // set to -1ULL if is detached.
+            std::exception_ptr exception_ptr;
+        };
     };
 
     template<typename T>
-    class task_promise<T &> final : public task_promise_base {
+    class task_promise<T &> final : public task_promise_base<T &> {
       public:
         task_promise() noexcept = default;
 
@@ -287,6 +325,7 @@ class [[nodiscard("Did you forget to co_await?")]] task {
     }
 
     void detach() noexcept {
+        handle.promise().is_detached_flag = uintptr_t(-1ULL);
         handle = nullptr;
     }
 
