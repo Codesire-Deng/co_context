@@ -67,7 +67,7 @@ void submit_read_request(uring &ring, const std::filesystem::path path) {
 
     // submit the read request
     liburingcxx::sq_entry &sqe = *ring.get_sq_entry();
-    sqe.prepare_readv(file_fd, std::span{fi->iovecs, blocks}, 0)
+    sqe.prep_readv(file_fd, std::span{fi->iovecs, blocks}, 0)
         .set_data(reinterpret_cast<uint64_t>(fi));
 
     // Must be called after any request (except for polling mode)
