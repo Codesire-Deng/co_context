@@ -10,6 +10,8 @@
 #include <tuple>
 #include <vector>
 
+#pragma GCC diagnostic ignored "-Wmismatched-new-delete"
+
 namespace {
 ///////////////////////
 // Simple non-nested serial generator
