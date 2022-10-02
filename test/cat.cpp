@@ -30,7 +30,7 @@ struct file_info {
     iovec iovecs[];
 };
 
-constexpr int countBlocks(size_t size, unsigned block_sz) noexcept {
+constexpr int count_blocks(size_t size, unsigned block_sz) noexcept {
     return size / block_sz + ((size / block_sz * block_sz) != size);
 }
 
@@ -41,7 +41,7 @@ void output(std::string_view s) noexcept {
 
 using uring = liburingcxx::uring<0>;
 
-void submit_readRequest(uring &ring, const std::filesystem::path path) {
+void submit_read_request(uring &ring, const std::filesystem::path path) {
     // open the file
     int file_fd = open(path.c_str(), O_RDONLY);
     if (file_fd < 0) {
@@ -50,7 +50,7 @@ void submit_readRequest(uring &ring, const std::filesystem::path path) {
 
     // calculate the file size then malloc iovecs
     const size_t file_size = std::filesystem::file_size(path);
-    const unsigned blocks = countBlocks(file_size, BLOCK_SZ);
+    const unsigned blocks = count_blocks(file_size, BLOCK_SZ);
     file_info *fi = (file_info *)malloc(sizeof(*fi) + (blocks * sizeof(iovec)));
     fi->size = file_size;
 
@@ -75,7 +75,7 @@ void submit_readRequest(uring &ring, const std::filesystem::path path) {
     ring.submit();
 }
 
-void wait_resultAndPrint(uring &ring) {
+void wait_result_and_print(uring &ring) {
     // get a result from the ring
     const liburingcxx::cq_entry *cqe;
     [[maybe_unused]] int err = ring.wait_cq_entry(cqe);
@@ -84,7 +84,7 @@ void wait_resultAndPrint(uring &ring) {
     file_info *fi = reinterpret_cast<file_info *>(cqe->user_data);
 
     // print the data to console
-    const int blocks = countBlocks(fi->size, BLOCK_SZ);
+    const int blocks = count_blocks(fi->size, BLOCK_SZ);
     for (int i = 0; i < blocks; ++i) {
         output({(char *)fi->iovecs[i].iov_base, fi->iovecs[i].iov_len});
     }
@@ -106,9 +106,9 @@ int main(int argc, char *argv[]) {
     for (int i = 1; i < argc; ++i) {
         try {
             // put read request into the ring
-            submit_readRequest(ring, argv[i]);
+            submit_read_request(ring, argv[i]);
             // get string from the ring, and output to console
-            wait_resultAndPrint(ring);
+            wait_result_and_print(ring);
         } catch (const std::system_error &e) {
             cerr << e.what() << "\n" << e.code() << "\n";
         } catch (const std::exception &e) {
