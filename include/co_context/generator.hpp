@@ -327,6 +327,7 @@ class _Gen_promise_base {
               ::std::ranges::begin(_Elem.range),
               ::std::ranges::end(_Elem.range))};
     }
+
 #pragma GCC diagnostic pop
 
     void await_transform() = delete;
