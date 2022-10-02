@@ -149,6 +149,8 @@ class [[nodiscard]] uring final {
     ) noexcept;
 #endif
 
+    void cq_advance(unsigned num) noexcept;
+
     void seen_cq_entry(const cq_entry *cqe) noexcept;
 
     int register_ring_fd();
@@ -186,8 +188,6 @@ class [[nodiscard]] uring final {
     bool is_cq_ring_need_flush() const noexcept;
 
     bool is_cq_ring_need_enter() const noexcept;
-
-    void cq_advance(unsigned num) noexcept;
 
     void buf_ring_cq_advance(buf_ring &br, unsigned count) noexcept;
 
