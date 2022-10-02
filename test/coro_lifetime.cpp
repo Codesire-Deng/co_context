@@ -13,8 +13,19 @@ struct S {
     ~S() { printf("~S(%d)\n", x); }
 };
 
+task<S> coro_copy(S x) {
+    co_return x;
+}
+
+task<S &> coro_ref(S x) {
+    co_return x;
+}
+
 task<> coro(S s) {
-    printf("coro running\n");
+    printf("coro_copy:\n");
+    S res0 = co_await coro_copy(s);
+    printf("coro_ref:\n");
+    S res1 = co_await coro_ref(s);
     printf("coro finished\n");
     co_return;
 }
