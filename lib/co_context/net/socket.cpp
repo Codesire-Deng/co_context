@@ -40,7 +40,7 @@ socket &socket::set_tcp_no_delay(bool on) {
             static_cast<socklen_t>(sizeof optval)
         )
         < 0) {
-        perror("socket::setTcpNoDelay");
+        perror("socket::set_tcp_no_delay");
     }
     return *this;
 }
@@ -50,7 +50,7 @@ inet_address socket::get_local_addr() const {
     socklen_t addrlen = sizeof localaddr;
     struct sockaddr *addr = reinterpret_cast<struct sockaddr *>(&localaddr);
     if (::getsockname(sockfd, addr, &addrlen) < 0) {
-        perror("socket::getLocalAddr");
+        perror("socket::get_local_addr");
     }
     return inet_address(*addr);
 }
@@ -60,7 +60,7 @@ inet_address socket::get_peer_addr() const {
     socklen_t addrlen = sizeof peeraddr;
     struct sockaddr *addr = reinterpret_cast<struct sockaddr *>(&peeraddr);
     if (::getpeername(sockfd, addr, &addrlen) < 0) {
-        perror("socket::getPeerAddr");
+        perror("socket::get_peer_addr");
     }
     return inet_address(*addr);
 }
