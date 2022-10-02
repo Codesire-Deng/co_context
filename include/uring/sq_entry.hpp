@@ -194,9 +194,9 @@ class sq_entry final : private io_uring_sqe {
     }
 
     inline sq_entry &prepare_timeout(
-        __kernel_timespec *ts, unsigned count, unsigned flags
+        const __kernel_timespec &ts, unsigned count, unsigned flags
     ) noexcept {
-        prepare_rw(IORING_OP_TIMEOUT, -1, ts, 1, count);
+        prepare_rw(IORING_OP_TIMEOUT, -1, &ts, 1, count);
         this->timeout_flags = flags;
         return *this;
     }
@@ -212,11 +212,11 @@ class sq_entry final : private io_uring_sqe {
     }
 
     inline sq_entry &prepare_timeout_rpdate(
-        __kernel_timespec *ts, uint64_t user_data, unsigned flags
+        const __kernel_timespec &ts, uint64_t user_data, unsigned flags
     ) noexcept {
         prepare_rw(
             IORING_OP_TIMEOUT_REMOVE, -1, reinterpret_cast<void *>(user_data),
-            0, (uintptr_t)ts
+            0, (uintptr_t)(&ts)
         );
         this->timeout_flags = flags | IORING_TIMEOUT_UPDATE;
         return *this;
@@ -256,9 +256,9 @@ class sq_entry final : private io_uring_sqe {
     }
 
     inline sq_entry &prepare_link_timeout(
-        struct __kernel_timespec *ts, unsigned flags
+        const __kernel_timespec &ts, unsigned flags
     ) noexcept {
-        prepare_rw(IORING_OP_LINK_TIMEOUT, -1, ts, 1, 0);
+        prepare_rw(IORING_OP_LINK_TIMEOUT, -1, &ts, 1, 0);
         this->timeout_flags = flags;
         return *this;
     }

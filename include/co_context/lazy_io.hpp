@@ -404,7 +404,7 @@ namespace detail {
     struct lazy_timeout_timespec : lazy_awaiter {
       public:
         [[nodiscard("Did you forget to co_await?")]] inline lazy_timeout_timespec(
-            __kernel_timespec *ts, unsigned int count, unsigned int flags
+            const __kernel_timespec &ts, unsigned int count, unsigned int flags
         ) noexcept {
             sqe->prepare_timeout(ts, count, flags);
         }
@@ -443,7 +443,7 @@ namespace detail {
             std::chrono::duration<Rep, Period> duration, unsigned int flags
         ) noexcept
             : lazy_timeout_base(duration) {
-            sqe->prepare_timeout(&ts, 0, flags);
+            sqe->prepare_timeout(ts, 0, flags);
         }
     };
 
@@ -453,7 +453,7 @@ namespace detail {
             std::chrono::duration<Rep, Period> duration, unsigned int flags
         ) noexcept
             : lazy_timeout_base(duration) {
-            sqe->prepare_link_timeout(&this->ts, flags);
+            sqe->prepare_link_timeout(this->ts, flags);
         }
     };
 
@@ -725,7 +725,7 @@ inline namespace lazy {
      * @return lazy_awaiter
      */
     inline detail::lazy_timeout_timespec timeout(
-        __kernel_timespec *ts, unsigned int count, unsigned int flags
+        const __kernel_timespec &ts, unsigned int count, unsigned int flags
     ) noexcept {
         return detail::lazy_timeout_timespec{ts, count, flags};
     }
