@@ -385,7 +385,7 @@ namespace detail {
 
     struct eager_timeout_timespec : eager_awaiter {
         inline eager_timeout_timespec(
-            __kernel_timespec *ts, unsigned int count, unsigned int flags
+            const __kernel_timespec &ts, unsigned int count, unsigned int flags
         ) noexcept {
             sqe->prepare_timeout(ts, count, flags);
             submit();
@@ -406,7 +406,7 @@ namespace detail {
             ts.tv_nsec =
                 duration_cast<chrono::duration<long long, std::nano>>(duration)
                     .count();
-            sqe->prepare_timeout(&ts, 0, flags);
+            sqe->prepare_timeout(ts, 0, flags);
             submit();
         }
     };
@@ -632,7 +632,7 @@ namespace eager {
      * @return eager_awaiter
      */
     inline detail::eager_timeout_timespec timeout(
-        __kernel_timespec *ts, unsigned int count, unsigned int flags
+        const __kernel_timespec &ts, unsigned int count, unsigned int flags
     ) noexcept {
         return detail::eager_timeout_timespec{ts, count, flags};
     }
