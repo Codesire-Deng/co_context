@@ -37,7 +37,7 @@ int main() {
     to[0].target = tasks[1].get_handle();
     to[1].target = tasks[0].get_handle();
 
-    auto duration = hostTiming([&] { tasks[0].get_handle().resume(); });
+    auto duration = host_timing([&] { tasks[0].get_handle().resume(); });
 
     printf(
         "Avg. coro switch time = %3.3f ns.\n",
