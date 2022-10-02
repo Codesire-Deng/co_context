@@ -1,9 +1,10 @@
-简中 | [English(in progress)](./doc/README_en.md)
+[简中](../README.md) | English(in progress)
 
 # co_context
 
-**co_context** 是一个**协程**异步多线程并发框架，以提供可靠的性能为使命，同时致力于减轻用户的心智负担，让 C++ 初学者也能轻松写出高并发程序。
-co_context 基于 Linux io_uring，其性能通常优于 epoll。
+A coroutine framework aimed at high-concurrency io with reasonable latency, based on [liburingcxx](https://github.com/Codesire-Deng/liburingcxx).
+
+**co_context** 是一个**协程**异步多线程并发框架，以提供可靠的性能为使命，也致力于减轻用户的心智负担，让 C++ 初学者也能轻松写出高并发程序。
 
 ## 已有功能
 
@@ -11,7 +12,7 @@ co_context 基于 Linux io_uring，其性能通常优于 epoll。
 2. 并发支持: `mutex`, `semaphore`, `condition_variable`, `channel`。
 3. 调度提示: `yield`
 
-## 编译和运行环境
+## Requirement
 
 1. [Optional] [mimalloc](https://github.com/microsoft/mimalloc)  从包管理器或源代码安装。
 2. Linux 内核版本 >= 5.6，建议 >= 5.11，越新越好。
@@ -19,9 +20,9 @@ co_context 基于 Linux io_uring，其性能通常优于 epoll。
     - 由于开发环境是 Linux 5.19，在其他版本下可能出现兼容性错误。如遇问题，请将报错发到[issue](https://github.com/Codesire-Deng/co_context/issues)或B站私信[@等疾风](https://space.bilibili.com/35186937)，非常感谢！
     - **docker 将继承宿主机的 Linux 内核版本**。 因此，docker 无法解决 Linux 内核版本过低的问题。
 
-## 代码示例
+## Example
 
-### 基础用法
+### Basic usage
 
 创建一个 `io_context`，用于运行协程：
 
@@ -30,7 +31,7 @@ co_context 基于 Linux io_uring，其性能通常优于 epoll。
     io_context context;
 ```
 
-使用`task`定义一个 socket 监听协程：
+定义一个 socket 监听协程：
 
 ```cpp
 task<> server(uint16_t port) {
@@ -41,7 +42,7 @@ task<> server(uint16_t port) {
 }
 ```
 
-使用`task`描述业务逻辑：
+描述业务逻辑（以 netcat 为例）：
 
 ```cpp
 task<> session(co_context::socket sock) {
@@ -56,7 +57,7 @@ task<> session(co_context::socket sock) {
 }
 ```
 
-`main()` 函数调用`io_context::run()`即可：
+`main()` 函数：
 
 ```cpp
 int main(int argc, const char *argv[]) {
@@ -81,9 +82,9 @@ int main(int argc, const char *argv[]) {
 
 ```
 
-### 更多特性示例
+### More widgets
 
-#### 一秒触发器
+#### One second timer
 
 ```cpp
 task<> my_clock() {
@@ -94,9 +95,7 @@ task<> my_clock() {
 }
 ```
 
-#### 网络超时
-
-秒懂的超时控制。
+#### Network timeout
 
 ```cpp
 task<> session(co_context::socket peer) {
@@ -145,7 +144,7 @@ int main() {
 }
 ```
 
-#### 链接 IO
+#### Linked IO
 
 用 `&&` 来链接两个 I/O。链接 I/O 可以减少重入内核态和调度器，增强性能表现。（默认只返回最后一个返回值。）
 
@@ -158,15 +157,11 @@ nr = co_await (
 
 此例子利用 link_io 大幅增强 echo_server 的性能
 
-#### channel（实验性）
+#### channel（experimental）
 
 借鉴自 Go 语言的阻塞队列。
 
-[示例：channel.cpp](https://github.com/Codesire-Deng/co_context/blob/main/test/channel.cpp)
-
-## 性能
-
-co_context 在开发过程中表现出惊人的性能。早期测试见[我的博客](https://codesire-deng.github.io/2022/06/25/co-context-2/#%E5%B0%8F%E7%BB%93)。下一个开发周期将进行更多测试。
+[example: channel.cpp](https://github.com/Codesire-Deng/co_context/blob/main/test/channel.cpp)
 
 ## 协程方案的局限场景
 
