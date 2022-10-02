@@ -277,7 +277,7 @@ namespace detail {
         [[nodiscard("Did you forget to co_await?")]] inline lazy_sync_file_range(
             int fd, uint32_t len, uint64_t offset, int flags
         ) noexcept {
-            sqe->prepare_syncFileRange(fd, len, offset, flags);
+            sqe->prepare_sync_file_range(fd, len, offset, flags);
         }
     };
 

@@ -255,9 +255,8 @@ class sq_entry final : private io_uring_sqe {
         return *this;
     }
 
-    inline sq_entry &prepare_link_timeout(
-        const __kernel_timespec &ts, unsigned flags
-    ) noexcept {
+    inline sq_entry &
+    prepare_link_timeout(const __kernel_timespec &ts, unsigned flags) noexcept {
         prepare_rw(IORING_OP_LINK_TIMEOUT, -1, &ts, 1, 0);
         this->timeout_flags = flags;
         return *this;
@@ -310,7 +309,7 @@ class sq_entry final : private io_uring_sqe {
         return *this;
     }
 
-    inline sq_entry &prepare_syncFileRange(
+    inline sq_entry &prepare_sync_file_range(
         int fd, uint32_t len, uint64_t offset, int flags
     ) noexcept {
         prepare_rw(IORING_OP_SYNC_FILE_RANGE, fd, nullptr, len, offset);
@@ -374,7 +373,7 @@ class sq_entry final : private io_uring_sqe {
         return *this;
     }
 
-    inline sq_entry &prepare_provide_buffers(int nr, int bgid) noexcept {
+    inline sq_entry &prepare_remove_buffers(int nr, int bgid) noexcept {
         prepare_rw(IORING_OP_REMOVE_BUFFERS, nr, nullptr, 0, 0);
         this->buf_group = (uint16_t)bgid;
         return *this;
@@ -413,6 +412,10 @@ class sq_entry final : private io_uring_sqe {
         prepare_rw(IORING_OP_UNLINKAT, dfd, path, 0, 0);
         this->unlink_flags = (uint32_t)flags;
         return *this;
+    }
+
+    inline sq_entry &prepare_unlink(const char *path, int flags) noexcept {
+        return prepare_unlinkat(AT_FDCWD, path, flags);
     }
 
     inline sq_entry &prepare_renameat(
