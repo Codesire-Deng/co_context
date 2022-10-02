@@ -176,7 +176,7 @@ int add_accept_request(
     socklen_t *client_addr_len
 ) {
     auto &sqe = *ring.get_sq_entry();
-    sqe.prepare_accept(
+    sqe.prep_accept(
         server_socket, reinterpret_cast<sockaddr *>(client_addr),
         client_addr_len, 0
     );
@@ -200,7 +200,7 @@ int add_read_request(int client_socket) {
     req->client_socket = client_socket;
     std::memset(req->iov[0].iov_base, 0, READ_SZ);
     /* Linux kernel 5.5 has support for readv, but not for recv() or read() */
-    sqe.prepare_readv(client_socket, {req->iov, 1}, 0);
+    sqe.prep_readv(client_socket, {req->iov, 1}, 0);
     sqe.set_data((uint64_t)req);
     ring.append_sq_entry(&sqe);
     ring.submit();
@@ -210,7 +210,7 @@ int add_read_request(int client_socket) {
 int add_write_request(struct request *req) {
     auto &sqe = *ring.get_sq_entry();
     req->event_type = EVENT_TYPE_WRITE;
-    sqe.prepare_writev(req->client_socket, {req->iov, req->iovec_count}, 0);
+    sqe.prep_writev(req->client_socket, {req->iov, req->iovec_count}, 0);
     sqe.set_data((uint64_t)req);
     ring.append_sq_entry(&sqe);
     ring.submit();

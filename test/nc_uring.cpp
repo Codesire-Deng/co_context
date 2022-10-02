@@ -26,7 +26,7 @@ void handle_recv() {
 void handle_peer() {
     peer = res;
     auto sqe = ring.get_sq_entry();
-    sqe->prepare_recv(peer, recv_buf, 0);
+    sqe->prep_recv(peer, recv_buf, 0);
     sqe->set_data((uintptr_t)handle_recv);
     ring.append_sq_entry(sqe);
     ring.submit();
@@ -50,7 +50,7 @@ void event_loop() {
 void server(uint16_t port) {
     acceptor ac{inet_address{port}};
     auto sqe = ring.get_sq_entry();
-    sqe->prepare_accept(ac.listen_fd(), nullptr, nullptr, 0);
+    sqe->prep_accept(ac.listen_fd(), nullptr, nullptr, 0);
     sqe->set_data((uintptr_t)handle_peer);
     ring.append_sq_entry(sqe);
     ring.submit();
@@ -64,7 +64,7 @@ void client(std::string_view hostname, uint16_t port) {
         co_context::socket sock{co_context::socket::create_tcp(addr.family())};
         // 连接一个 server
         auto sqe = ring.get_sq_entry();
-        sqe->prepare_connect(sock.fd(), addr.get_sockaddr(), addr.length());
+        sqe->prep_connect(sock.fd(), addr.get_sockaddr(), addr.length());
         sqe->set_data((uintptr_t)handle_peer);
         ring.append_sq_entry(sqe);
         ring.submit();
