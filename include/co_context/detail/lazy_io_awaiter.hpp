@@ -346,6 +346,7 @@ namespace detail {
         }
     };
 
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 19)
     struct lazy_multishot_accept : lazy_awaiter {
         inline lazy_multishot_accept(
             int fd, sockaddr *addr, socklen_t *addrlen, int flags
@@ -353,7 +354,9 @@ namespace detail {
             sqe->prep_multishot_accept(fd, addr, addrlen, flags);
         }
     };
+#endif
 
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 19)
     struct lazy_multishot_accept_direct : lazy_awaiter {
         inline lazy_multishot_accept_direct(
             int fd, sockaddr *addr, socklen_t *addrlen, int flags
@@ -361,6 +364,7 @@ namespace detail {
             sqe->prep_multishot_accept_direct(fd, addr, addrlen, flags);
         }
     };
+#endif
 
     struct lazy_cancel : lazy_awaiter {
         inline lazy_cancel(uint64_t user_data, int flags) noexcept {
@@ -543,6 +547,7 @@ namespace detail {
         }
     };
 
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 20)
     struct lazy_recv_multishot : lazy_awaiter {
         inline lazy_recv_multishot(
             int sockfd, std::span<char> buf, int flags
@@ -550,6 +555,7 @@ namespace detail {
             sqe->prep_recv_multishot(sockfd, buf, flags);
         }
     };
+#endif
 
     struct lazy_openat2 : lazy_awaiter {
         inline lazy_openat2(int dfd, const char *path, open_how *how) noexcept {

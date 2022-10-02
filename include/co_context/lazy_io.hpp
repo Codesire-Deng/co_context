@@ -213,6 +213,7 @@ inline namespace lazy {
         return detail::lazy_accept_direct{fd, addr, addrlen, flags, file_index};
     }
 
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 19)
     [[nodiscard("Did you forget to co_await?"
     )]] inline detail::lazy_multishot_accept
     multishot_accept(
@@ -220,7 +221,9 @@ inline namespace lazy {
     ) noexcept {
         return detail::lazy_multishot_accept{fd, addr, addrlen, flags};
     }
+#endif
 
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 19)
     [[nodiscard("Did you forget to co_await?"
     )]] inline detail::lazy_multishot_accept_direct
     multishot_accept_direct(
@@ -228,6 +231,7 @@ inline namespace lazy {
     ) noexcept {
         return detail::lazy_multishot_accept_direct{fd, addr, addrlen, flags};
     }
+#endif
 
     [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_cancel
     cancel(uint64_t user_data, int flags = 0) noexcept {
@@ -349,11 +353,13 @@ inline namespace lazy {
         return detail::lazy_recv{sockfd, buf, flags};
     }
 
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 20)
     [[nodiscard("Did you forget to co_await?"
     )]] inline detail::lazy_recv_multishot
     recv_multishot(int sockfd, std::span<char> buf, int flags = 0) noexcept {
         return detail::lazy_recv_multishot{sockfd, buf, flags};
     }
+#endif
 
     [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_openat2
     openat2(int dfd, const char *path, open_how *how) noexcept {
