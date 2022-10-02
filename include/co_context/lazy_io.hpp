@@ -1,756 +1,10 @@
 #pragma once
 
-#include "uring/uring.hpp"
-#include "co_context/detail/thread_meta.hpp"
-#include "co_context/detail/worker_meta.hpp"
-#include "co_context/detail/task_info.hpp"
-#include <cassert>
-#include <span>
-#include <chrono>
+#include "./detail/lazy_io_awaiter.hpp"
 
 namespace co_context {
 
-namespace detail {
-
-    struct [[nodiscard("Did you forget to co_await?")]] lazy_link_io {
-        class lazy_awaiter *last_io;
-
-        constexpr bool await_ready() const noexcept {
-            return false;
-        }
-
-        void await_suspend(std::coroutine_handle<> current) noexcept;
-
-        int32_t await_resume() const noexcept;
-    };
-
-    class [[nodiscard("Did you forget to co_await?")]] lazy_awaiter {
-      public:
-        constexpr bool await_ready() const noexcept {
-            return false;
-        }
-
-        void await_suspend(std::coroutine_handle<> current) noexcept {
-            io_info.handle = current;
-            submit();
-        }
-
-        int32_t await_resume() const noexcept {
-            return io_info.result;
-        }
-
-      protected:
-        friend class lazy_link_io;
-        friend struct lazy_link_timeout;
-        liburingcxx::sq_entry *sqe;
-        task_info io_info;
-
-        inline void submit() noexcept {
-            worker_meta *const worker = detail::this_thread.worker;
-            worker->submit_sqe();
-        }
-
-        friend lazy_link_io operator&&(
-            lazy_awaiter &&lhs, lazy_awaiter &&rhs
-        ) noexcept;
-
-        friend lazy_link_io &&operator&&(
-            lazy_link_io &&lhs, lazy_awaiter &&rhs
-        ) noexcept;
-
-        friend lazy_link_io &&operator&&(
-            lazy_link_io &&lhs, lazy_link_io &&rhs
-        ) noexcept;
-
-        friend lazy_link_io &&operator&&(
-            lazy_awaiter &&lhs, struct lazy_link_timeout &&rhs
-        ) noexcept;
-
-        friend void set_link_awaiter(lazy_awaiter & awaiter) noexcept;
-
-        lazy_awaiter() noexcept : io_info(task_info::task_type::lazy_sqe) {
-            io_info.tid_hint = detail::this_thread.tid;
-            sqe = this_thread.worker->get_free_sqe();
-            assert(sqe != nullptr);
-            sqe->set_data(io_info.as_user_data());
-        }
-
-#ifndef __INTELLISENSE__
-        lazy_awaiter(const lazy_awaiter &) = delete;
-        lazy_awaiter(lazy_awaiter &&) = delete;
-        lazy_awaiter &operator=(const lazy_awaiter &) = delete;
-        lazy_awaiter &operator=(lazy_awaiter &&) = delete;
-#endif
-    };
-
-    inline void set_link_sqe(liburingcxx::sq_entry *sqe) noexcept {
-        sqe->set_link();
-        sqe->fetch_data() |= __u64(task_info::task_type::lazy_link_sqe);
-    }
-
-    inline void set_link_awaiter(lazy_awaiter &awaiter) noexcept {
-        set_link_sqe(awaiter.sqe);
-        awaiter.io_info.type = task_info::task_type::lazy_link_sqe;
-    }
-
-    inline void set_link_link_io(lazy_link_io &link_io) noexcept {
-        set_link_awaiter(*link_io.last_io);
-    }
-
-    inline lazy_link_io
-    operator&&(lazy_awaiter &&lhs, lazy_awaiter &&rhs) noexcept {
-        set_link_awaiter(lhs);
-        return lazy_link_io{.last_io = &rhs};
-    }
-
-    inline lazy_link_io &&
-    operator&&(lazy_link_io &&lhs, lazy_awaiter &&rhs) noexcept {
-        set_link_link_io(lhs);
-        lhs.last_io = &rhs;
-        return std::move(lhs);
-    }
-
-    inline lazy_link_io &&
-    operator&&(lazy_link_io &&lhs, lazy_link_io &&rhs) noexcept {
-        set_link_link_io(lhs);
-        return std::move(rhs);
-    }
-
-    inline void lazy_link_io::await_suspend(std::coroutine_handle<> current
-    ) noexcept {
-        this->last_io->io_info.handle = current;
-        worker_meta *const worker = detail::this_thread.worker;
-        worker->submit_sqe();
-    }
-
-    inline int32_t lazy_link_io::await_resume() const noexcept {
-        return this->last_io->io_info.result;
-    }
-
-    struct lazy_read : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_read(
-            int fd, std::span<char> buf, uint64_t offset
-        ) noexcept {
-            sqe->prep_read(fd, buf, offset);
-        }
-    };
-
-    struct lazy_readv : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_readv(
-            int fd, std::span<const iovec> iovecs, uint64_t offset
-        ) noexcept {
-            sqe->prep_readv(fd, iovecs, offset);
-        }
-    };
-
-    struct lazy_read_fixed : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_read_fixed(
-            int fd, std::span<char> buf, uint64_t offset, uint16_t bufIndex
-        ) noexcept {
-            sqe->prep_read_fixed(fd, buf, offset, bufIndex);
-        }
-    };
-
-    struct lazy_write : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_write(
-            int fd, std::span<const char> buf, uint64_t offset
-        ) noexcept {
-            sqe->prep_write(fd, buf, offset);
-        }
-    };
-
-    struct lazy_writev : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_writev(
-            int fd, std::span<const iovec> iovecs, uint64_t offset
-        ) noexcept {
-            sqe->prep_writev(fd, iovecs, offset);
-        }
-    };
-
-    struct lazy_write_fixed : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_write_fixed(
-            int fd,
-            std::span<const char> buf,
-            uint64_t offset,
-            uint16_t bufIndex
-        ) noexcept {
-            sqe->prep_write_fixed(fd, buf, offset, bufIndex);
-        }
-    };
-
-    struct lazy_accept : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_accept(
-            int fd, sockaddr *addr, socklen_t *addrlen, int flags
-        ) noexcept {
-            sqe->prep_accept(fd, addr, addrlen, flags);
-        }
-    };
-
-    struct lazy_accept_direct : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_accept_direct(
-            int fd,
-            sockaddr *addr,
-            socklen_t *addrlen,
-            int flags,
-            uint32_t file_index
-        ) noexcept {
-            sqe->prep_accept_direct(fd, addr, addrlen, flags, file_index);
-        }
-    };
-
-    struct lazy_cancel : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?"
-        )]] inline lazy_cancel(uint64_t user_data, int flags) noexcept {
-            sqe->prep_cancle(user_data, flags);
-        }
-    };
-
-    struct lazy_cancel_fd : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?"
-        )]] inline lazy_cancel_fd(int fd, unsigned int flags) noexcept {
-            sqe->prep_cancle_fd(fd, flags);
-        }
-    };
-
-    struct lazy_recv : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_recv(
-            int sockfd, std::span<char> buf, int flags
-        ) noexcept {
-            sqe->prep_recv(sockfd, buf, flags);
-        }
-    };
-
-    struct lazy_recvmsg : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_recvmsg(
-            int fd, msghdr *msg, unsigned int flags
-        ) noexcept {
-            sqe->prep_recvmsg(fd, msg, flags);
-        }
-    };
-
-    struct lazy_send : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_send(
-            int sockfd, std::span<const char> buf, int flags
-        ) noexcept {
-            sqe->prep_send(sockfd, buf, flags);
-        }
-    };
-
-    struct lazy_sendmsg : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_sendmsg(
-            int fd, const msghdr *msg, unsigned int flags
-        ) noexcept {
-            sqe->prep_sendmsg(fd, msg, flags);
-        }
-    };
-
-    struct lazy_connect : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_connect(
-            int sockfd, const sockaddr *addr, socklen_t addrlen
-        ) noexcept {
-            sqe->prep_connect(sockfd, addr, addrlen);
-        }
-    };
-
-    struct lazy_close : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_close(int fd
-        ) noexcept {
-            sqe->prep_close(fd);
-        }
-    };
-
-    struct lazy_shutdown : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?"
-        )]] inline lazy_shutdown(int fd, int how) noexcept {
-            sqe->prep_shutdown(fd, how);
-        }
-    };
-
-    struct lazy_fsync : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?"
-        )]] inline lazy_fsync(int fd, uint32_t fsync_flags) noexcept {
-            sqe->prep_fsync(fd, fsync_flags);
-        }
-    };
-
-    struct lazy_sync_file_range : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_sync_file_range(
-            int fd, uint32_t len, uint64_t offset, int flags
-        ) noexcept {
-            sqe->prep_sync_file_range(fd, len, offset, flags);
-        }
-    };
-
-    struct lazy_uring_nop : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?"
-        )]] inline lazy_uring_nop() noexcept {
-            sqe->prep_nop();
-        }
-    };
-
-    struct lazy_files_update : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?"
-        )]] inline lazy_files_update(std::span<int> fds, int offset) noexcept {
-            sqe->prep_files_update(fds, offset);
-        }
-    };
-
-    struct lazy_fallocate : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_fallocate(
-            int fd, int mode, off_t offset, off_t len
-        ) noexcept {
-            sqe->prep_fallocate(fd, mode, offset, len);
-        }
-    };
-
-    struct lazy_openat : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_openat(
-            int dfd, const char *path, int flags, mode_t mode
-        ) noexcept {
-            sqe->prep_openat(dfd, path, flags, mode);
-        }
-    };
-
-    /* open directly into the fixed file table */
-    struct lazy_openat_direct : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_openat_direct(
-            int dfd,
-            const char *path,
-            int flags,
-            mode_t mode,
-            unsigned file_index
-        ) noexcept {
-            sqe->prep_openat_direct(dfd, path, flags, mode, file_index);
-        }
-    };
-
-    struct lazy_openat2 : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_openat2(
-            int dfd, const char *path, open_how *how
-        ) noexcept {
-            sqe->prep_openat2(dfd, path, how);
-        }
-    };
-
-    /* open directly into the fixed file table */
-    struct lazy_openat2_direct : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_openat2_direct(
-            int dfd, const char *path, open_how *how, unsigned int file_index
-        ) noexcept {
-            sqe->prep_openat2_direct(dfd, path, how, file_index);
-        }
-    };
-
-    struct lazy_statx : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_statx(
-            int dfd,
-            const char *path,
-            int flags,
-            unsigned int mask,
-            struct statx *statxbuf
-        ) noexcept {
-            sqe->prep_statx(dfd, path, flags, mask, statxbuf);
-        }
-    };
-
-    struct lazy_unlinkat : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_unlinkat(
-            int dfd, const char *path, int flags
-        ) noexcept {
-            sqe->prep_unlinkat(dfd, path, flags);
-        }
-    };
-
-    struct lazy_renameat : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_renameat(
-            int olddfd,
-            const char *oldpath,
-            int newdfd,
-            const char *newpath,
-            int flags
-        ) noexcept {
-            sqe->prep_renameat(olddfd, oldpath, newdfd, newpath, flags);
-        }
-    };
-
-    struct lazy_mkdirat : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_mkdirat(
-            int dfd, const char *path, mode_t mode
-        ) noexcept {
-            sqe->prep_mkdirat(dfd, path, mode);
-        }
-    };
-
-    struct lazy_symlinkat : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_symlinkat(
-            const char *target, int newdirfd, const char *linkpath
-        ) noexcept {
-            sqe->prep_symlinkat(target, newdirfd, linkpath);
-        }
-    };
-
-    struct lazy_linkat : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_linkat(
-            int olddfd,
-            const char *oldpath,
-            int newdfd,
-            const char *newpath,
-            int flags
-        ) noexcept {
-            sqe->prep_linkat(olddfd, oldpath, newdfd, newpath, flags);
-        }
-    };
-
-    struct lazy_timeout_timespec : lazy_awaiter {
-      public:
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_timeout_timespec(
-            const __kernel_timespec &ts, unsigned int count, unsigned int flags
-        ) noexcept {
-            sqe->prep_timeout(ts, count, flags);
-        }
-
-      protected:
-        inline lazy_timeout_timespec() noexcept {}
-    };
-
-    struct lazy_timeout_base : lazy_awaiter {
-      protected:
-        __kernel_timespec ts;
-
-      public:
-        template<class Rep, class Period = std::ratio<1>>
-        void set_ts(std::chrono::duration<Rep, Period> duration) noexcept {
-            using namespace std;
-            using namespace std::literals;
-            ts.tv_sec = duration / 1s;
-            duration -= chrono::seconds(ts.tv_sec);
-            ts.tv_nsec =
-                duration_cast<chrono::duration<long long, std::nano>>(duration)
-                    .count();
-        }
-
-        template<class Rep, class Period = std::ratio<1>>
-        [[nodiscard("Should not be used directly"
-        )]] inline lazy_timeout_base(std::chrono::duration<Rep, Period> duration
-        ) noexcept {
-            set_ts(duration);
-        }
-    };
-
-    struct lazy_timeout : lazy_timeout_base {
-        template<class Rep, class Period = std::ratio<1>>
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_timeout(
-            std::chrono::duration<Rep, Period> duration, unsigned int flags
-        ) noexcept
-            : lazy_timeout_base(duration) {
-            sqe->prep_timeout(ts, 0, flags);
-        }
-    };
-
-    struct lazy_link_timeout_base : lazy_timeout_base {
-        template<class Rep, class Period = std::ratio<1>>
-        [[nodiscard("Should not be used directly")]] inline lazy_link_timeout_base(
-            std::chrono::duration<Rep, Period> duration, unsigned int flags
-        ) noexcept
-            : lazy_timeout_base(duration) {
-            sqe->prep_link_timeout(this->ts, flags);
-        }
-    };
-
-    struct lazy_link_timeout : lazy_link_io {
-        lazy_link_timeout_base timer;
-
-        template<class Rep, class Period = std::ratio<1>>
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_link_timeout(
-            lazy_awaiter &&timed_io,
-            std::chrono::duration<Rep, Period> duration,
-            unsigned int flags
-        ) noexcept
-            : timer(duration, flags) {
-            // Mark timed_io as normal task type, and set sqe link.
-            timed_io.sqe->set_link();
-            // Mark timer as lazy_link_sqe task type, and without sqe link.
-            timer.io_info.type = task_info::task_type::lazy_link_sqe;
-            // Send the result to timed_io.
-            this->last_io = &timed_io;
-        }
-    };
-
-    inline lazy_link_io &&
-    operator&&(lazy_awaiter &&lhs, struct lazy_link_timeout &&rhs) noexcept {
-        set_link_awaiter(lhs);
-        return std::move(rhs);
-    }
-
-    struct lazy_yield {
-        constexpr bool await_ready() const noexcept { return false; }
-
-        void await_suspend(std::coroutine_handle<> current) noexcept {
-            auto &worker = *detail::this_thread.worker;
-            worker.co_spawn(current);
-        }
-
-        constexpr void await_resume() const noexcept {}
-
-        constexpr lazy_yield() noexcept = default;
-    };
-
-    struct lazy_splice : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_splice(
-            int fd_in,
-            int64_t off_in,
-            int fd_out,
-            int64_t off_out,
-            unsigned int nbytes,
-            unsigned int splice_flags
-        ) noexcept {
-            sqe->prep_splice(
-                fd_in, off_in, fd_out, off_out, nbytes, splice_flags
-            );
-        }
-    };
-
-    struct lazy_tee : lazy_awaiter {
-        [[nodiscard("Did you forget to co_await?")]] inline lazy_tee(
-            int fd_in,
-            int fd_out,
-            unsigned int nbytes,
-            unsigned int splice_flags
-        ) noexcept {
-            sqe->prep_tee(fd_in, fd_out, nbytes, splice_flags);
-        }
-    };
-
-} // namespace detail
-
 inline namespace lazy {
-
-    inline detail::lazy_yield yield() noexcept {
-        return {};
-    }
-
-    inline detail::lazy_read
-    read(int fd, std::span<char> buf, uint64_t offset = -1ULL) noexcept {
-        return detail::lazy_read{fd, buf, offset};
-    }
-
-    inline detail::lazy_readv readv(
-        int fd, std::span<const iovec> iovecs, uint64_t offset = -1ULL
-    ) noexcept {
-        return detail::lazy_readv{fd, iovecs, offset};
-    }
-
-    inline detail::lazy_read_fixed read_fixed(
-        int fd, std::span<char> buf, uint64_t offset, uint16_t bufIndex
-    ) noexcept {
-        return detail::lazy_read_fixed{fd, buf, offset, bufIndex};
-    }
-
-    inline detail::lazy_write
-    write(int fd, std::span<const char> buf, uint64_t offset = -1ULL) noexcept {
-        return detail::lazy_write{fd, buf, offset};
-    }
-
-    inline detail::lazy_writev writev(
-        int fd, std::span<const iovec> iovecs, uint64_t offset = -1ULL
-    ) noexcept {
-        return detail::lazy_writev{fd, iovecs, offset};
-    }
-
-    inline detail::lazy_write_fixed write_fixed(
-        int fd, std::span<const char> buf, uint64_t offset, uint16_t bufIndex
-    ) noexcept {
-        return detail::lazy_write_fixed{fd, buf, offset, bufIndex};
-    }
-
-    inline detail::lazy_accept
-    accept(int fd, sockaddr *addr, socklen_t *addrlen, int flags) noexcept {
-        return detail::lazy_accept{fd, addr, addrlen, flags};
-    }
-
-    inline detail::lazy_accept_direct accept_direct(
-        int fd,
-        sockaddr *addr,
-        socklen_t *addrlen,
-        int flags,
-        uint32_t file_index
-    ) noexcept {
-        return detail::lazy_accept_direct{fd, addr, addrlen, flags, file_index};
-    }
-
-    [[deprecated("Consider cancel_fd instead.")]] inline detail::lazy_cancel
-    cancel(uint64_t user_data, int flags = 0) noexcept {
-        return detail::lazy_cancel{user_data, flags};
-    }
-
-    inline detail::lazy_cancel_fd
-    cancel(int fd, unsigned int flags = 0) noexcept {
-        return detail::lazy_cancel_fd{fd, flags};
-    }
-
-    inline detail::lazy_recv
-    recv(int sockfd, std::span<char> buf, int flags = 0) noexcept {
-        return detail::lazy_recv{sockfd, buf, flags};
-    }
-
-    inline detail::lazy_recvmsg
-    recvmsg(int fd, msghdr *msg, unsigned int flags) noexcept {
-        return detail::lazy_recvmsg{fd, msg, flags};
-    }
-
-    inline detail::lazy_send
-    send(int sockfd, std::span<const char> buf, int flags = 0) noexcept {
-        return detail::lazy_send{sockfd, buf, flags};
-    }
-
-    inline detail::lazy_sendmsg
-    sendmsg(int fd, const msghdr *msg, unsigned int flags) noexcept {
-        return detail::lazy_sendmsg{fd, msg, flags};
-    }
-
-    inline detail::lazy_connect
-    connect(int sockfd, const sockaddr *addr, socklen_t addrlen) noexcept {
-        return detail::lazy_connect{sockfd, addr, addrlen};
-    }
-
-    inline detail::lazy_close close(int fd) noexcept {
-        return detail::lazy_close{fd};
-    }
-
-    inline detail::lazy_shutdown shutdown(int fd, int how) noexcept {
-        return detail::lazy_shutdown{fd, how};
-    }
-
-    inline detail::lazy_fsync fsync(int fd, uint32_t fsync_flags) noexcept {
-        return detail::lazy_fsync{fd, fsync_flags};
-    }
-
-    inline detail::lazy_sync_file_range
-    sync_file_range(int fd, uint32_t len, uint64_t offset, int flags) noexcept {
-        return detail::lazy_sync_file_range{fd, len, offset, flags};
-    }
-
-    inline detail::lazy_uring_nop uring_nop() noexcept {
-        return detail::lazy_uring_nop{};
-    }
-
-    inline detail::lazy_files_update
-    files_update(std::span<int> fds, int offset) noexcept {
-        return detail::lazy_files_update{fds, offset};
-    }
-
-    inline detail::lazy_fallocate
-    fallocate(int fd, int mode, off_t offset, off_t len) noexcept {
-        return detail::lazy_fallocate{fd, mode, offset, len};
-    }
-
-    inline detail::lazy_openat
-    openat(int dfd, const char *path, int flags, mode_t mode) noexcept {
-        return detail::lazy_openat{dfd, path, flags, mode};
-    }
-
-    inline detail::lazy_openat_direct openat_direct(
-        int dfd,
-        const char *path,
-        int flags,
-        mode_t mode,
-        unsigned int file_index
-    ) noexcept {
-        return detail::lazy_openat_direct{dfd, path, flags, mode, file_index};
-    }
-
-    inline detail::lazy_openat2
-    openat2(int dfd, const char *path, open_how *how) noexcept {
-        return detail::lazy_openat2{dfd, path, how};
-    }
-
-    inline detail::lazy_openat2_direct openat2_direct(
-        int dfd, const char *path, open_how *how, unsigned int file_index
-    ) noexcept {
-        return detail::lazy_openat2_direct{dfd, path, how, file_index};
-    }
-
-    inline detail::lazy_statx statx(
-        int dfd,
-        const char *path,
-        int flags,
-        unsigned int mask,
-        struct statx *statxbuf
-    ) noexcept {
-        return detail::lazy_statx{dfd, path, flags, mask, statxbuf};
-    }
-
-    inline detail::lazy_unlinkat
-    unlinkat(int dfd, const char *path, int flags) noexcept {
-        return detail::lazy_unlinkat{dfd, path, flags};
-    }
-
-    inline detail::lazy_renameat renameat(
-        int olddfd,
-        const char *oldpath,
-        int newdfd,
-        const char *newpath,
-        int flags
-    ) noexcept {
-        return detail::lazy_renameat{olddfd, oldpath, newdfd, newpath, flags};
-    }
-
-    inline detail::lazy_mkdirat
-    mkdirat(int dfd, const char *path, mode_t mode) noexcept {
-        return detail::lazy_mkdirat{dfd, path, mode};
-    }
-
-    inline detail::lazy_symlinkat
-    symlinkat(const char *target, int newdirfd, const char *linkpath) noexcept {
-        return detail::lazy_symlinkat{target, newdirfd, linkpath};
-    }
-
-    inline detail::lazy_linkat linkat(
-        int olddfd,
-        const char *oldpath,
-        int newdfd,
-        const char *newpath,
-        int flags
-    ) noexcept {
-        return detail::lazy_linkat{olddfd, oldpath, newdfd, newpath, flags};
-    }
-
-    /**
-     * @brief Set timeout. When it expires, the coroutine will wake up
-     *
-     * @param ts The relative time duration, or the absolute time stamp.
-     * @param count The completion event count.
-     * @param flags If it contains IORING_TIMEOUT_ABS, uses absolute time
-     * stamp. See man io_uring_enter(2).
-     * @return lazy_awaiter
-     */
-    inline detail::lazy_timeout_timespec timeout(
-        const __kernel_timespec &ts, unsigned int count, unsigned int flags
-    ) noexcept {
-        return detail::lazy_timeout_timespec{ts, count, flags};
-    }
-
-    /**
-     * @brief Set duration timeout.
-     *
-     * @param flags See man io_uring_enter(2).
-     * @return lazy_awaiter
-     */
-    template<class Rep, class Period = std::ratio<1>>
-    inline detail::lazy_timeout timeout(
-        std::chrono::duration<Rep, Period> duration, unsigned int flags = 0
-    ) noexcept {
-        return detail::lazy_timeout{duration, flags};
-    }
-
-    template<class Rep, class Period = std::ratio<1>>
-    inline detail::lazy_link_timeout timeout(
-        detail::lazy_awaiter &&timed_io,
-        std::chrono::duration<Rep, Period> duration,
-        unsigned int flags = 0
-    ) noexcept {
-        return detail::lazy_link_timeout{std::move(timed_io), duration, flags};
-    }
 
     /**
      * @pre Either fd_in or fd_out must be a pipe.
@@ -773,7 +27,8 @@ inline namespace lazy {
      * unsupported from kernel 5.7 to 5.11. Check issue #291 for more
      * information.
      */
-    inline detail::lazy_splice splice(
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_splice
+    splice(
         int fd_in,
         int64_t off_in,
         int fd_out,
@@ -785,10 +40,490 @@ inline namespace lazy {
                                    off_out, nbytes, splice_flags};
     }
 
-    inline detail::lazy_tee
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_tee
     tee(int fd_in, int fd_out, unsigned int nbytes, unsigned int splice_flags
     ) noexcept {
         return detail::lazy_tee{fd_in, fd_out, nbytes, splice_flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_readv
+    readv(
+        int fd, std::span<const iovec> iovecs, uint64_t offset = -1ULL
+    ) noexcept {
+        return detail::lazy_readv{fd, iovecs, offset};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_readv2
+    readv2(
+        int fd, std::span<const iovec> iovecs, __u64 offset, int flags
+    ) noexcept {
+        return detail::lazy_readv2{fd, iovecs, offset, flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_read_fixed
+    read_fixed(
+        int fd, std::span<char> buf, uint64_t offset, uint16_t bufIndex
+    ) noexcept {
+        return detail::lazy_read_fixed{fd, buf, offset, bufIndex};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_writev
+    writev(
+        int fd, std::span<const iovec> iovecs, uint64_t offset = -1ULL
+    ) noexcept {
+        return detail::lazy_writev{fd, iovecs, offset};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_write_fixed
+    write_fixed(
+        int fd, std::span<const char> buf, uint64_t offset, uint16_t bufIndex
+    ) noexcept {
+        return detail::lazy_write_fixed{fd, buf, offset, bufIndex};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_recvmsg
+    recvmsg(int fd, msghdr *msg, unsigned int flags) noexcept {
+        return detail::lazy_recvmsg{fd, msg, flags};
+    }
+
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 20)
+    [[nodiscard("Did you forget to co_await?"
+    )]] inline detail::lazy_recvmsg_multishot
+    recvmsg_multishot(int fd, const msghdr *msg, unsigned int flags) noexcept {
+        return detail::lazy_recvmsg_multishot{fd, msg, flags};
+    }
+#endif
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_sendmsg
+    sendmsg(int fd, const msghdr *msg, unsigned int flags) noexcept {
+        return detail::lazy_sendmsg{fd, msg, flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_poll_add
+    poll_add(int fd, unsigned poll_mask) noexcept {
+        return detail::lazy_poll_add{fd, poll_mask};
+    }
+
+    [[nodiscard("Did you forget to co_await?"
+    )]] inline detail::lazy_poll_multishot
+    poll_multishot(int fd, unsigned poll_mask) noexcept {
+        return detail::lazy_poll_multishot{fd, poll_mask};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_poll_remove
+    poll_remove(int fd, uint64_t user_data) noexcept {
+        return detail::lazy_poll_remove{fd, user_data};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_poll_update
+    poll_update(
+        int fd,
+        uint64_t old_user_data,
+        uint64_t new_user_data,
+        unsigned poll_mask,
+        unsigned flags
+    ) noexcept {
+        return detail::lazy_poll_update{
+            fd, old_user_data, new_user_data, poll_mask, flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_fsync
+    fsync(int fd, uint32_t fsync_flags) noexcept {
+        return detail::lazy_fsync{fd, fsync_flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_uring_nop
+    uring_nop() noexcept {
+        return detail::lazy_uring_nop{};
+    }
+
+    /**
+     * @brief Set timeout. When it expires, the coroutine will wake up
+     *
+     * @param ts The relative time duration, or the absolute time stamp.
+     * @param count The completion event count.
+     * @param flags If it contains IORING_TIMEOUT_ABS, uses absolute time
+     * stamp. See man io_uring_enter(2).
+     * @return lazy_awaiter
+     */
+    [[nodiscard("Did you forget to co_await?"
+    )]] inline detail::lazy_timeout_timespec
+    timeout(
+        const __kernel_timespec &ts, unsigned int count, unsigned int flags
+    ) noexcept {
+        return detail::lazy_timeout_timespec{ts, count, flags};
+    }
+
+    /**
+     * @brief Set duration timeout.
+     *
+     * @param flags See man io_uring_enter(2).
+     * @return lazy_awaiter
+     */
+    template<class Rep, class Period = std::ratio<1>>
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_timeout
+    timeout(
+        std::chrono::duration<Rep, Period> duration, unsigned int flags = 0
+    ) noexcept {
+        return detail::lazy_timeout{duration, flags};
+    }
+
+    template<class Rep, class Period = std::ratio<1>>
+    [[nodiscard("Did you forget to co_await?"
+    )]] inline detail::lazy_link_timeout
+    timeout(
+        detail::lazy_awaiter &&timed_io,
+        std::chrono::duration<Rep, Period> duration,
+        unsigned int flags = 0
+    ) noexcept {
+        return detail::lazy_link_timeout{std::move(timed_io), duration, flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?"
+    )]] inline detail::lazy_timeout_remove
+    timeout_remove(uint64_t user_data, unsigned flags) noexcept {
+        return detail::lazy_timeout_remove{user_data, flags};
+    }
+
+    template<class Rep, class Period = std::ratio<1>>
+    [[nodiscard("Did you forget to co_await?"
+    )]] inline detail::lazy_timeout_update
+    timeout_update(
+        std::chrono::duration<Rep, Period> duration,
+        uint64_t user_data,
+        unsigned flags = 0
+    ) noexcept {
+        return detail::lazy_timeout_update{duration, user_data, flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_accept
+    accept(int fd, sockaddr *addr, socklen_t *addrlen, int flags) noexcept {
+        return detail::lazy_accept{fd, addr, addrlen, flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?"
+    )]] inline detail::lazy_accept_direct
+    accept_direct(
+        int fd,
+        sockaddr *addr,
+        socklen_t *addrlen,
+        int flags,
+        uint32_t file_index
+    ) noexcept {
+        return detail::lazy_accept_direct{fd, addr, addrlen, flags, file_index};
+    }
+
+    [[nodiscard("Did you forget to co_await?"
+    )]] inline detail::lazy_multishot_accept
+    multishot_accept(
+        int fd, sockaddr *addr, socklen_t *addrlen, int flags
+    ) noexcept {
+        return detail::lazy_multishot_accept{fd, addr, addrlen, flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?"
+    )]] inline detail::lazy_multishot_accept_direct
+    multishot_accept_direct(
+        int fd, sockaddr *addr, socklen_t *addrlen, int flags
+    ) noexcept {
+        return detail::lazy_multishot_accept_direct{fd, addr, addrlen, flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_cancel
+    cancel(uint64_t user_data, int flags = 0) noexcept {
+        return detail::lazy_cancel{user_data, flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_cancel_fd
+    cancel(int fd, unsigned int flags = 0) noexcept {
+        return detail::lazy_cancel_fd{fd, flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_connect
+    connect(int sockfd, const sockaddr *addr, socklen_t addrlen) noexcept {
+        return detail::lazy_connect{sockfd, addr, addrlen};
+    }
+
+    [[nodiscard("Did you forget to co_await?"
+    )]] inline detail::lazy_files_update
+    files_update(std::span<int> fds, int offset) noexcept {
+        return detail::lazy_files_update{fds, offset};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_fallocate
+    fallocate(int fd, int mode, off_t offset, off_t len) noexcept {
+        return detail::lazy_fallocate{fd, mode, offset, len};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_openat
+    openat(int dfd, const char *path, int flags, mode_t mode) noexcept {
+        return detail::lazy_openat{dfd, path, flags, mode};
+    }
+
+    [[nodiscard("Did you forget to co_await?"
+    )]] inline detail::lazy_openat_direct
+    openat_direct(
+        int dfd,
+        const char *path,
+        int flags,
+        mode_t mode,
+        unsigned int file_index
+    ) noexcept {
+        return detail::lazy_openat_direct{dfd, path, flags, mode, file_index};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_close
+    close(int fd) noexcept {
+        return detail::lazy_close{fd};
+    }
+
+    [[nodiscard("Did you forget to co_await?"
+    )]] inline detail::lazy_close_direct
+    close_direct(unsigned file_index) noexcept {
+        return detail::lazy_close_direct{file_index};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_read
+    read(int fd, std::span<char> buf, uint64_t offset = -1ULL) noexcept {
+        return detail::lazy_read{fd, buf, offset};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_write
+    write(int fd, std::span<const char> buf, uint64_t offset = -1ULL) noexcept {
+        return detail::lazy_write{fd, buf, offset};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_statx
+    statx(
+        int dfd,
+        const char *path,
+        int flags,
+        unsigned int mask,
+        struct statx *statxbuf
+    ) noexcept {
+        return detail::lazy_statx{dfd, path, flags, mask, statxbuf};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_fadvise
+    fadvise(int fd, uint64_t offset, off_t len, int advice) noexcept {
+        return detail::lazy_fadvise{fd, offset, len, advice};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_madvise
+    madvise(void *addr, off_t length, int advice) noexcept {
+        return detail::lazy_madvise{addr, length, advice};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_send
+    send(int sockfd, std::span<const char> buf, int flags = 0) noexcept {
+        return detail::lazy_send{sockfd, buf, flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_send_zc
+    send_zc(
+        int sockfd, std::span<const char> buf, int flags, unsigned zc_flags
+    ) noexcept {
+        return detail::lazy_send_zc{sockfd, buf, flags, zc_flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?"
+    )]] inline detail::lazy_send_zc_fixed
+    send_zc_fixed(
+        int sockfd,
+        std::span<const char> buf,
+        int flags,
+        unsigned zc_flags,
+        unsigned buf_index
+    ) noexcept {
+        return detail::lazy_send_zc_fixed{
+            sockfd, buf, flags, zc_flags, buf_index};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_sendmsg_zc
+    sendmsg_zc(int fd, const msghdr *msg, unsigned flags) noexcept {
+        return detail::lazy_sendmsg_zc{fd, msg, flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_recv
+    recv(int sockfd, std::span<char> buf, int flags = 0) noexcept {
+        return detail::lazy_recv{sockfd, buf, flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?"
+    )]] inline detail::lazy_recv_multishot
+    recv_multishot(int sockfd, std::span<char> buf, int flags = 0) noexcept {
+        return detail::lazy_recv_multishot{sockfd, buf, flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_openat2
+    openat2(int dfd, const char *path, open_how *how) noexcept {
+        return detail::lazy_openat2{dfd, path, how};
+    }
+
+    [[nodiscard("Did you forget to co_await?"
+    )]] inline detail::lazy_openat2_direct
+    openat2_direct(
+        int dfd, const char *path, open_how *how, unsigned int file_index
+    ) noexcept {
+        return detail::lazy_openat2_direct{dfd, path, how, file_index};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_epoll_ctl
+    epoll_ctl(int epfd, int fd, int op, epoll_event *ev) noexcept {
+        return detail::lazy_epoll_ctl{epfd, fd, op, ev};
+    }
+
+    [[nodiscard("Did you forget to co_await?"
+    )]] inline detail::lazy_provide_buffers
+    provide_buffers(
+        const void *addr, int len, int nr, int bgid, int bid
+    ) noexcept {
+        return detail::lazy_provide_buffers{addr, len, nr, bgid, bid};
+    }
+
+    [[nodiscard("Did you forget to co_await?"
+    )]] inline detail::lazy_remove_buffers
+    remove_buffers(int nr, int bgid) noexcept {
+        return detail::lazy_remove_buffers{nr, bgid};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_shutdown
+    shutdown(int fd, int how) noexcept {
+        return detail::lazy_shutdown{fd, how};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_unlinkat
+    unlinkat(int dfd, const char *path, int flags) noexcept {
+        return detail::lazy_unlinkat{dfd, path, flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_unlink
+    unlink(const char *path, int flags) noexcept {
+        return detail::lazy_unlink{path, flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_renameat
+    renameat(
+        int olddfd,
+        const char *oldpath,
+        int newdfd,
+        const char *newpath,
+        int flags
+    ) noexcept {
+        return detail::lazy_renameat{olddfd, oldpath, newdfd, newpath, flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_rename
+    rename(const char *oldpath, const char *newpath) noexcept {
+        return detail::lazy_rename{oldpath, newpath};
+    }
+
+    [[nodiscard("Did you forget to co_await?"
+    )]] inline detail::lazy_sync_file_range
+    sync_file_range(int fd, uint32_t len, uint64_t offset, int flags) noexcept {
+        return detail::lazy_sync_file_range{fd, len, offset, flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_mkdirat
+    mkdirat(int dfd, const char *path, mode_t mode) noexcept {
+        return detail::lazy_mkdirat{dfd, path, mode};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_mkdir
+    mkdir(const char *path, mode_t mode) noexcept {
+        return detail::lazy_mkdir{path, mode};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_symlinkat
+    symlinkat(const char *target, int newdirfd, const char *linkpath) noexcept {
+        return detail::lazy_symlinkat{target, newdirfd, linkpath};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_symlink
+    symlink(const char *target, const char *linkpath) noexcept {
+        return detail::lazy_symlink{target, linkpath};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_linkat
+    linkat(
+        int olddfd,
+        const char *oldpath,
+        int newdfd,
+        const char *newpath,
+        int flags
+    ) noexcept {
+        return detail::lazy_linkat{olddfd, oldpath, newdfd, newpath, flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_link
+    link(const char *oldpath, const char *newpath, int flags) noexcept {
+        return detail::lazy_link{oldpath, oldpath, flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_msg_ring
+    msg_ring(
+        int fd, unsigned int cqe_res, uint64_t cqe_user_data, unsigned int flags
+    ) noexcept {
+        return detail::lazy_msg_ring{fd, cqe_res, cqe_user_data, flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_getxattr
+    getxattr(
+        const char *name, char *value, const char *path, size_t len
+    ) noexcept {
+        return detail::lazy_getxattr{name, value, path, len};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_setxattr
+    setxattr(
+        const char *name, char *value, const char *path, int flags, size_t len
+    ) noexcept {
+        return detail::lazy_setxattr{name, value, path, flags, len};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_fgetxattr
+    fgetxattr(int fd, const char *name, char *value, size_t len) noexcept {
+        return detail::lazy_fgetxattr{fd, name, value, len};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_fsetxattr
+    fsetxattr(
+        int fd, const char *name, const char *value, int flags, size_t len
+    ) noexcept {
+        return detail::lazy_fsetxattr{fd, name, value, flags, len};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_socket
+    make_socket(
+        int domain, int type, int protocol, unsigned int flags
+    ) noexcept {
+        return detail::lazy_socket{domain, type, protocol, flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?"
+    )]] inline detail::lazy_socket_direct
+    make_socket_direct(
+        int domain,
+        int type,
+        int protocol,
+        unsigned file_index,
+        unsigned int flags
+    ) noexcept {
+        return detail::lazy_socket_direct{
+            domain, type, protocol, file_index, flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?"
+    )]] inline detail::lazy_socket_direct_alloc
+    make_socket_direct_alloc(
+        int domain, int type, int protocol, unsigned int flags
+    ) noexcept {
+        return detail::lazy_socket_direct_alloc{domain, type, protocol, flags};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_yield
+    yield() noexcept {
+        return {};
     }
 
 } // namespace lazy

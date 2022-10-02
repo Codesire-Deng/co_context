@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include "uring/compat.h"
 #include "uring/utility/io_helper.hpp"
+#include "uring/utility/kernel_version.hpp"
 
 struct __kernel_timespec;
 struct epoll_event;
@@ -88,7 +89,6 @@ class sq_entry final : private io_uring_sqe {
 
     inline void *get_padding() noexcept { return __pad2; }
 
-  public:
     inline sq_entry &prep_rw(
         uint8_t op, int fd, const void *addr, uint32_t len, uint64_t offset
     ) noexcept {
@@ -107,6 +107,12 @@ class sq_entry final : private io_uring_sqe {
         this->__pad2[0] = 0;
         return *this;
     }
+
+  public:
+    /**************************************
+     *    io operations to be exported    *
+     **************************************
+     */
 
     /**
      * @pre Either fd_in or fd_out must be a pipe.
@@ -135,9 +141,7 @@ class sq_entry final : private io_uring_sqe {
         unsigned int nbytes,
         unsigned int splice_flags
     ) noexcept {
-        prep_rw(
-            IORING_OP_SPLICE, fd_out, nullptr, nbytes, (uint64_t)off_out
-        );
+        prep_rw(IORING_OP_SPLICE, fd_out, nullptr, nbytes, (uint64_t)off_out);
         this->splice_off_in = (uint64_t)off_in;
         this->splice_flags = splice_flags;
         this->splice_fd_in = fd_in;
@@ -209,6 +213,7 @@ class sq_entry final : private io_uring_sqe {
         return *this;
     }
 
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 20)
     /**
      * @brief same as recvmsg but generate multi-CQE, see
      * `man io_uring_prep_recvmsg_multishot`
@@ -221,6 +226,7 @@ class sq_entry final : private io_uring_sqe {
         this->ioprio |= IORING_RECV_MULTISHOT;
         return *this;
     }
+#endif
 
     inline sq_entry &
     prep_sendmsg(int fd, const msghdr *msg, unsigned flags) noexcept {
@@ -244,8 +250,7 @@ class sq_entry final : private io_uring_sqe {
         return *this;
     }
 
-    inline sq_entry &
-    prep_poll_multishot(int fd, unsigned poll_mask) noexcept {
+    inline sq_entry &prep_poll_multishot(int fd, unsigned poll_mask) noexcept {
         prep_poll_add(fd, poll_mask);
         this->len = IORING_POLL_ADD_MULTI;
         return *this;
@@ -298,7 +303,7 @@ class sq_entry final : private io_uring_sqe {
         return *this;
     }
 
-    inline sq_entry &prep_timeout_rpdate(
+    inline sq_entry &prep_timeout_update(
         const __kernel_timespec &ts, uint64_t user_data, unsigned flags
     ) noexcept {
         prep_rw(
@@ -505,9 +510,8 @@ class sq_entry final : private io_uring_sqe {
      *
      * available @since Linux 5.20
      */
-    inline sq_entry &prep_recv_multishot(
-        int sockfd, std::span<char> buf, int flags
-    ) noexcept {
+    inline sq_entry &
+    prep_recv_multishot(int sockfd, std::span<char> buf, int flags) noexcept {
         prep_recv(sockfd, buf, flags);
         this->ioprio |= IORING_RECV_MULTISHOT;
         return *this;
@@ -525,8 +529,7 @@ class sq_entry final : private io_uring_sqe {
     inline sq_entry &prep_openat2_direct(
         int dfd, const char *path, struct open_how *how, unsigned file_index
     ) noexcept {
-        return prep_openat2(dfd, path, how)
-            .set_target_fixed_file(file_index);
+        return prep_openat2(dfd, path, how).set_target_fixed_file(file_index);
     }
 
     inline sq_entry &
@@ -638,6 +641,7 @@ class sq_entry final : private io_uring_sqe {
         return prep_linkat(AT_FDCWD, oldpath, AT_FDCWD, newpath, flags);
     }
 
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 18)
     /**
      * @brief send a CQE to another ring
      *
@@ -650,6 +654,7 @@ class sq_entry final : private io_uring_sqe {
         this->rw_flags = flags;
         return *this;
     }
+#endif
 
     inline sq_entry &prep_getxattr(
         const char *name, char *value, const char *path, size_t len
@@ -675,9 +680,8 @@ class sq_entry final : private io_uring_sqe {
         return *this;
     }
 
-    inline sq_entry &prep_fgetxattr(
-        int fd, const char *name, char *value, size_t len
-    ) noexcept {
+    inline sq_entry &
+    prep_fgetxattr(int fd, const char *name, char *value, size_t len) noexcept {
         prep_rw(
             IORING_OP_FGETXATTR, fd, name, len,
             (uint64_t) reinterpret_cast<uintptr_t>(value)
@@ -705,7 +709,6 @@ class sq_entry final : private io_uring_sqe {
     }
 
     inline sq_entry &prep_socket_direct(
-        struct io_uring_sqe *sqe,
         int domain,
         int type,
         int protocol,
@@ -718,11 +721,7 @@ class sq_entry final : private io_uring_sqe {
     }
 
     inline sq_entry &prep_socket_direct_alloc(
-        struct io_uring_sqe *sqe,
-        int domain,
-        int type,
-        int protocol,
-        unsigned int flags
+        int domain, int type, int protocol, unsigned int flags
     ) {
         prep_rw(IORING_OP_SOCKET, domain, nullptr, protocol, type);
         this->rw_flags = flags;
