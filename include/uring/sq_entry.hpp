@@ -333,6 +333,7 @@ class sq_entry final : private io_uring_sqe {
             .set_target_fixed_file(file_index);
     }
 
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 19)
     inline sq_entry &prep_multishot_accept(
         int fd, sockaddr *addr, socklen_t *addrlen, int flags
     ) noexcept {
@@ -340,13 +341,16 @@ class sq_entry final : private io_uring_sqe {
         this->ioprio |= IORING_ACCEPT_MULTISHOT;
         return *this;
     }
+#endif
 
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 19)
     inline sq_entry &prep_multishot_accept_direct(
         int fd, sockaddr *addr, socklen_t *addrlen, int flags
     ) noexcept {
         return prep_multishot_accept(fd, addr, addrlen, flags)
             .set_target_fixed_file(IORING_FILE_INDEX_ALLOC - 1);
     }
+#endif
 
     // Same as io_uring_prep_cancel64()
     inline sq_entry &prep_cancle(uint64_t user_data, int flags) noexcept {
@@ -504,6 +508,7 @@ class sq_entry final : private io_uring_sqe {
         return *this;
     }
 
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 20)
     /**
      * @brief same as recv but generate multi-CQE, see
      * `man io_uring_prep_recv_multishot`
@@ -516,6 +521,7 @@ class sq_entry final : private io_uring_sqe {
         this->ioprio |= IORING_RECV_MULTISHOT;
         return *this;
     }
+#endif
 
     inline sq_entry &
     prep_openat2(int dfd, const char *path, struct open_how *how) noexcept {
