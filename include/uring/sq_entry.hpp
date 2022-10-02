@@ -8,8 +8,10 @@
 // #include <sys/uio.h>
 #include <fcntl.h>
 #include "uring/compat.h"
+#include "uring/utility/io_helper.hpp"
 
 struct __kernel_timespec;
+struct epoll_event;
 
 namespace liburingcxx {
 
@@ -77,6 +79,7 @@ class sq_entry final : private io_uring_sqe {
         return *this;
     }
 
+  private:
     inline sq_entry &set_target_fixed_file(uint32_t file_index) noexcept {
         /* 0 means no fixed files, indexes should be encoded as "index + 1" */
         this->file_index = file_index + 1;
@@ -85,6 +88,7 @@ class sq_entry final : private io_uring_sqe {
 
     inline void *get_padding() noexcept { return __pad2; }
 
+  public:
     inline sq_entry &prepare_rw(
         uint8_t op, int fd, const void *addr, uint32_t len, uint64_t offset
     ) noexcept {
@@ -101,6 +105,52 @@ class sq_entry final : private io_uring_sqe {
         this->file_index = 0;
         this->addr3 = 0;
         this->__pad2[0] = 0;
+        return *this;
+    }
+
+    /**
+     * @pre Either fd_in or fd_out must be a pipe.
+     * @param off_in If fd_in refers to a pipe, off_in must be (int64_t) -1;
+     *               If fd_in does not refer to a pipe and off_in is (int64_t)
+     * -1, then bytes are read from fd_in starting from the file offset and it
+     * is adjust appropriately; If fd_in does not refer to a pipe and off_in is
+     * not (int64_t) -1, then the starting offset of fd_in will be off_in.
+     * @param off_out The description of off_in also applied to off_out.
+     * @param splice_flags see man splice(2) for description of flags.
+     *
+     * This splice operation can be used to implement sendfile by splicing to an
+     * intermediate pipe first, then splice to the final destination. In fact,
+     * the implementation of sendfile in kernel uses splice internally.
+     *
+     * NOTE that even if fd_in or fd_out refers to a pipe, the splice operation
+     * can still failed with EINVAL if one of the fd doesn't explicitly support
+     * splice operation, e.g. reading from terminal is unsupported from
+     * kernel 5.7 to 5.11. Check issue #291 for more information.
+     */
+    inline sq_entry &prepare_splice(
+        int fd_in,
+        int64_t off_in,
+        int fd_out,
+        int64_t off_out,
+        unsigned int nbytes,
+        unsigned int splice_flags
+    ) noexcept {
+        prepare_rw(
+            IORING_OP_SPLICE, fd_out, nullptr, nbytes, (uint64_t)off_out
+        );
+        this->splice_off_in = (uint64_t)off_in;
+        this->splice_flags = splice_flags;
+        this->splice_fd_in = fd_in;
+        return *this;
+    }
+
+    inline sq_entry &prepare_tee(
+        int fd_in, int fd_out, unsigned int nbytes, unsigned int splice_flags
+    ) noexcept {
+        prepare_rw(IORING_OP_TEE, fd_out, nullptr, nbytes, 0);
+        this->splice_off_in = 0;
+        this->splice_flags = splice_flags;
+        this->splice_fd_in = fd_in;
         return *this;
     }
 
@@ -153,16 +203,6 @@ class sq_entry final : private io_uring_sqe {
     }
 
     inline sq_entry &
-    prepare_read(int fd, std::span<char> buf, uint64_t offset) noexcept {
-        return prepare_rw(IORING_OP_READ, fd, buf.data(), buf.size(), offset);
-    }
-
-    inline sq_entry &
-    prepare_write(int fd, std::span<const char> buf, uint64_t offset) noexcept {
-        return prepare_rw(IORING_OP_WRITE, fd, buf.data(), buf.size(), offset);
-    }
-
-    inline sq_entry &
     prepare_recvmsg(int fd, msghdr *msg, unsigned flags) noexcept {
         prepare_rw(IORING_OP_RECVMSG, fd, msg, 1, 0);
         this->msg_flags = flags;
@@ -186,6 +226,53 @@ class sq_entry final : private io_uring_sqe {
     prepare_sendmsg(int fd, const msghdr *msg, unsigned flags) noexcept {
         prepare_rw(IORING_OP_SENDMSG, fd, msg, 1, 0);
         this->msg_flags = flags;
+        return *this;
+    }
+
+  private:
+    inline unsigned prepare_poll_mask(unsigned poll_mask) noexcept {
+#if __BYTE_ORDER == __BIG_ENDIAN
+        poll_mask = __swahw32(poll_mask);
+#endif
+        return poll_mask;
+    }
+
+  public:
+    inline sq_entry &prepare_poll_add(int fd, unsigned poll_mask) noexcept {
+        prepare_rw(IORING_OP_POLL_ADD, fd, nullptr, 0, 0);
+        this->poll32_events = prepare_poll_mask(poll_mask);
+        return *this;
+    }
+
+    inline sq_entry &
+    prepare_poll_multishot(int fd, unsigned poll_mask) noexcept {
+        prepare_poll_add(fd, poll_mask);
+        this->len = IORING_POLL_ADD_MULTI;
+        return *this;
+    }
+
+    inline sq_entry &prepare_poll_remove(int fd, uint64_t user_data) noexcept {
+        prepare_rw(IORING_OP_POLL_REMOVE, -1, nullptr, 0, 0);
+        this->addr = user_data;
+        return *this;
+    }
+
+    inline sq_entry &prepare_poll_update(
+        int fd,
+        uint64_t old_user_data,
+        uint64_t new_user_data,
+        unsigned poll_mask,
+        unsigned flags
+    ) noexcept {
+        prepare_rw(IORING_OP_POLL_REMOVE, -1, nullptr, flags, new_user_data);
+        this->addr = old_user_data;
+        this->poll32_events = prepare_poll_mask(poll_mask);
+        return *this;
+    }
+
+    inline sq_entry &prepare_fsync(int fd, uint32_t fsync_flags) noexcept {
+        prepare_rw(IORING_OP_FSYNC, fd, nullptr, 0, 0);
+        this->fsync_flags = fsync_flags;
         return *this;
     }
 
@@ -237,16 +324,35 @@ class sq_entry final : private io_uring_sqe {
         int flags,
         uint32_t file_index
     ) noexcept {
+        return prepare_accept(fd, addr, addrlen, flags)
+            .set_target_fixed_file(file_index);
+    }
+
+    inline sq_entry &prepare_multishot_accept(
+        int fd, sockaddr *addr, socklen_t *addrlen, int flags
+    ) noexcept {
         prepare_accept(fd, addr, addrlen, flags);
-        set_target_fixed_file(file_index);
+        this->ioprio |= IORING_ACCEPT_MULTISHOT;
         return *this;
     }
 
+    inline sq_entry &prepare_multishot_accept_direct(
+        int fd, sockaddr *addr, socklen_t *addrlen, int flags
+    ) noexcept {
+        return prepare_multishot_accept(fd, addr, addrlen, flags)
+            .set_target_fixed_file(IORING_FILE_INDEX_ALLOC - 1);
+    }
+
+    // Same as io_uring_prep_cancel64()
     inline sq_entry &prepare_cancle(uint64_t user_data, int flags) noexcept {
         prepare_rw(IORING_OP_ASYNC_CANCEL, -1, nullptr, 0, 0);
         this->addr = user_data;
         this->cancel_flags = (uint32_t)flags;
         return *this;
+    }
+
+    inline sq_entry &prepare_cancle(void *user_data, int flags) noexcept {
+        return prepare_cancle(reinterpret_cast<uint64_t>(user_data), flags);
     }
 
     inline sq_entry &prepare_cancle_fd(int fd, unsigned int flags) noexcept {
@@ -267,69 +373,19 @@ class sq_entry final : private io_uring_sqe {
         return prepare_rw(IORING_OP_CONNECT, fd, addr, 0, addrlen);
     }
 
-    inline sq_entry &prepare_close(int fd) noexcept {
-        return prepare_rw(IORING_OP_CLOSE, fd, nullptr, 0, 0);
-    }
-
-    inline sq_entry &
-    prepare_send(int sockfd, std::span<const char> buf, int flags) noexcept {
-        prepare_rw(IORING_OP_SEND, sockfd, buf.data(), buf.size(), 0);
-        this->msg_flags = (uint32_t)flags;
-        return *this;
-    }
-
-    inline sq_entry &
-    prepare_recv(int sockfd, std::span<char> buf, int flags) noexcept {
-        prepare_rw(IORING_OP_RECV, sockfd, buf.data(), buf.size(), 0);
-        this->msg_flags = (uint32_t)flags;
-        return *this;
-    }
-
-    /**
-     * @brief same as recv but generate multi-CQE, see
-     * `man io_uring_prep_recv_multishot`
-     *
-     * available @since Linux 5.20
-     */
-    inline sq_entry &prepare_recv_multishot(
-        int sockfd, std::span<char> buf, int flags
-    ) noexcept {
-        prepare_recv(sockfd, buf, flags);
-        this->ioprio |= IORING_RECV_MULTISHOT;
-        return *this;
-    }
-
-    inline sq_entry &prepare_shutdown(int fd, int how) noexcept {
-        return prepare_rw(IORING_OP_SHUTDOWN, fd, nullptr, (uint32_t)how, 0);
-    }
-
-    inline sq_entry &prepare_fsync(int fd, uint32_t fsync_flags) noexcept {
-        prepare_rw(IORING_OP_SYNC_FILE_RANGE, fd, nullptr, 0, 0);
-        this->fsync_flags = fsync_flags;
-        return *this;
-    }
-
-    inline sq_entry &prepare_sync_file_range(
-        int fd, uint32_t len, uint64_t offset, int flags
-    ) noexcept {
-        prepare_rw(IORING_OP_SYNC_FILE_RANGE, fd, nullptr, len, offset);
-        this->sync_range_flags = (uint32_t)flags;
-        return *this;
-    }
-
     inline sq_entry &
     prepare_files_update(std::span<int> fds, int offset) noexcept {
-        prepare_rw(IORING_OP_FILES_UPDATE, -1, fds.data(), fds.size(), offset);
-        return *this;
+        return prepare_rw(
+            IORING_OP_FILES_UPDATE, -1, fds.data(), fds.size(), offset
+        );
     }
 
     inline sq_entry &
     prepare_fallocate(int fd, int mode, off_t offset, off_t len) noexcept {
-        prepare_rw(
-            IORING_OP_FALLOCATE, fd, (const uintptr_t *)(unsigned long)len,
+        return prepare_rw(
+            IORING_OP_FALLOCATE, fd, reinterpret_cast<void *>(uintptr_t(len)),
             (uint32_t)mode, (uint64_t)offset
         );
-        return *this;
     }
 
     inline sq_entry &
@@ -347,36 +403,22 @@ class sq_entry final : private io_uring_sqe {
             .set_target_fixed_file(file_index);
     }
 
+    inline sq_entry &prepare_close(int fd) noexcept {
+        return prepare_rw(IORING_OP_CLOSE, fd, nullptr, 0, 0);
+    }
+
+    inline sq_entry &prepare_close_direct(unsigned file_index) noexcept {
+        return prepare_close(0).set_target_fixed_file(file_index);
+    }
+
     inline sq_entry &
-    prepare_openat2(int dfd, const char *path, struct open_how *how) noexcept {
-        prepare_rw(
-            IORING_OP_OPENAT2, dfd, path, sizeof(*how), (uint64_t)(uintptr_t)how
-        );
-        return *this;
+    prepare_read(int fd, std::span<char> buf, uint64_t offset) noexcept {
+        return prepare_rw(IORING_OP_READ, fd, buf.data(), buf.size(), offset);
     }
 
-    /* open directly into the fixed file table */
-    inline sq_entry &prepare_openat2_direct(
-        int dfd, const char *path, struct open_how *how, unsigned file_index
-    ) noexcept {
-        return prepare_openat2(dfd, path, how)
-            .set_target_fixed_file(file_index);
-    }
-
-    inline sq_entry &prepare_provide_buffers(
-        const void *addr, int len, int nr, int bgid, int bid
-    ) noexcept {
-        prepare_rw(
-            IORING_OP_PROVIDE_BUFFERS, nr, addr, (uint32_t)len, (uint64_t)bid
-        );
-        this->buf_group = (uint16_t)bgid;
-        return *this;
-    }
-
-    inline sq_entry &prepare_remove_buffers(int nr, int bgid) noexcept {
-        prepare_rw(IORING_OP_REMOVE_BUFFERS, nr, nullptr, 0, 0);
-        this->buf_group = (uint16_t)bgid;
-        return *this;
+    inline sq_entry &
+    prepare_write(int fd, std::span<const char> buf, uint64_t offset) noexcept {
+        return prepare_rw(IORING_OP_WRITE, fd, buf.data(), buf.size(), offset);
     }
 
     inline sq_entry &prepare_statx(
@@ -408,6 +450,113 @@ class sq_entry final : private io_uring_sqe {
     }
 
     inline sq_entry &
+    prepare_send(int sockfd, std::span<const char> buf, int flags) noexcept {
+        prepare_rw(IORING_OP_SEND, sockfd, buf.data(), buf.size(), 0);
+        this->msg_flags = (uint32_t)flags;
+        return *this;
+    }
+
+    inline sq_entry &prepare_send_zc(
+        int sockfd, std::span<const char> buf, int flags, unsigned zc_flags
+    ) noexcept {
+        prepare_rw(IORING_OP_SEND_ZC, sockfd, buf.data(), buf.size(), 0);
+        this->msg_flags = (uint32_t)flags;
+        this->ioprio = zc_flags;
+        return *this;
+    }
+
+    inline sq_entry &prepare_send_zc_fixed(
+        int sockfd,
+        std::span<const char> buf,
+        int flags,
+        unsigned zc_flags,
+        unsigned buf_index
+    ) noexcept {
+        prepare_send_zc(sockfd, buf, flags, zc_flags);
+        this->ioprio |= IORING_RECVSEND_FIXED_BUF;
+        this->buf_index |= buf_index;
+        return *this;
+    }
+
+    inline sq_entry &
+    prepare_sendmsg_zc(int fd, const msghdr *msg, unsigned flags) noexcept {
+        prepare_sendmsg(fd, msg, flags);
+        this->opcode = IORING_OP_SENDMSG_ZC;
+        return *this;
+    }
+
+    inline sq_entry &
+    prepare_send_set_addr(const sockaddr *dest_addr, uint16_t addr_len) {
+        this->addr2 = reinterpret_cast<unsigned long>(dest_addr);
+        this->addr_len = addr_len;
+        return *this;
+    }
+
+    inline sq_entry &
+    prepare_recv(int sockfd, std::span<char> buf, int flags) noexcept {
+        prepare_rw(IORING_OP_RECV, sockfd, buf.data(), buf.size(), 0);
+        this->msg_flags = (uint32_t)flags;
+        return *this;
+    }
+
+    /**
+     * @brief same as recv but generate multi-CQE, see
+     * `man io_uring_prep_recv_multishot`
+     *
+     * available @since Linux 5.20
+     */
+    inline sq_entry &prepare_recv_multishot(
+        int sockfd, std::span<char> buf, int flags
+    ) noexcept {
+        prepare_recv(sockfd, buf, flags);
+        this->ioprio |= IORING_RECV_MULTISHOT;
+        return *this;
+    }
+
+    inline sq_entry &
+    prepare_openat2(int dfd, const char *path, struct open_how *how) noexcept {
+        prepare_rw(
+            IORING_OP_OPENAT2, dfd, path, sizeof(*how), (uint64_t)(uintptr_t)how
+        );
+        return *this;
+    }
+
+    /* open directly into the fixed file table */
+    inline sq_entry &prepare_openat2_direct(
+        int dfd, const char *path, struct open_how *how, unsigned file_index
+    ) noexcept {
+        return prepare_openat2(dfd, path, how)
+            .set_target_fixed_file(file_index);
+    }
+
+    inline sq_entry &
+    prepare_epoll_ctl(int epfd, int fd, int op, epoll_event *ev) noexcept {
+        return prepare_rw(
+            IORING_OP_EPOLL_CTL, epfd, ev, (uint32_t)op, (uint32_t)fd
+        );
+    }
+
+    inline sq_entry &prepare_provide_buffers(
+        const void *addr, int len, int nr, int bgid, int bid
+    ) noexcept {
+        prepare_rw(
+            IORING_OP_PROVIDE_BUFFERS, nr, addr, (uint32_t)len, (uint64_t)bid
+        );
+        this->buf_group = (uint16_t)bgid;
+        return *this;
+    }
+
+    inline sq_entry &prepare_remove_buffers(int nr, int bgid) noexcept {
+        prepare_rw(IORING_OP_REMOVE_BUFFERS, nr, nullptr, 0, 0);
+        this->buf_group = (uint16_t)bgid;
+        return *this;
+    }
+
+    inline sq_entry &prepare_shutdown(int fd, int how) noexcept {
+        return prepare_rw(IORING_OP_SHUTDOWN, fd, nullptr, (uint32_t)how, 0);
+    }
+
+    inline sq_entry &
     prepare_unlinkat(int dfd, const char *path, int flags) noexcept {
         prepare_rw(IORING_OP_UNLINKAT, dfd, path, 0, 0);
         this->unlink_flags = (uint32_t)flags;
@@ -434,9 +583,21 @@ class sq_entry final : private io_uring_sqe {
     }
 
     inline sq_entry &
-    prepare_mkdirat(int dfd, const char *path, mode_t mode) noexcept {
-        prepare_rw(IORING_OP_MKDIRAT, dfd, path, mode, 0);
+    prepare_rename(const char *oldpath, const char *newpath) noexcept {
+        return prepare_renameat(AT_FDCWD, oldpath, AT_FDCWD, newpath, 0);
+    }
+
+    inline sq_entry &prepare_sync_file_range(
+        int fd, uint32_t len, uint64_t offset, int flags
+    ) noexcept {
+        prepare_rw(IORING_OP_SYNC_FILE_RANGE, fd, nullptr, len, offset);
+        this->sync_range_flags = (uint32_t)flags;
         return *this;
+    }
+
+    inline sq_entry &
+    prepare_mkdirat(int dfd, const char *path, mode_t mode) noexcept {
+        return prepare_rw(IORING_OP_MKDIRAT, dfd, path, mode, 0);
     }
 
     inline sq_entry &prepare_mkdir(const char *path, mode_t mode) noexcept {
@@ -446,11 +607,10 @@ class sq_entry final : private io_uring_sqe {
     inline sq_entry &prepare_symlinkat(
         const char *target, int newdirfd, const char *linkpath
     ) noexcept {
-        prepare_rw(
+        return prepare_rw(
             IORING_OP_SYMLINKAT, newdirfd, target, 0,
             (uint64_t)(uintptr_t)linkpath
         );
-        return *this;
     }
 
     inline sq_entry &
@@ -491,54 +651,83 @@ class sq_entry final : private io_uring_sqe {
         return *this;
     }
 
-    /**
-     * @pre Either fd_in or fd_out must be a pipe.
-     * @param off_in If fd_in refers to a pipe, off_in must be (int64_t) -1;
-     *               If fd_in does not refer to a pipe and off_in is (int64_t)
-     * -1, then bytes are read from fd_in starting from the file offset and it
-     * is adjust appropriately; If fd_in does not refer to a pipe and off_in is
-     * not (int64_t) -1, then the starting offset of fd_in will be off_in.
-     * @param off_out The description of off_in also applied to off_out.
-     * @param splice_flags see man splice(2) for description of flags.
-     *
-     * This splice operation can be used to implement sendfile by splicing to an
-     * intermediate pipe first, then splice to the final destination. In fact,
-     * the implementation of sendfile in kernel uses splice internally.
-     *
-     * NOTE that even if fd_in or fd_out refers to a pipe, the splice operation
-     * can still failed with EINVAL if one of the fd doesn't explicitly support
-     * splice operation, e.g. reading from terminal is unsupported from
-     * kernel 5.7 to 5.11. Check issue #291 for more information.
-     */
-    inline sq_entry &prepare_splice(
-        int fd_in,
-        int64_t off_in,
-        int fd_out,
-        int64_t off_out,
-        unsigned int nbytes,
-        unsigned int splice_flags
+    inline sq_entry &prepare_getxattr(
+        const char *name, char *value, const char *path, size_t len
     ) noexcept {
         prepare_rw(
-            IORING_OP_SPLICE, fd_out, nullptr, nbytes, (uint64_t)off_out
+            IORING_OP_GETXATTR, 0, name, len,
+            (uint64_t) reinterpret_cast<uintptr_t>(value)
         );
-        this->splice_off_in = (uint64_t)off_in;
-        this->splice_flags = splice_flags;
-        this->splice_fd_in = fd_in;
+        this->addr3 = (uint64_t) reinterpret_cast<uintptr_t>(path);
+        this->xattr_flags = 0;
         return *this;
     }
 
-    inline sq_entry &prepare_tee(
-        int fd_in, int fd_out, unsigned int nbytes, unsigned int splice_flags
+    inline sq_entry &prepare_setxattr(
+        const char *name, char *value, const char *path, int flags, size_t len
     ) noexcept {
-        prepare_rw(IORING_OP_TEE, fd_out, nullptr, nbytes, 0);
-        this->splice_off_in = 0;
-        this->splice_flags = splice_flags;
-        this->splice_fd_in = fd_in;
+        prepare_rw(
+            IORING_OP_SETXATTR, 0, name, len,
+            (uint64_t) reinterpret_cast<uintptr_t>(value)
+        );
+        this->addr3 = (uint64_t) reinterpret_cast<uintptr_t>(path);
+        this->xattr_flags = flags;
         return *this;
     }
 
-    /* TODO: more prepare: epoll_ctl ...
-     */
+    inline sq_entry &prepare_fgetxattr(
+        int fd, const char *name, char *value, size_t len
+    ) noexcept {
+        prepare_rw(
+            IORING_OP_FGETXATTR, fd, name, len,
+            (uint64_t) reinterpret_cast<uintptr_t>(value)
+        );
+        this->xattr_flags = 0;
+        return *this;
+    }
+
+    inline sq_entry &prepare_fsetxattr(
+        int fd, const char *name, const char *value, int flags, size_t len
+    ) noexcept {
+        prepare_rw(
+            IORING_OP_FSETXATTR, fd, name, len,
+            (uint64_t) reinterpret_cast<uintptr_t>(value)
+        );
+        this->xattr_flags = flags;
+        return *this;
+    }
+
+    inline sq_entry &
+    prepare_socket(int domain, int type, int protocol, unsigned int flags) {
+        prepare_rw(IORING_OP_SOCKET, domain, nullptr, protocol, type);
+        this->rw_flags = flags;
+        return *this;
+    }
+
+    inline sq_entry &prepare_socket_direct(
+        struct io_uring_sqe *sqe,
+        int domain,
+        int type,
+        int protocol,
+        unsigned file_index,
+        unsigned int flags
+    ) {
+        prepare_rw(IORING_OP_SOCKET, domain, nullptr, protocol, type);
+        this->rw_flags = flags;
+        return set_target_fixed_file(file_index);
+    }
+
+    inline sq_entry &prepare_socket_direct_alloc(
+        struct io_uring_sqe *sqe,
+        int domain,
+        int type,
+        int protocol,
+        unsigned int flags
+    ) {
+        prepare_rw(IORING_OP_SOCKET, domain, nullptr, protocol, type);
+        this->rw_flags = flags;
+        return set_target_fixed_file(IORING_FILE_INDEX_ALLOC - 1);
+    }
 };
 
 } // namespace liburingcxx
