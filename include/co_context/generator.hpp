@@ -308,6 +308,8 @@ class _Gen_promise_base {
     // clang-format on
 
     // clang-format off
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmismatched-new-delete"
     template <::std::ranges::input_range _Rng, class _Alloc>
         requires std::convertible_to<::std::ranges::range_reference_t<_Rng>, _Yielded>
     [[nodiscard]] auto yield_value(::co_context::ranges::elements_of<_Rng, _Alloc> _Elem) noexcept {
@@ -325,6 +327,7 @@ class _Gen_promise_base {
               ::std::ranges::begin(_Elem.range),
               ::std::ranges::end(_Elem.range))};
     }
+#pragma GCC diagnostic pop
 
     void await_transform() = delete;
 
