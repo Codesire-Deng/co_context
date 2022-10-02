@@ -6,7 +6,6 @@ using Socket = co_context::socket;
 constexpr std::string_view hostname{"127.0.0.1"};
 constexpr uint16_t port = 9527;
 constexpr size_t buf_size = 512;
-constexpr int connection_num = 100;
 
 task<> recv_session(Socket sock) {
     char buf[buf_size];
