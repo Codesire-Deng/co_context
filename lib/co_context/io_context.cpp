@@ -692,7 +692,9 @@ void io_context::run() {
                             const liburingcxx::cq_entry *_;
                             ring.wait_cq_entry(_);
                             num = ring.cq_ready_relaxed();
-                            assert(num > 0);
+                            if constexpr (config::log_level <= config::level::debug)
+                                if (num == 0)
+                                    log::d("wait_cq_entry() gets 0 cqe.\n");
                         }
                     }
 
