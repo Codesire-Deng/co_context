@@ -41,7 +41,9 @@ std::coroutine_handle<> counting_semaphore::try_release() noexcept {
     acquire_awaiter *resume_head = to_resume;
     if (resume_head == nullptr) {
         auto *node = awaiting.exchange(nullptr, std::memory_order_acquire);
-        if (node == nullptr) return nullptr; // no awaiting
+        if (node == nullptr) {
+            return nullptr; // no awaiting
+        }
 
         do {
             acquire_awaiter *tmp = node->next;

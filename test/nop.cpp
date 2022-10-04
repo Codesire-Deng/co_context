@@ -45,8 +45,9 @@ int main(int argc, char *argv[]) {
 
     io_context context;
 
-    for (int i = 0; i < concur; ++i)
+    for (int i = 0; i < concur; ++i) {
         context.co_spawn(gen_task());
+    }
 
     context.run();
 

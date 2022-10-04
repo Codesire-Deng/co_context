@@ -36,18 +36,20 @@ inet_address::inet_address(uint16_t port, bool isIpv6) noexcept {
     if (isIpv6) {
         std::memset(&addr6, 0, sizeof(addr6));
         addr6.sin6_family = AF_INET6;
-        if constexpr (config::loopback_only)
+        if constexpr (config::loopback_only) {
             addr6.sin6_addr = in6addr_loopback;
-        else
+        } else {
             addr6.sin6_addr = in6addr_any;
+        }
         addr6.sin6_port = htons(port);
     } else {
         std::memset(&addr, 0, sizeof(addr));
         addr.sin_family = AF_INET;
-        if constexpr (config::loopback_only)
+        if constexpr (config::loopback_only) {
             addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-        else
+        } else {
             addr.sin_addr.s_addr = htonl(INADDR_ANY);
+        }
         addr.sin_port = htons(port);
     }
 }
@@ -82,14 +84,17 @@ std::string inet_address::to_ip_port() const {
     char buf[32];
     snprintf(buf, sizeof buf, ":%u", port());
 
-    if (family() == AF_INET6)
+    if (family() == AF_INET6) {
         return "[" + to_ip() + "]" + buf;
-    else
+    } else {
         return to_ip() + buf;
+    }
 }
 
 bool inet_address::operator==(const inet_address &rhs) const noexcept {
-    if (family() != rhs.family()) return false;
+    if (family() != rhs.family()) {
+        return false;
+    }
     if (family() == AF_INET) {
         return addr.sin_port == rhs.addr.sin_port
                && addr.sin_addr.s_addr == rhs.addr.sin_addr.s_addr;
@@ -114,7 +119,9 @@ bool inet_address::resolve(
         log::v("ip port: %s\n", addr.to_ip_port().data());
     }
 
-    if (addrs.empty()) return false;
+    if (addrs.empty()) {
+        return false;
+    }
     out = addrs.back(); // for ipv4 precedence
     return true;
 }
@@ -126,10 +133,11 @@ std::vector<inet_address> inet_address::resolve_all(
     struct addrinfo *result = nullptr;
     int err = getaddrinfo(hostname.data(), nullptr, hints, &result);
     if (err != 0) {
-        if (err == EAI_SYSTEM)
+        if (err == EAI_SYSTEM) {
             perror("inet_address::resolve");
-        else
+        } else {
             fprintf(stderr, "inet_address::resolve: %s\n", gai_strerror(err));
+        }
         return ret;
     }
 

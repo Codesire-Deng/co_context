@@ -4,8 +4,9 @@
 #include <ranges>
 
 co_context::generator<int> gen_iota(int x) {
-    while (true)
+    while (true) {
         co_yield x++;
+    }
 }
 
 int main() {

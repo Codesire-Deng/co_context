@@ -166,8 +166,9 @@ namespace detail {
                     // info.io_info->flags = info.flags;
                     if constexpr (config::enable_link_io_result) {
                         if (info.io_info->type
-                            == task_info::task_type::lazy_link_sqe)
+                            == task_info::task_type::lazy_link_sqe) {
                             continue;
+                        }
                     }
                     return info.io_info->handle;
                 } else {
@@ -269,8 +270,9 @@ void io_context::handle_semaphore_release(task_info *sem_release) noexcept {
     counting_semaphore &sem = *detail::as_counting_semaphore(sem_release);
     const counting_semaphore::T update =
         as_atomic(sem_release->update).exchange(0, std::memory_order_relaxed);
-    if (update == 0) [[unlikely]]
+    if (update == 0) [[unlikely]] {
         return;
+    }
 
     counting_semaphore::T done = 0;
     std::coroutine_handle<> handle;
@@ -293,11 +295,13 @@ void io_context::handle_condition_variable_notify(task_info *cv_notify
         as_atomic(cv_notify->notify_counter)
             .exchange(0, std::memory_order_relaxed);
 
-    if (notify_counter == 0) [[unlikely]]
+    if (notify_counter == 0) [[unlikely]] {
         return;
+    }
 
-    if (cv.awaiting.load(std::memory_order_relaxed) != nullptr)
+    if (cv.awaiting.load(std::memory_order_relaxed) != nullptr) {
         cv.to_resume_fetch_all();
+    }
 
     condition_variable::T done = 0;
     const bool is_nofity_all = notify_counter & cv.notify_all_flag;
@@ -305,16 +309,19 @@ void io_context::handle_condition_variable_notify(task_info *cv_notify
            && cv.to_resume_head != nullptr) {
         mutex::lock_awaiter &to_awake = cv.to_resume_head->lock_awaken_handle;
         // let the coroutine get the lock
-        if (!to_awake.register_awaiting())
+        if (!to_awake.register_awaiting()) {
             // lock succ, wakeup
             forward_task(to_awake.get_coroutine());
+        }
         // lock failed, just wait for another mutex.unlock()
 
         cv.to_resume_head = cv.to_resume_head->next;
         ++done;
     }
 
-    if (cv.to_resume_head == nullptr) cv.to_resume_tail = nullptr;
+    if (cv.to_resume_head == nullptr) {
+        cv.to_resume_tail = nullptr;
+    }
 }
 
 bool io_context::try_find_submit_worker_relaxed() noexcept {
@@ -323,8 +330,9 @@ bool io_context::try_find_submit_worker_relaxed() noexcept {
     } else {
         for (config::tid_t i = 0; i < config::workers_number; ++i) {
             if (!this->worker[s_cur]
-                     .sharing.submit_cur.is_empty_load_tail_relaxed())
+                     .sharing.submit_cur.is_empty_load_tail_relaxed()) {
                 return true;
+            }
             cur_next(s_cur);
         }
         return false;
@@ -336,8 +344,9 @@ bool io_context::try_find_submit_worker_relaxed() noexcept {
         return !this->worker[0].sharing.submit_cur.is_empty_load_tail();
     } else {
         for (config::tid_t i = 0; i < config::workers_number; ++i) {
-            if (!this->worker[s_cur].sharing.submit_cur.is_empty_load_tail())
+            if (!this->worker[s_cur].sharing.submit_cur.is_empty_load_tail()) {
                 return true;
+            }
             cur_next(s_cur);
         }
         return false;
@@ -349,8 +358,9 @@ bool io_context::try_find_submit_worker_relaxed() noexcept {
         return this->worker[0].sharing.reap_cur.is_available_load_head();
     } else {
         for (config::tid_t i = 0; i < config::workers_number; ++i) {
-            if (this->worker[r_cur].sharing.reap_cur.is_available_load_head())
+            if (this->worker[r_cur].sharing.reap_cur.is_available_load_head()) {
                 return true;
+            }
             cur_next(r_cur);
         }
         return false;
@@ -362,8 +372,9 @@ bool io_context::try_find_reap_worker_relaxed() noexcept {
         return this->worker[0].sharing.reap_cur.is_available();
     } else {
         for (config::tid_t i = 0; i < config::workers_number; ++i) {
-            if (this->worker[r_cur].sharing.reap_cur.is_available())
+            if (this->worker[r_cur].sharing.reap_cur.is_available()) {
                 return true;
+            }
             cur_next(r_cur);
         }
         return false;
@@ -494,7 +505,9 @@ static bool eager_io_need_awake(detail::task_info *io_info) {
         as_atomic(io_info->eager_io_state)
             // .fetch_or(eager::io_ready, std::memory_order_seq_cst);
             .fetch_or(eager::io_ready, std::memory_order_release);
-    if (old_state & eager::io_detached) delete io_info;
+    if (old_state & eager::io_detached) {
+        delete io_info;
+    }
     return old_state & eager::io_wait;
 }
 
@@ -506,7 +519,9 @@ inline void io_context::poll_completion() noexcept {
     // reap round
     const liburingcxx::cq_entry *polling_cqe;
     ring.peek_cq_entry(polling_cqe);
-    if (polling_cqe == nullptr) return;
+    if (polling_cqe == nullptr) {
+        return;
+    }
 
     --requests_to_reap;
     log::v("ctx poll_completion found, remaining=%d\n", requests_to_reap);
@@ -534,8 +549,9 @@ inline void io_context::poll_completion() noexcept {
                 user_data ^ uint64_t(task_type::eager_sqe)
             );
             eager_io_info->result = result;
-            if (eager_io_need_awake(eager_io_info)) [[likely]]
+            if (eager_io_need_awake(eager_io_info)) [[likely]] {
                 reap_or_overflow(detail::reap_info{eager_io_info->handle});
+            }
             return;
         }
         // must be lazy_sqe or lazy_link_sqe here
@@ -543,7 +559,9 @@ inline void io_context::poll_completion() noexcept {
 
     if constexpr (!config::enable_link_io_result) {
         // if link_io_result is not enabled, we can skip the lazy_link_sqe.
-        if (user_data & uint64_t(task_type::lazy_link_sqe)) return;
+        if (user_data & uint64_t(task_type::lazy_link_sqe)) {
+            return;
+        }
     }
 
     task_info *const io_info = detail::raw_task_info_ptr(user_data);
@@ -551,7 +569,9 @@ inline void io_context::poll_completion() noexcept {
 }
 
 bool io_context::try_clear_reap_overflow_buf() noexcept {
-    if (reap_overflow_buf.empty()) return true;
+    if (reap_overflow_buf.empty()) {
+        return true;
+    }
     do {
         const detail::reap_info info = reap_overflow_buf.front();
         // OPTIMIZE impossible for task_type::co_spawn
@@ -647,7 +667,7 @@ void io_context::run() {
         worker[0].init(0, this);
     }
 
-    if constexpr (config::use_standalone_completion_poller)
+    if constexpr (config::use_standalone_completion_poller) {
         std::thread{[this] {
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
             log::i("ctx completion_poller runs on %d\n", gettid());
@@ -658,58 +678,65 @@ void io_context::run() {
                 }
             }
         }}.detach();
+    }
 
-    while (!will_stop)
-        [[likely]] {
-            if constexpr (config::worker_threads_number == 0) {
-                has_task_ready = false;
-                auto num = worker[0].number_to_schedule_relaxed();
-                log::v("worker run %u times...\n", num);
-                while (num--) {
-                    worker[0].worker_run_once();
+    while (!will_stop) {
+        if constexpr (config::worker_threads_number == 0) {
+            has_task_ready = false;
+            auto num = worker[0].number_to_schedule_relaxed();
+            log::v("worker run %u times...\n", num);
+            while (num--) {
+                worker[0].worker_run_once();
+            }
+        }
+
+        // if (try_clear_submit_overflow_buf()) {
+        // log::v("ctx poll_submission...\n");
+        if constexpr (config::submit_poll_rounds > 1) {
+            for (uint8_t i = 0; i < config::submit_poll_rounds; ++i) {
+                if (!poll_submission()) {
+                    break;
                 }
             }
+        } else {
+            poll_submission();
+        }
+        // }
 
-            // if (try_clear_submit_overflow_buf()) {
-            // log::v("ctx poll_submission...\n");
-            if constexpr (config::submit_poll_rounds > 1)
-                for (uint8_t i = 0; i < config::submit_poll_rounds; ++i) {
-                    if (!poll_submission()) break;
-                }
-            else
-                poll_submission();
-            // }
+        if constexpr (!config::use_standalone_completion_poller) {
+            // TODO judge the memory order (relaxed may cause bugs)
+            // TODO consider reap_poll_rounds and reap_overflow_buf
+            if (requests_to_reap > 0) [[likely]] {
+                auto num = ring.cq_ready_relaxed();
 
-            if constexpr (!config::use_standalone_completion_poller) {
-                // TODO judge the memory order (relaxed may cause bugs)
-                // TODO consider reap_poll_rounds and reap_overflow_buf
-                if (requests_to_reap > 0) [[likely]] {
-                    auto num = ring.cq_ready_relaxed();
-
-                    // io_context can block itself in the following situation
-                    if constexpr (config::worker_threads_number == 0 && config::use_wait_and_notify) {
-                        if (num == 0 && !has_task_ready) [[unlikely]] {
-                            const liburingcxx::cq_entry *_;
-                            ring.wait_cq_entry(_);
-                            num = ring.cq_ready_relaxed();
-                            if constexpr (config::log_level <= config::level::debug)
-                                if (num == 0)
-                                    log::d("wait_cq_entry() gets 0 cqe.\n");
+                // io_context can block itself in the following situation
+                if constexpr (config::worker_threads_number == 0 && config::use_wait_and_notify) {
+                    if (num == 0 && !has_task_ready) [[unlikely]] {
+                        const liburingcxx::cq_entry *_;
+                        ring.wait_cq_entry(_);
+                        num = ring.cq_ready_relaxed();
+                        if constexpr (config::log_level <= config::level::debug) {
+                            if (num == 0) {
+                                log::d("wait_cq_entry() gets 0 cqe.\n");
+                            }
                         }
                     }
+                }
 
-                    // TODO enhance perf here: reuse the internal head-tail
-                    // infomation of the ring
-                    while (num--) {
-                        poll_completion();
+                // TODO enhance perf here: reuse the internal head-tail
+                // infomation of the ring
+                while (num--) {
+                    poll_completion();
+                }
+            } else {
+                if constexpr (config::worker_threads_number == 0) {
+                    if (!has_task_ready) [[unlikely]] {
+                        will_stop = true;
                     }
-                } else {
-                    if constexpr (config::worker_threads_number == 0)
-                        if (!has_task_ready) [[unlikely]]
-                            will_stop = true;
                 }
             }
         }
+    }
 
     log::d("ctx stopped\n");
 }

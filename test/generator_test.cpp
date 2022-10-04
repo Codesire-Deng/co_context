@@ -194,8 +194,9 @@ zip(Rs &&...rs) {
 
 void value_type_example() {
     std::vector<std::string_view> s1 = to_vector(string_views());
-    for (auto &s : s1)
+    for (auto &s : s1) {
         std::printf("\"%*s\"\n", (int)s.size(), s.data());
+    }
 
     std::printf("\n");
 

@@ -114,8 +114,9 @@ class [[nodiscard]] io_context final {
      * @brief `cur = (cur + 1) % workers_number`
      */
     inline static void cur_next(config::tid_t &cur) noexcept {
-        if constexpr (config::workers_number > 1)
+        if constexpr (config::workers_number > 1) {
             cur = (cur + 1) % config::workers_number;
+        }
     }
 
   private:
@@ -246,7 +247,9 @@ class [[nodiscard]] io_context final {
     ~io_context() noexcept {
         for (int i = 0; i < config::worker_threads_number; ++i) {
             std::thread &t = worker[i].host_thread;
-            if (t.joinable()) t.join();
+            if (t.joinable()) {
+                t.join();
+            }
         }
     }
 
@@ -260,10 +263,11 @@ class [[nodiscard]] io_context final {
 };
 
 inline void co_spawn(task<void> &&entrance) noexcept {
-    if (detail::this_thread.worker != nullptr) [[likely]]
+    if (detail::this_thread.worker != nullptr) [[likely]] {
         detail::this_thread.worker->co_spawn(entrance.get_handle());
-    else
+    } else {
         detail::this_thread.ctx->co_spawn(entrance.get_handle());
+    }
     entrance.detach();
 }
 

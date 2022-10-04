@@ -84,8 +84,9 @@ int main(int argc, char *argv[]) {
 
     io_context context;
 
-    for (unsigned i = 0; i < std::min(MAX_ON_FLY, times); ++i)
+    for (unsigned i = 0; i < std::min(MAX_ON_FLY, times); ++i) {
         context.co_spawn(run());
+    }
 
     context.run();
 

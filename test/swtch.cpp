@@ -21,8 +21,9 @@ constexpr uint32_t total_switch = 2e9;
 uint32_t count = 0;
 
 task<> f(const swtch &to) {
-    while (count++ < total_switch)
-        [[likely]] co_await to;
+    while (count++ < total_switch) {
+        co_await to;
+    }
 }
 
 bool g() {

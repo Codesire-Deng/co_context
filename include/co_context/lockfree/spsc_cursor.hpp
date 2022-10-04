@@ -39,47 +39,53 @@ struct spsc_cursor {
     }
 
     inline T load_head() const noexcept {
-        if constexpr (need_thread_safe)
+        if constexpr (need_thread_safe) {
             return as_c_atomic(m_head).load(std::memory_order_acquire) & mask;
-        else
+        } else {
             return head();
+        }
     }
 
     inline T load_tail() const noexcept {
-        if constexpr (need_thread_safe)
+        if constexpr (need_thread_safe) {
             return as_c_atomic(m_tail).load(std::memory_order_acquire) & mask;
-        else
+        } else {
             return tail();
+        }
     }
 
     inline T load_raw_head() const noexcept {
-        if constexpr (need_thread_safe)
+        if constexpr (need_thread_safe) {
             return as_c_atomic(m_head).load(std::memory_order_acquire);
-        else
+        } else {
             return raw_head();
+        }
     }
 
     inline T load_raw_tail() const noexcept {
-        if constexpr (need_thread_safe)
+        if constexpr (need_thread_safe) {
             return as_c_atomic(m_tail).load(std::memory_order_acquire);
-        else
+        } else {
             return raw_tail();
+        }
     }
 
     inline T load_raw_tail_relaxed() const noexcept {
-        if constexpr (need_thread_safe)
+        if constexpr (need_thread_safe) {
             return as_c_atomic(m_tail).load(std::memory_order_relaxed);
-        else
+        } else {
             return raw_tail();
+        }
     }
 
     // inline void set_raw_tail(T tail) const noexcept { m_tail = tail; }
 
     inline void store_raw_tail(T tail) noexcept {
-        if constexpr (need_thread_safe)
+        if constexpr (need_thread_safe) {
             as_atomic(m_tail).store(tail, std::memory_order_release);
-        else
+        } else {
             m_tail = tail;
+        }
     }
 
     inline bool is_empty_load_head() const noexcept {
@@ -125,29 +131,33 @@ struct spsc_cursor {
     }
 
     inline void push(T num = 1) noexcept {
-        if constexpr (need_thread_safe)
+        if constexpr (need_thread_safe) {
             as_atomic(m_tail).store(m_tail + num, std::memory_order_release);
-        else
+        } else {
             m_tail += num;
+        }
     }
 
     inline void pop(T num = 1) noexcept {
-        if constexpr (need_thread_safe)
+        if constexpr (need_thread_safe) {
             as_atomic(m_head).store(m_head + num, std::memory_order_release);
-        else
+        } else {
             m_head += num;
+        }
     }
 
     inline void push_notify(T num = 1) noexcept {
         push(num);
-        if constexpr (need_thread_safe && config::use_wait_and_notify)
+        if constexpr (need_thread_safe && config::use_wait_and_notify) {
             as_atomic(m_tail).notify_one();
+        }
     }
 
     inline void pop_notify(T num = 1) noexcept {
         pop(num);
-        if constexpr (need_thread_safe && config::use_wait_and_notify)
+        if constexpr (need_thread_safe && config::use_wait_and_notify) {
             as_atomic(m_head).notify_one();
+        }
     }
 };
 
