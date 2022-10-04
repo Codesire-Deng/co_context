@@ -1,7 +1,7 @@
 #pragma once
 
-#include <concepts>
 #include <chrono>
+#include <concepts>
 
 template<std::invocable F>
 [[maybe_unused]] auto host_timing(const F &func) {

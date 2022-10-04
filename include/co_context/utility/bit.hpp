@@ -1,7 +1,7 @@
 #pragma once
 
-#include <concepts>
 #include <bit>
+#include <concepts>
 #include <cstdint>
 
 namespace co_context {
