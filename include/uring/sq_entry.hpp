@@ -175,10 +175,10 @@ class sq_entry final : private io_uring_sqe {
     }
 
     inline sq_entry &prep_read_fixed(
-        int fd, std::span<char> buf, uint64_t offset, uint16_t bufIndex
+        int fd, std::span<char> buf, uint64_t offset, uint16_t buf_index
     ) noexcept {
         prep_rw(IORING_OP_READ_FIXED, fd, buf.data(), buf.size(), offset);
-        this->buf_index = bufIndex;
+        this->buf_index = buf_index;
         return *this;
     }
 
@@ -199,10 +199,10 @@ class sq_entry final : private io_uring_sqe {
     }
 
     inline sq_entry &prep_write_fixed(
-        int fd, std::span<const char> buf, uint64_t offset, uint16_t bufIndex
+        int fd, std::span<const char> buf, uint64_t offset, uint16_t buf_index
     ) noexcept {
         prep_rw(IORING_OP_WRITE_FIXED, fd, buf.data(), buf.size(), offset);
-        this->buf_index = bufIndex;
+        this->buf_index = buf_index;
         return *this;
     }
 

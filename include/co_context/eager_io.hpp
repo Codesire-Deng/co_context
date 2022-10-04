@@ -122,9 +122,9 @@ namespace detail {
 
     struct eager_read_fixed : eager_awaiter {
         inline eager_read_fixed(
-            int fd, std::span<char> buf, uint64_t offset, uint16_t bufIndex
+            int fd, std::span<char> buf, uint64_t offset, uint16_t buf_index
         ) noexcept {
-            sqe->prep_read_fixed(fd, buf, offset, bufIndex);
+            sqe->prep_read_fixed(fd, buf, offset, buf_index);
             submit();
         }
     };
@@ -152,9 +152,9 @@ namespace detail {
             int fd,
             std::span<const char> buf,
             uint64_t offset,
-            uint16_t bufIndex
+            uint16_t buf_index
         ) noexcept {
-            sqe->prep_write_fixed(fd, buf, offset, bufIndex);
+            sqe->prep_write_fixed(fd, buf, offset, buf_index);
             submit();
         }
     };
@@ -458,9 +458,9 @@ namespace eager {
     }
 
     inline detail::eager_read_fixed read_fixed(
-        int fd, std::span<char> buf, uint64_t offset, uint16_t bufIndex
+        int fd, std::span<char> buf, uint64_t offset, uint16_t buf_index
     ) noexcept {
-        return detail::eager_read_fixed{fd, buf, offset, bufIndex};
+        return detail::eager_read_fixed{fd, buf, offset, buf_index};
     }
 
     inline detail::eager_write
@@ -474,9 +474,9 @@ namespace eager {
     }
 
     inline detail::eager_write_fixed write_fixed(
-        int fd, std::span<const char> buf, uint64_t offset, uint16_t bufIndex
+        int fd, std::span<const char> buf, uint64_t offset, uint16_t buf_index
     ) noexcept {
-        return detail::eager_write_fixed{fd, buf, offset, bufIndex};
+        return detail::eager_write_fixed{fd, buf, offset, buf_index};
     }
 
     inline detail::eager_accept

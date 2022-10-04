@@ -3,6 +3,8 @@
     "files.associations": {
         ".clang-format": "yaml",
         "*.clang-format": "yaml",
+        ".clang-tidy": "yaml",
+        "*.clang-tidy": "yaml",
         "*.cu": "cpp",
         "io_uring.h": "c",
         "syscall.h": "c",
