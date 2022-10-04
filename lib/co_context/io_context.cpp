@@ -667,7 +667,7 @@ void io_context::run() {
         worker[0].init(0, this);
     }
 
-    if constexpr (config::use_standalone_completion_poller) {
+    if constexpr (config::is_using_standalone_completion_poller) {
         std::thread{[this] {
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
             log::i("ctx completion_poller runs on %d\n", gettid());
@@ -703,14 +703,14 @@ void io_context::run() {
         }
         // }
 
-        if constexpr (!config::use_standalone_completion_poller) {
+        if constexpr (!config::is_using_standalone_completion_poller) {
             // TODO judge the memory order (relaxed may cause bugs)
             // TODO consider reap_poll_rounds and reap_overflow_buf
             if (requests_to_reap > 0) [[likely]] {
                 auto num = ring.cq_ready_relaxed();
 
                 // io_context can block itself in the following situation
-                if constexpr (config::worker_threads_number == 0 && config::use_wait_and_notify) {
+                if constexpr (config::worker_threads_number == 0 && config::is_using_wait_and_notify) {
                     if (num == 0 && !has_task_ready) [[unlikely]] {
                         const liburingcxx::cq_entry *_;
                         ring.wait_cq_entry(_);

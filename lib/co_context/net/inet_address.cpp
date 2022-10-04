@@ -36,7 +36,7 @@ inet_address::inet_address(uint16_t port, bool is_ipv6) noexcept {
     if (is_ipv6) {
         std::memset(&addr6, 0, sizeof(addr6));
         addr6.sin6_family = AF_INET6;
-        if constexpr (config::loopback_only) {
+        if constexpr (config::is_loopback_only) {
             addr6.sin6_addr = in6addr_loopback;
         } else {
             addr6.sin6_addr = in6addr_any;
@@ -45,7 +45,7 @@ inet_address::inet_address(uint16_t port, bool is_ipv6) noexcept {
     } else {
         std::memset(&addr, 0, sizeof(addr));
         addr.sin_family = AF_INET;
-        if constexpr (config::loopback_only) {
+        if constexpr (config::is_loopback_only) {
             addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
         } else {
             addr.sin_addr.s_addr = htonl(INADDR_ANY);

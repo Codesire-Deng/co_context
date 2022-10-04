@@ -110,7 +110,7 @@ struct spsc_cursor {
             assert(head_full != load_raw_head());
             return;
         }
-        if constexpr (config::use_wait_and_notify) {
+        if constexpr (config::is_using_wait_and_notify) {
             as_c_atomic(m_head).wait(head_full, std::memory_order_acquire);
         } else {
             while (head_full == load_raw_head()) {}
@@ -123,7 +123,7 @@ struct spsc_cursor {
             assert(tail_empty != load_raw_tail());
             return;
         }
-        if constexpr (config::use_wait_and_notify) {
+        if constexpr (config::is_using_wait_and_notify) {
             as_c_atomic(m_tail).wait(tail_empty, std::memory_order_acquire);
         } else {
             while (tail_empty == load_raw_tail()) {}
@@ -148,14 +148,14 @@ struct spsc_cursor {
 
     inline void push_notify(T num = 1) noexcept {
         push(num);
-        if constexpr (need_thread_safe && config::use_wait_and_notify) {
+        if constexpr (need_thread_safe && config::is_using_wait_and_notify) {
             as_atomic(m_tail).notify_one();
         }
     }
 
     inline void pop_notify(T num = 1) noexcept {
         pop(num);
-        if constexpr (need_thread_safe && config::use_wait_and_notify) {
+        if constexpr (need_thread_safe && config::is_using_wait_and_notify) {
             as_atomic(m_head).notify_one();
         }
     }
