@@ -1,9 +1,9 @@
 #pragma once
 
-#include <coroutine>
-#include <atomic>
 #include "co_context/detail/task_info.hpp"
+#include <atomic>
 #include <cassert>
+#include <coroutine>
 
 namespace co_context {
 
@@ -20,7 +20,7 @@ class mutex final {
         explicit lock_awaiter(mutex & mtx) noexcept : mtx(mtx) {
         }
 
-        constexpr bool await_ready() const noexcept {
+        static constexpr bool await_ready() noexcept {
             return false;
         }
 
@@ -110,7 +110,7 @@ class mutex final {
     /**
      * @brief Construct a new mutex that is not locked.
      */
-    mutex() noexcept : awaiting(not_locked), to_resume(nullptr) {}
+    mutex() noexcept : awaiting(not_locked) {}
 
     /**
      * @brief Destroy the mutex.
@@ -155,7 +155,7 @@ class mutex final {
     inline static constexpr std::uintptr_t not_locked = 1;
 
     std::atomic<std::uintptr_t> awaiting;
-    lock_awaiter *to_resume;
+    lock_awaiter *to_resume = nullptr;
 };
 
 } // namespace co_context
