@@ -1,14 +1,14 @@
 #pragma once
 
 #include "co_context/config.hpp"
-#include "co_context/detail/swap_zone.hpp"
-#include "co_context/detail/submit_info.hpp"
 #include "co_context/detail/reap_info.hpp"
+#include "co_context/detail/submit_info.hpp"
+#include "co_context/detail/swap_zone.hpp"
 #include "co_context/detail/thread_meta.hpp"
-#include "co_context/task.hpp"
 #include "co_context/log/log.hpp"
-#include <thread>
+#include "co_context/task.hpp"
 #include <queue>
+#include <thread>
 
 namespace co_context {
 
@@ -17,8 +17,11 @@ class io_context;
 namespace detail {
 
     struct worker_meta final {
-        enum class [[deprecated]] worker_state : uint8_t{
-            running, idle, blocked};
+        enum class [[deprecated]] worker_state : uint8_t {
+            running,
+            idle,
+            blocked
+        };
 
         using cur_t = config::cur_t;
 
@@ -65,20 +68,20 @@ namespace detail {
 
         std::coroutine_handle<> schedule() noexcept;
 
-        cur_t number_to_schedule_relaxed() noexcept {
+        cur_t number_to_schedule_relaxed() const noexcept {
             const auto &cur = this->sharing.reap_cur;
             return cur.size();
         }
 
         std::coroutine_handle<> try_schedule() noexcept;
 
-        void init(const int thread_index, io_context *const context);
+        void init(int thread_index, io_context *context);
 
         void co_spawn(task<void> &&entrance) noexcept;
 
         void co_spawn(std::coroutine_handle<> entrance) noexcept;
 
-        void worker_run_loop(const int thread_index, io_context *const context);
+        void worker_run_loop(int thread_index, io_context *context);
 
         void worker_run_once();
     };
