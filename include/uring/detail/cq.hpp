@@ -35,8 +35,9 @@ namespace detail {
             ring_mask = *(unsigned *)((uintptr_t)ring_ptr + off.ring_mask);
             ring_entries =
                 *(unsigned *)((uintptr_t)ring_ptr + off.ring_entries);
-            if (off.flags)
+            if (off.flags) {
                 kflags = (unsigned *)((uintptr_t)ring_ptr + off.flags);
+            }
             koverflow = (unsigned *)((uintptr_t)ring_ptr + off.overflow);
             cqes = (cq_entry *)((uintptr_t)ring_ptr + off.cqes);
         }

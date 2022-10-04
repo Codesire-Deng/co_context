@@ -52,7 +52,9 @@ namespace detail {
 
             std::coroutine_handle<> continuation = promise.parent_coro;
 
-            if (promise.is_detached_flag == uintptr_t(-1ULL)) current.destroy();
+            if (promise.is_detached_flag == uintptr_t(-1ULL)) {
+                current.destroy();
+            }
 
             return continuation;
         }
@@ -131,16 +133,18 @@ namespace detail {
 
         // get the lvalue ref
         T &result() & {
-            if (state == value_state::exception) [[unlikely]]
+            if (state == value_state::exception) [[unlikely]] {
                 std::rethrow_exception(exception_ptr);
+            }
             assert(state == value_state::value);
             return value;
         }
 
         // get the prvalue
         T &&result() && {
-            if (state == value_state::exception) [[unlikely]]
+            if (state == value_state::exception) [[unlikely]] {
                 std::rethrow_exception(exception_ptr);
+            }
             assert(state == value_state::value);
             return std::move(value);
         }
@@ -172,8 +176,9 @@ namespace detail {
         }
 
         void result() {
-            if (this->exception_ptr) [[unlikely]]
+            if (this->exception_ptr) [[unlikely]] {
                 std::rethrow_exception(this->exception_ptr);
+            }
         }
 
       private:
@@ -199,8 +204,9 @@ namespace detail {
         }
 
         T &result() {
-            if (exception_ptr) [[unlikely]]
+            if (exception_ptr) [[unlikely]] {
                 std::rethrow_exception(exception_ptr);
+            }
             return *value;
         }
 
@@ -252,7 +258,9 @@ class [[nodiscard("Did you forget to co_await?")]] task {
 
     task<> &operator=(task<> &&other) noexcept {
         if (this != std::addressof(other)) [[likely]] {
-            if (handle) handle.destroy();
+            if (handle) {
+                handle.destroy();
+            }
             handle = other.handle;
             other.handle = nullptr;
         }
@@ -261,7 +269,9 @@ class [[nodiscard("Did you forget to co_await?")]] task {
 
     // Free the promise object and coroutine parameters
     ~task() {
-        if (handle) handle.destroy();
+        if (handle) {
+            handle.destroy();
+        }
     }
 
     inline bool is_ready() const noexcept {

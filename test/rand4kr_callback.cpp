@@ -75,8 +75,9 @@ int main(int argc, char *argv[]) {
 
     int concur = std::min(MAX_ON_FLY, times);
     remain.store(times - concur);
-    for (int i = 0; i < concur; ++i)
+    for (int i = 0; i < concur; ++i) {
         context.co_spawn(run());
+    }
 
     context.run();
 

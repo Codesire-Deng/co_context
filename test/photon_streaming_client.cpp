@@ -12,7 +12,9 @@ task<> recv_session(Socket sock) {
 
     while (true) {
         int nr = co_await sock.recv(buf);
-        if (nr <= 0) break;
+        if (nr <= 0) {
+            break;
+        }
     }
 }
 
@@ -21,7 +23,9 @@ task<> send_session(Socket sock) {
 
     while (true) {
         int nw = co_await sock.send(buf);
-        if (nw <= 0) break;
+        if (nw <= 0) {
+            break;
+        }
     }
 }
 

@@ -25,7 +25,9 @@ task<> session(Socket sock) {
         nr = co_await timeout(sock.recv(buf), 3s);
     }
 
-    if (nr < 0) log_error(-nr);
+    if (nr < 0) {
+        log_error(-nr);
+    }
 }
 
 task<> server(uint16_t port) {

@@ -11,12 +11,13 @@
 namespace liburingcxx {
 
 consteval bool is_kernel_reach(int major, int patchlevel) noexcept {
-    if (LIBURINGCXX_KERNEL_VERSION_MAJOR != major)
+    if (LIBURINGCXX_KERNEL_VERSION_MAJOR != major) {
         return LIBURINGCXX_KERNEL_VERSION_MAJOR > major;
+    }
     return LIBURINGCXX_KERNEL_VERSION_PATCHLEVEL >= patchlevel;
 }
 
-}
+} // namespace liburingcxx
 
 #define LIBURINGCXX_IS_KERNEL_REACH(major, patchlevel) \
     (LIBURINGCXX_KERNEL_VERSION_MAJOR > major)         \

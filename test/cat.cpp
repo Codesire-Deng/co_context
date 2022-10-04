@@ -35,8 +35,9 @@ constexpr int count_blocks(size_t size, unsigned block_sz) noexcept {
 }
 
 void output(std::string_view s) noexcept {
-    for (char c : s)
+    for (char c : s) {
         putchar(c);
+    }
 }
 
 using uring = liburingcxx::uring<0>;

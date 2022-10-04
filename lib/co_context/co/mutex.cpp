@@ -35,8 +35,9 @@ void mutex::unlock() noexcept {
         if (awaiting.compare_exchange_strong(
                 desire, not_locked, std::memory_order_release,
                 std::memory_order_relaxed
-            ))
+            )) {
             return; // no awaiting -> not locked & return
+        }
 
         // There must be something awaiting now.
         auto top =

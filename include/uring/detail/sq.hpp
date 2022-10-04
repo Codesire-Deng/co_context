@@ -67,10 +67,11 @@ namespace detail {
                  * Ensure that the kernel sees the SQE updates before it sees
                  * the tail update.
                  */
-                if constexpr (!(uring_flags & IORING_SETUP_SQPOLL))
+                if constexpr (!(uring_flags & IORING_SETUP_SQPOLL)) {
                     io_uring_smp_store_release(ktail, sqe_tail);
-                else
+                } else {
                     IO_URING_WRITE_ONCE(*ktail, sqe_tail);
+                }
             }
             /*
              * This _may_ look problematic, as we're not supposed to be reading
@@ -98,11 +99,13 @@ namespace detail {
              * wasn't ready. We don't need the load acquire for non-SQPOLL since
              * then we drive updates.
              */
-            if constexpr (uring_flags & IORING_SETUP_SQPOLL)
+            if constexpr (uring_flags & IORING_SETUP_SQPOLL) {
                 return sqe_tail - io_uring_smp_load_acquire(khead);
+            }
             /* always use real head, to avoid losing sync for short submit */
-            else
+            else {
                 return sqe_tail - *khead;
+            }
         }
 
         /**
@@ -132,10 +135,11 @@ namespace detail {
                 bool(uring_flags & IORING_SETUP_SQE128) ? 1 : 0;
 
             unsigned int head;
-            if constexpr (!(uring_flags & IORING_SETUP_SQPOLL))
+            if constexpr (!(uring_flags & IORING_SETUP_SQPOLL)) {
                 head = IO_URING_READ_ONCE(*khead);
-            else
+            } else {
                 head = io_uring_smp_load_acquire(khead);
+            }
 
             if (sqe_free_head - head < ring_entries) [[likely]] {
                 return &sqes[(array[sqe_free_head++ & ring_mask]) << shift];

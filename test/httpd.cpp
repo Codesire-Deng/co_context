@@ -121,8 +121,9 @@ void check_for_index_file() {
  * */
 
 void strtolower(char *str) {
-    for (; *str; ++str)
+    for (; *str; ++str) {
         *str = (char)tolower(*str);
+    }
 }
 
 /*
@@ -148,11 +149,14 @@ int setup_listening_socket(int port) {
     struct sockaddr_in srv_addr;
 
     sock = socket(PF_INET, SOCK_STREAM, 0);
-    if (sock == -1) fatal_error("socket()");
+    if (sock == -1) {
+        fatal_error("socket()");
+    }
 
     int enable = 1;
-    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0)
+    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
         fatal_error("setsockopt(SO_REUSEADDR)");
+    }
 
     std::memset(&srv_addr, 0, sizeof(srv_addr));
     srv_addr.sin_family = AF_INET;
@@ -162,10 +166,13 @@ int setup_listening_socket(int port) {
     /* We bind to a port and turn this socket into a listening
      * socket.
      * */
-    if (bind(sock, (const struct sockaddr *)&srv_addr, sizeof(srv_addr)) < 0)
+    if (bind(sock, (const struct sockaddr *)&srv_addr, sizeof(srv_addr)) < 0) {
         fatal_error("bind()");
+    }
 
-    if (listen(sock, 10) < 0) fatal_error("listen()");
+    if (listen(sock, 10) < 0) {
+        fatal_error("listen()");
+    }
 
     return (sock);
 }
@@ -259,7 +266,9 @@ void copy_file_contents(char *file_path, off_t file_size, struct iovec *iov) {
 
     char *buf = reinterpret_cast<char *>(zh_malloc(file_size));
     fd = open(file_path, O_RDONLY);
-    if (fd < 0) fatal_error("read");
+    if (fd < 0) {
+        fatal_error("read");
+    }
 
     /* We should really check for short reads here */
     int ret = read(fd, buf, file_size);
@@ -279,7 +288,9 @@ void copy_file_contents(char *file_path, off_t file_size, struct iovec *iov) {
 
 const char *get_filename_ext(const char *filename) {
     const char *dot = strrchr(filename, '.');
-    if (!dot || dot == filename) return "";
+    if (!dot || dot == filename) {
+        return "";
+    }
     return dot + 1;
 }
 
@@ -314,24 +325,33 @@ void send_headers(const char *path, off_t len, struct iovec *iov) {
      * we turn the extension into lower case before checking.
      * */
     const char *file_ext = get_filename_ext(small_case_path);
-    if (strcmp("jpg", file_ext) == 0)
+    if (strcmp("jpg", file_ext) == 0) {
         strcpy(send_buffer, "Content-Type: image/jpeg\r\n");
-    if (strcmp("jpeg", file_ext) == 0)
+    }
+    if (strcmp("jpeg", file_ext) == 0) {
         strcpy(send_buffer, "Content-Type: image/jpeg\r\n");
-    if (strcmp("png", file_ext) == 0)
+    }
+    if (strcmp("png", file_ext) == 0) {
         strcpy(send_buffer, "Content-Type: image/png\r\n");
-    if (strcmp("gif", file_ext) == 0)
+    }
+    if (strcmp("gif", file_ext) == 0) {
         strcpy(send_buffer, "Content-Type: image/gif\r\n");
-    if (strcmp("htm", file_ext) == 0)
+    }
+    if (strcmp("htm", file_ext) == 0) {
         strcpy(send_buffer, "Content-Type: text/html\r\n");
-    if (strcmp("html", file_ext) == 0)
+    }
+    if (strcmp("html", file_ext) == 0) {
         strcpy(send_buffer, "Content-Type: text/html\r\n");
-    if (strcmp("js", file_ext) == 0)
+    }
+    if (strcmp("js", file_ext) == 0) {
         strcpy(send_buffer, "Content-Type: application/javascript\r\n");
-    if (strcmp("css", file_ext) == 0)
+    }
+    if (strcmp("css", file_ext) == 0) {
         strcpy(send_buffer, "Content-Type: text/css\r\n");
-    if (strcmp("txt", file_ext) == 0)
+    }
+    if (strcmp("txt", file_ext) == 0) {
         strcpy(send_buffer, "Content-Type: text/plain\r\n");
+    }
     slen = strlen(send_buffer);
     iov[2].iov_base = zh_malloc(slen);
     iov[2].iov_len = slen;

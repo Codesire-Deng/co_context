@@ -27,32 +27,37 @@ namespace detail {
 namespace log {
     template<typename... T>
     void v(const char *__restrict__ fmt, const T &...args) {
-        if constexpr (config::log_level <= config::level::verbose)
+        if constexpr (config::log_level <= config::level::verbose) {
             detail::log(fmt, args...);
+        }
     }
 
     template<typename... T>
     void i(const char *__restrict__ fmt, const T &...args) {
-        if constexpr (config::log_level <= config::level::info)
+        if constexpr (config::log_level <= config::level::info) {
             detail::log(fmt, args...);
+        }
     }
 
     template<typename... T>
     void d(const char *__restrict__ fmt, const T &...args) {
-        if constexpr (config::log_level <= config::level::debug)
+        if constexpr (config::log_level <= config::level::debug) {
             detail::log(fmt, args...);
+        }
     }
 
     template<typename... T>
     void w(const char *__restrict__ fmt, const T &...args) {
-        if constexpr (config::log_level <= config::level::warning)
+        if constexpr (config::log_level <= config::level::warning) {
             detail::err(fmt, args...);
+        }
     }
 
     template<typename... T>
     void e(const char *__restrict__ fmt, const T &...args) {
-        if constexpr (config::log_level <= config::level::error)
+        if constexpr (config::log_level <= config::level::error) {
             detail::err(fmt, args...);
+        }
     }
 } // namespace log
 
