@@ -1,13 +1,13 @@
 #pragma once
 
 // #include <concepts>
-#include <type_traits>
-#include <atomic>
 #include "co_context/config.hpp"
+#include "co_context/lockfree/spsc_cursor.hpp"
 #include "co_context/utility/as_atomic.hpp"
 #include "co_context/utility/bit.hpp"
-#include "co_context/lockfree/spsc_cursor.hpp"
+#include <atomic>
 #include <cstring>
+#include <type_traits>
 
 namespace co_context {
 

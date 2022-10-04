@@ -8,7 +8,7 @@ class io_context;
 
 namespace detail {
 
-    class worker_meta;
+    struct worker_meta;
 
     struct alignas(config::cache_line_size) thread_meta {
         io_context *ctx;

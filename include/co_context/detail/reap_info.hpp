@@ -1,8 +1,8 @@
 #pragma once
 
+#include <co_context/utility/bit.hpp>
 #include <coroutine>
 #include <cstdint>
-#include <co_context/utility/bit.hpp>
 
 namespace liburingcxx {
 
