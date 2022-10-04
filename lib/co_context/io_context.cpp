@@ -2,10 +2,10 @@
 #include <mimalloc-new-delete.h>
 #endif
 #include "co_context/io_context.hpp"
-#include "co_context/utility/set_cpu_affinity.hpp"
-#include "co_context/co/semaphore.hpp"
 #include "co_context/co/condition_variable.hpp"
+#include "co_context/co/semaphore.hpp"
 #include "co_context/detail/eager_io_state.hpp"
+#include "co_context/utility/set_cpu_affinity.hpp"
 #include <atomic>
 
 // fold level = 3 (ctrl+a, ctrl+k, ctrl+3 in vscode)

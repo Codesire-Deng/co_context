@@ -18,18 +18,17 @@
  */
 #pragma once
 
-#include <linux/version.h>
-#include <thread>
-#include <vector>
-#include <queue>
 #include "uring/uring.hpp"
 #include "co_context/config.hpp"
-#include "co_context/detail/task_info.hpp"
-#include "co_context/detail/submit_info.hpp"
 #include "co_context/detail/reap_info.hpp"
-#include "co_context/task.hpp"
+#include "co_context/detail/submit_info.hpp"
+#include "co_context/detail/task_info.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/detail/worker_meta.hpp"
+#include "co_context/task.hpp"
+#include <queue>
+#include <thread>
+#include <vector>
 
 namespace co_context {
 
@@ -53,7 +52,7 @@ class [[nodiscard]] io_context final {
 
     using task_info = detail::task_info;
 
-    friend class detail::worker_meta;
+    friend struct detail::worker_meta;
     using worker_meta = detail::worker_meta;
 
   private:
