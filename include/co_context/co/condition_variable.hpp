@@ -1,11 +1,11 @@
 #pragma once
 
 #include "co_context/co/mutex.hpp"
-#include "co_context/task.hpp"
-#include "co_context/utility/bit.hpp"
-#include "co_context/utility/as_atomic.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/detail/worker_meta.hpp"
+#include "co_context/task.hpp"
+#include "co_context/utility/as_atomic.hpp"
+#include "co_context/utility/bit.hpp"
 
 namespace co_context {
 
@@ -18,10 +18,10 @@ namespace detail {
         using mutex = co_context::mutex;
 
         explicit cv_wait_awaiter(condition_variable & cv, mutex & mtx) noexcept
-            : lock_awaken_handle(mtx.lock()), cv(cv), next(nullptr) {
+            : lock_awaken_handle(mtx.lock()), cv(cv) {
         }
 
-        constexpr bool await_ready() const noexcept {
+        static constexpr bool await_ready() noexcept {
             return false;
         }
 
@@ -40,7 +40,7 @@ namespace detail {
         // mutex &mtx;
         // std::coroutine_handle<> handle;
 
-        cv_wait_awaiter *next;
+        cv_wait_awaiter *next = nullptr;
         friend class ::co_context::condition_variable;
         friend class ::co_context::io_context;
     };
@@ -57,8 +57,6 @@ class condition_variable final {
   public:
     condition_variable() noexcept
         : awaiting(nullptr)
-        , to_resume_head(nullptr)
-        , to_resume_tail(nullptr)
         , notify_task(task_info::task_type::condition_variable_notify) {
         // notify_task.cv = this; // deprecated
         as_atomic(notify_task.notify_counter)
@@ -93,8 +91,8 @@ class condition_variable final {
     friend class io_context;
 
     std::atomic<cv_wait_awaiter *> awaiting;
-    cv_wait_awaiter *to_resume_head;
-    cv_wait_awaiter *to_resume_tail;
+    cv_wait_awaiter *to_resume_head = nullptr;
+    cv_wait_awaiter *to_resume_tail = nullptr;
 
     task_info notify_task;
 

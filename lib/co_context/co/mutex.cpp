@@ -45,7 +45,7 @@ void mutex::unlock() noexcept {
 
         assert(top != not_locked && top != locked_no_awaiting);
 
-        lock_awaiter *node = reinterpret_cast<lock_awaiter *>(top);
+        auto *node = reinterpret_cast<lock_awaiter *>(top);
         do {
             lock_awaiter *tmp = node->next;
             node->next = resume_head;

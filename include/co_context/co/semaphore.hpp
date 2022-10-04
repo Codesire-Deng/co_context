@@ -1,8 +1,8 @@
 #pragma once
 
-#include <type_traits>
 #include "co_context/detail/task_info.hpp"
 #include "co_context/utility/as_atomic.hpp"
+#include <type_traits>
 
 namespace co_context {
 
@@ -18,7 +18,7 @@ class counting_semaphore final {
         }
 
         bool await_ready() noexcept {
-            T old_counter =
+            const T old_counter =
                 sem.counter.fetch_sub(1, std::memory_order_acquire); // seq_cst?
             return old_counter > 0;
         }
@@ -38,7 +38,7 @@ class counting_semaphore final {
   public:
     explicit counting_semaphore(T desired) noexcept
         : awaiting(nullptr)
-        , to_resume(nullptr)
+
         , counter(desired)
         , awaken_task(task_info::task_type::semaphore_release) {
         // awaken_task.sem = this; // deprecated
@@ -64,7 +64,7 @@ class counting_semaphore final {
 
   private:
     std::atomic<acquire_awaiter *> awaiting;
-    acquire_awaiter *to_resume;
+    acquire_awaiter *to_resume = nullptr;
     std::atomic<T> counter;
 
     task_info awaken_task;
