@@ -10,6 +10,8 @@ if (NOT CMAKE_BUILD_TYPE)
     message("Setting default CMAKE_BUILD_TYPE to Release")
 endif()
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 project(co_context VERSION 0.5.0 LANGUAGES C CXX)
 
 if (NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
