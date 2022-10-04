@@ -5,7 +5,7 @@ namespace co_context {
 class inet_address;
 
 socket &socket::bind(const inet_address &addr) {
-    int res = ::bind(sockfd, addr.get_sockaddr(), addr.length());
+    const int res = ::bind(sockfd, addr.get_sockaddr(), addr.length());
     if (res != 0) {
         perror("socket::bind");
         abort();
@@ -15,7 +15,7 @@ socket &socket::bind(const inet_address &addr) {
 }
 
 socket &socket::listen() {
-    int res = ::listen(sockfd, SOMAXCONN);
+    const int res = ::listen(sockfd, SOMAXCONN);
     if (res != 0) {
         perror("socket::listen");
         abort();
@@ -25,7 +25,7 @@ socket &socket::listen() {
 }
 
 socket &socket::set_reuse_addr(bool on) {
-    int optval = on;
+    int optval = static_cast<int>(on);
     if (::setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval)
         < 0) {
         perror("socket::set_reuse_addr");
@@ -48,7 +48,7 @@ socket &socket::set_tcp_no_delay(bool on) {
 inet_address socket::get_local_addr() const {
     struct sockaddr_storage localaddr;
     socklen_t addrlen = sizeof localaddr;
-    struct sockaddr *addr = reinterpret_cast<struct sockaddr *>(&localaddr);
+    auto *addr = reinterpret_cast<struct sockaddr *>(&localaddr);
     if (::getsockname(sockfd, addr, &addrlen) < 0) {
         perror("socket::get_local_addr");
     }
@@ -58,7 +58,7 @@ inet_address socket::get_local_addr() const {
 inet_address socket::get_peer_addr() const {
     struct sockaddr_storage peeraddr;
     socklen_t addrlen = sizeof peeraddr;
-    struct sockaddr *addr = reinterpret_cast<struct sockaddr *>(&peeraddr);
+    auto *addr = reinterpret_cast<struct sockaddr *>(&peeraddr);
     if (::getpeername(sockfd, addr, &addrlen) < 0) {
         perror("socket::get_peer_addr");
     }

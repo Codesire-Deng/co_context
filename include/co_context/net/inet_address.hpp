@@ -1,12 +1,12 @@
 #pragma once
 
-#include <netinet/in.h>
+#include "co_context/utility/defer.hpp"
+#include "co_context/config.hpp"
 #include <netdb.h>
+#include <netinet/in.h>
 #include <string>
 #include <string_view>
 #include <vector>
-#include "co_context/utility/defer.hpp"
-#include "co_context/config.hpp"
 
 namespace co_context {
 
@@ -25,7 +25,7 @@ class inet_address {
     /**
      * @brief for listening
      */
-    inet_address(uint16_t port, bool isIpv6 = false) noexcept;
+    inet_address(uint16_t port, bool is_ipv6 = false) noexcept;
 
     /**
      * @brief for Sockets API

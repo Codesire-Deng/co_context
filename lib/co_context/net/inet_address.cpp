@@ -1,11 +1,11 @@
 #include "co_context/net/inet_address.hpp"
 #include "co_context/log/log.hpp"
+#include <arpa/inet.h>
+#include <cassert>
 #include <cstring>
 #include <string>
 #include <string_view>
 #include <sys/socket.h>
-#include <arpa/inet.h>
-#include <cassert>
 
 namespace co_context {
 
@@ -29,11 +29,11 @@ inet_address::inet_address(std::string_view ip, uint16_t port) noexcept {
 /**
  * @brief for listening
  */
-inet_address::inet_address(uint16_t port, bool isIpv6) noexcept {
+inet_address::inet_address(uint16_t port, bool is_ipv6) noexcept {
     static_assert(offsetof(inet_address, addr6) == 0, "addr6 offset 0");
     static_assert(offsetof(inet_address, addr) == 0, "addr offset 0");
 
-    if (isIpv6) {
+    if (is_ipv6) {
         std::memset(&addr6, 0, sizeof(addr6));
         addr6.sin6_family = AF_INET6;
         if constexpr (config::loopback_only) {
@@ -86,9 +86,9 @@ std::string inet_address::to_ip_port() const {
 
     if (family() == AF_INET6) {
         return "[" + to_ip() + "]" + buf;
-    } else {
-        return to_ip() + buf;
     }
+
+    return to_ip() + buf;
 }
 
 bool inet_address::operator==(const inet_address &rhs) const noexcept {
@@ -98,13 +98,13 @@ bool inet_address::operator==(const inet_address &rhs) const noexcept {
     if (family() == AF_INET) {
         return addr.sin_port == rhs.addr.sin_port
                && addr.sin_addr.s_addr == rhs.addr.sin_addr.s_addr;
-    } else {
-        return addr6.sin6_port == rhs.addr6.sin6_port
-               && memcmp(
-                      &addr6.sin6_addr, &rhs.addr6.sin6_addr,
-                      sizeof(addr6.sin6_addr)
-                  ) == 0;
     }
+
+    return addr6.sin6_port == rhs.addr6.sin6_port
+           && memcmp(
+                  &addr6.sin6_addr, &rhs.addr6.sin6_addr,
+                  sizeof(addr6.sin6_addr)
+              ) == 0;
 }
 
 bool inet_address::resolve(
@@ -131,7 +131,7 @@ std::vector<inet_address> inet_address::resolve_all(
 ) {
     std::vector<inet_address> ret;
     struct addrinfo *result = nullptr;
-    int err = getaddrinfo(hostname.data(), nullptr, hints, &result);
+    const int err = getaddrinfo(hostname.data(), nullptr, hints, &result);
     if (err != 0) {
         if (err == EAI_SYSTEM) {
             perror("inet_address::resolve");
@@ -142,7 +142,7 @@ std::vector<inet_address> inet_address::resolve_all(
     }
 
     assert(result != nullptr);
-    defer guard{[result] {
+    const defer guard{[result] {
         freeaddrinfo(result);
     }};
 

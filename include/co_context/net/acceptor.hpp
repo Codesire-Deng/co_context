@@ -31,7 +31,7 @@ class acceptor {
     socket listen_socket;
 };
 
-acceptor::acceptor(const inet_address &listen_addr)
+inline acceptor::acceptor(const inet_address &listen_addr)
     : listen_socket(socket::create_tcp(listen_addr.family())) {
     listen_socket.set_reuse_addr(true).bind(listen_addr).listen();
 }
