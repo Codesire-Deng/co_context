@@ -34,7 +34,7 @@ namespace detail {
         int32_t await_resume() const noexcept { return io_info.result; }
 
       protected:
-        friend class lazy_link_io;
+        friend struct lazy_link_io;
         friend struct lazy_link_timeout;
         liburingcxx::sq_entry *sqe;
         task_info io_info;
