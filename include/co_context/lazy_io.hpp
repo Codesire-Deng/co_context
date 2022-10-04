@@ -463,7 +463,7 @@ inline namespace lazy {
 
     [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_link
     link(const char *oldpath, const char *newpath, int flags) noexcept {
-        return detail::lazy_link{oldpath, oldpath, flags};
+        return detail::lazy_link{oldpath, newpath, flags};
     }
 
     [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_msg_ring

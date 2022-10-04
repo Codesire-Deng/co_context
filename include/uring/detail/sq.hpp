@@ -1,7 +1,9 @@
 #pragma once
 
-#include <numeric>
+#include "uring/barrier.h"
 #include "uring/sq_entry.hpp"
+#include <cassert>
+#include <numeric>
 
 namespace liburingcxx {
 

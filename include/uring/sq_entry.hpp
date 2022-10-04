@@ -12,6 +12,7 @@
 
 struct __kernel_timespec;
 struct epoll_event;
+struct statx;
 
 namespace liburingcxx {
 
