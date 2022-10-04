@@ -1,9 +1,9 @@
+#include "co_context/all.hpp"
 #include <array>
 #include <cstddef>
 #include <iomanip>
 #include <iostream>
 #include <random>
-#include "co_context/all.hpp"
 
 co_context::condition_variable cv;
 co_context::mutex cv_m; // This mutex is used for three purposes:

@@ -59,6 +59,9 @@ _deps
 # clangd
 .cache/
 
+# clang-tidy
+.clang-tidy
+
 # Built Visual Studio Code Extensions
 *.vsix
 
