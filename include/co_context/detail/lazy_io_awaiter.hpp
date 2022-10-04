@@ -1,12 +1,12 @@
 #pragma once
 
 #include "uring/uring.hpp"
+#include "co_context/detail/task_info.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/detail/worker_meta.hpp"
-#include "co_context/detail/task_info.hpp"
 #include <cassert>
-#include <span>
 #include <chrono>
+#include <span>
 
 namespace co_context {
 
@@ -15,16 +15,16 @@ namespace detail {
     struct lazy_link_io {
         class lazy_awaiter *last_io;
 
-        constexpr bool await_ready() const noexcept { return false; }
+        static constexpr bool await_ready() noexcept { return false; }
 
-        void await_suspend(std::coroutine_handle<> current) noexcept;
+        void await_suspend(std::coroutine_handle<> current) const noexcept;
 
         int32_t await_resume() const noexcept;
     };
 
     class lazy_awaiter {
       public:
-        constexpr bool await_ready() const noexcept { return false; }
+        static constexpr bool await_ready() noexcept { return false; }
 
         void await_suspend(std::coroutine_handle<> current) noexcept {
             io_info.handle = current;
@@ -39,7 +39,7 @@ namespace detail {
         liburingcxx::sq_entry *sqe;
         task_info io_info;
 
-        inline void submit() noexcept {
+        static inline void submit() noexcept {
             worker_meta *const worker = detail::this_thread.worker;
             worker->submit_sqe();
         }
@@ -66,6 +66,8 @@ namespace detail {
         }
 
 #ifndef __INTELLISENSE__
+
+      public:
         lazy_awaiter(const lazy_awaiter &) = delete;
         lazy_awaiter(lazy_awaiter &&) = delete;
         lazy_awaiter &operator=(const lazy_awaiter &) = delete;
@@ -97,17 +99,17 @@ namespace detail {
     operator&&(lazy_link_io &&lhs, lazy_awaiter &&rhs) noexcept {
         set_link_link_io(lhs);
         lhs.last_io = &rhs;
-        return std::move(lhs);
+        return static_cast<lazy_link_io &&>(lhs);
     }
 
     inline lazy_link_io &&
     operator&&(lazy_link_io &&lhs, lazy_link_io &&rhs) noexcept {
         set_link_link_io(lhs);
-        return std::move(rhs);
+        return static_cast<lazy_link_io &&>(rhs);
     }
 
     inline void lazy_link_io::await_suspend(std::coroutine_handle<> current
-    ) noexcept {
+    ) const noexcept {
         this->last_io->io_info.handle = current;
         worker_meta *const worker = detail::this_thread.worker;
         worker->submit_sqe();
@@ -269,7 +271,7 @@ namespace detail {
         }
 
       protected:
-        inline lazy_timeout_timespec() noexcept {}
+        inline lazy_timeout_timespec() noexcept = default;
     };
 
     struct lazy_timeout_base : lazy_awaiter {
@@ -680,7 +682,7 @@ namespace detail {
         inline lazy_link(
             const char *oldpath, const char *newpath, int flags
         ) noexcept {
-            sqe->prep_link(oldpath, oldpath, flags);
+            sqe->prep_link(oldpath, newpath, flags);
         }
     };
 
@@ -762,9 +764,9 @@ namespace detail {
     };
 
     struct lazy_yield {
-        constexpr bool await_ready() const noexcept { return false; }
+        static constexpr bool await_ready() noexcept { return false; }
 
-        void await_suspend(std::coroutine_handle<> current) noexcept {
+        static void await_suspend(std::coroutine_handle<> current) noexcept {
             auto &worker = *detail::this_thread.worker;
             worker.co_spawn(current);
         }
