@@ -16,9 +16,11 @@ namespace detail {
     class eager_awaiter {
       public:
         inline bool is_ready() const noexcept {
-            return as_atomic(shared_io_info->eager_io_state)
-                       .load(std::memory_order_acquire)
-                   & eager::io_ready;
+            return bool(
+                as_atomic(shared_io_info->eager_io_state)
+                    .load(std::memory_order_acquire)
+                & eager::io_ready
+            );
         }
 
         bool await_ready() const noexcept { return is_ready(); }
@@ -33,15 +35,14 @@ namespace detail {
             assert(
                 !(old_state & io_detached) && "logic error: wait after detached"
             );
-            if (old_state & io_ready) {
-                return false; // do not suspend, worker will delete task_info
-            } else {
-                return true; // suspend, worker will delete task_info
-            }
+
+            // io isn't ready -> suspend, worker will delete task_info
+            // io is ready -> do not suspend, worker will delete task_info
+            return !bool(old_state & io_ready);
         }
 
         int32_t await_resume() noexcept {
-            int32_t result = shared_io_info->result;
+            const int32_t result = shared_io_info->result;
             delete shared_io_info;
             return result;
         }
@@ -54,10 +55,13 @@ namespace detail {
             assert(
                 !(old_state & io_wait) && "logic error: detach after waited"
             );
-            if (old_state & io_ready) {
+            if (bool(old_state & io_ready)) {
                 delete shared_io_info;
             }
         }
+
+        eager_awaiter(eager_awaiter &&) = delete;
+        eager_awaiter &operator=(eager_awaiter &&) = delete;
 
       protected:
         liburingcxx::sq_entry *sqe;
@@ -71,7 +75,7 @@ namespace detail {
             sqe->set_data(shared_io_info->as_eager_user_data());
         }
 
-        inline void submit() const noexcept {
+        static inline void submit() noexcept {
             worker_meta *const worker = detail::this_thread.worker;
             worker->submit_sqe();
             /*
@@ -79,18 +83,9 @@ namespace detail {
             */
         }
 
-        eager_awaiter(const eager_awaiter &other) noexcept
-            : sqe(other.sqe), shared_io_info(other.shared_io_info) {}
+        eager_awaiter(const eager_awaiter &other) noexcept = default;
 
-        eager_awaiter(eager_awaiter &&) = delete;
-
-        eager_awaiter &operator=(const eager_awaiter &other) noexcept {
-            sqe = other.sqe;
-            shared_io_info = other.shared_io_info;
-            return *this;
-        }
-
-        eager_awaiter &operator=(eager_awaiter &&) = delete;
+        eager_awaiter &operator=(const eager_awaiter &other) noexcept = default;
 
         ~eager_awaiter() noexcept {
             using namespace ::co_context::eager;

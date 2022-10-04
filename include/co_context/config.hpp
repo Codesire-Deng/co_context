@@ -41,14 +41,15 @@ namespace config {
 
     using tid_t = tid_size_t;
 
-    inline constexpr bool using_hyper_threading = true;
+    inline constexpr bool is_using_hyper_threading = true;
 
     /**
      * @brief This tells if a standalone thread will run in kernel space.
      *
      * @note Do not modify this, check `io_uring_flags` instead.
      */
-    inline constexpr bool using_SQPOLL = io_uring_flags & IORING_SETUP_SQPOLL;
+    inline constexpr bool is_using_sqpoll =
+        bool(io_uring_flags & IORING_SETUP_SQPOLL);
 
     /**
      * @brief This number tells how many standalone worker-threads are running
@@ -70,15 +71,15 @@ namespace config {
     inline constexpr tid_size_t workers_number =
         worker_threads_number > 1 ? worker_threads_number : 1;
 
-    inline constexpr bool use_standalone_completion_poller = false;
+    inline constexpr bool is_using_standalone_completion_poller = false;
     static_assert(
-        !use_standalone_completion_poller || worker_threads_number > 0
+        !is_using_standalone_completion_poller || worker_threads_number > 0
     );
     // ========================================================================
 
     // ======================= io_context configuration =======================
     // Enabling this would significantly increase latency in multi-thread model.
-    inline constexpr bool use_wait_and_notify = true;
+    inline constexpr bool is_using_wait_and_notify = true;
 
     using swap_capacity_size_t = uint16_t;
     using cur_t = swap_capacity_size_t;
@@ -109,8 +110,8 @@ namespace config {
     // ========================================================================
 
     // ========================== net configuration ===========================
-    inline constexpr bool loopback_only = true;
-    // inline constexpr bool loopback_only = false;
+    inline constexpr bool is_loopback_only = true;
+    // inline constexpr bool is_loopback_only = false;
     // ========================================================================
 
     // =========================== co configuration ===========================
