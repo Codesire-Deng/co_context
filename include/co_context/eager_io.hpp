@@ -1,14 +1,13 @@
 #pragma once
 
 #include "uring/uring.hpp"
+#include "co_context/detail/eager_io_state.hpp"
 #include "co_context/detail/task_info.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/detail/worker_meta.hpp"
 #include "co_context/utility/as_atomic.hpp"
-#include "co_context/detail/eager_io_state.hpp"
-// #include "co_context/detail/sqe_task_meta.hpp" // deprecated
-#include <span>
 #include <memory>
+#include <span>
 
 namespace co_context {
 

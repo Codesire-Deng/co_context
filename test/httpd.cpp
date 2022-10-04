@@ -1,15 +1,14 @@
-#include <stdio.h>
-#include <netinet/in.h>
-#include <string.h>
-#include <ctype.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <signal.h>
-// #include <liburing.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <sys/utsname.h>
 #include "uring/uring.hpp"
+#include <cctype>
+#include <csignal>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <sys/stat.h>
+#include <sys/utsname.h>
+#include <unistd.h>
 
 #define SERVER_STRING       "Server: zerohttpd/0.1\r\n"
 #define DEFAULT_SERVER_PORT 8000

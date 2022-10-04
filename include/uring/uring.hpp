@@ -21,27 +21,27 @@
 #define _XOPEN_SOURCE 500 /* Required for glibc to expose sigset_t */
 #endif
 
-#include <sys/socket.h>
-#include <sys/uio.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
-#include <sched.h>
-#include <linux/swab.h>
-#include <cassert>
-#include <cerrno>
-#include <csignal>
-#include <cinttypes>
-#include <ctime>
-#include <system_error>
 #include "uring/compat.h"
-#include "uring/io_uring.h"
 #include "uring/barrier.h"
-#include "uring/syscall.hpp"
 #include "uring/buf_ring.hpp"
-#include "uring/detail/sq.hpp"
 #include "uring/detail/cq.hpp"
 #include "uring/detail/int_flags.h"
+#include "uring/detail/sq.hpp"
+#include "uring/io_uring.h"
+#include "uring/syscall.hpp"
 #include "uring/utility/kernel_version.hpp"
+#include <cassert>
+#include <cerrno>
+#include <cinttypes>
+#include <csignal>
+#include <ctime>
+#include <linux/swab.h>
+#include <sched.h>
+#include <sys/mman.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/uio.h>
+#include <system_error>
 
 struct statx;
 
