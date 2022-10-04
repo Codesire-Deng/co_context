@@ -1,8 +1,8 @@
+#include <boost/asio.hpp>
 #include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <utility>
-#include <boost/asio.hpp>
 
 using boost::asio::ip::tcp;
 

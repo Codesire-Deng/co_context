@@ -1,14 +1,14 @@
+#include "co_context/co/mutex.hpp"
+#include "co_context/co/semaphore.hpp"
+#include "co_context/io_context.hpp"
+#include "co_context/lazy_io.hpp"
+#include "co_context/task.hpp"
 #include <array>
 #include <chrono>
 #include <cstddef>
 #include <iomanip>
 #include <iostream>
 #include <random>
-#include "co_context/co/mutex.hpp"
-#include "co_context/co/semaphore.hpp"
-#include "co_context/io_context.hpp"
-#include "co_context/task.hpp"
-#include "co_context/lazy_io.hpp"
 
 using namespace co_context;
 using namespace std::literals;

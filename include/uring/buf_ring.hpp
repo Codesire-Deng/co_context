@@ -1,6 +1,7 @@
 #pragma once
 
 #include "uring/io_uring.h"
+#include <cstdint>
 
 namespace liburingcxx {
 

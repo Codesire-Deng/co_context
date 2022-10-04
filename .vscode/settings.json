@@ -5,6 +5,7 @@
         "*.clang-format": "yaml",
         ".clang-tidy": "yaml",
         "*.clang-tidy": "yaml",
+        "*.cppx": "cpp",
         "*.cu": "cpp",
         "io_uring.h": "c",
         "syscall.h": "c",

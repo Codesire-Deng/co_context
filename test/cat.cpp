@@ -17,11 +17,10 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <fcntl.h>
-// #include <sys/stat.h>
-#include <iostream>
-#include <filesystem>
 #include "uring/uring.hpp"
+#include <fcntl.h>
+#include <filesystem>
+#include <iostream>
 
 constexpr unsigned BLOCK_SZ = 1024;
 
