@@ -3,7 +3,9 @@
 #include <cassert>
 #include <concepts>
 #include <coroutine>
+#include <exception>
 #include <memory>
+#include <type_traits>
 
 namespace co_context {
 
@@ -43,7 +45,7 @@ namespace detail {
      */
     template<>
     struct task_final_awaiter<void> {
-        constexpr bool await_ready() const noexcept { return false; }
+        static constexpr bool await_ready() noexcept { return false; }
 
         template<std::derived_from<task_promise_base<void>> Promise>
         std::coroutine_handle<>
@@ -52,7 +54,7 @@ namespace detail {
 
             std::coroutine_handle<> continuation = promise.parent_coro;
 
-            if (promise.is_detached_flag == uintptr_t(-1ULL)) {
+            if (promise.is_detached_flag == Promise::is_detached) {
                 current.destroy();
             }
 
@@ -163,30 +165,40 @@ namespace detail {
         friend class task<void>;
 
       public:
-        task_promise() noexcept : exception_ptr(nullptr){};
+        task_promise() noexcept : is_detached_flag(0){};
 
-        ~task_promise() noexcept {};
+        ~task_promise() noexcept {
+            if (is_detached_flag != is_detached) {
+                exception_ptr.~exception_ptr();
+            }
+        }
 
         task<void> get_return_object() noexcept;
 
         constexpr void return_void() noexcept {}
 
-        void unhandled_exception() noexcept {
-            exception_ptr = std::current_exception();
+        void unhandled_exception() {
+            if (is_detached_flag == is_detached) {
+                std::rethrow_exception(std::current_exception());
+            } else {
+                exception_ptr = std::current_exception();
+            }
         }
 
-        void result() {
+        void result() const {
             if (this->exception_ptr) [[unlikely]] {
                 std::rethrow_exception(this->exception_ptr);
             }
         }
 
       private:
+        inline static constexpr uintptr_t is_detached = -1;
+
         union {
-            uintptr_t is_detached_flag; // set to -1ULL if is detached.
+            uintptr_t is_detached_flag; // set to `is_detached` if is detached.
             std::exception_ptr exception_ptr;
         };
-    };
+    }; // namespace co_context
 
     template<typename T>
     class task_promise<T &> final : public task_promise_base<T &> {
@@ -248,15 +260,15 @@ class [[nodiscard("Did you forget to co_await?")]] task {
         : handle(current) {
     }
 
-    task(task<> && other) noexcept : handle(other) {
+    task(task && other) noexcept : handle(other) {
         other.handle = nullptr;
     }
 
     // Ban copy
     task(const task<> &) = delete;
-    task<> &operator=(const task<> &) = delete;
+    task &operator=(const task &) = delete;
 
-    task<> &operator=(task<> &&other) noexcept {
+    task &operator=(task &&other) noexcept {
         if (this != std::addressof(other)) [[likely]] {
             if (handle) {
                 handle.destroy();
@@ -335,7 +347,9 @@ class [[nodiscard("Did you forget to co_await?")]] task {
     }
 
     void detach() noexcept {
-        handle.promise().is_detached_flag = uintptr_t(-1ULL);
+        if constexpr (std::is_void_v<value_type>) {
+            handle.promise().is_detached_flag = promise_type::is_detached;
+        }
         handle = nullptr;
     }
 
