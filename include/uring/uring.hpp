@@ -111,7 +111,7 @@ class [[nodiscard]] uring final {
     ) noexcept;
 #endif
 
-    int submit_and_get_events(unsigned wait_num) noexcept;
+    int submit_and_get_events() noexcept;
 
     int get_events() noexcept;
 
@@ -266,8 +266,7 @@ inline int uring<uring_flags>::submit_and_wait_timeout(
 #endif
 
 template<unsigned uring_flags>
-inline int uring<uring_flags>::submit_and_get_events(unsigned wait_num
-) noexcept {
+inline int uring<uring_flags>::submit_and_get_events() noexcept {
     return __submit(sq.template flush<uring_flags>(), 0, true);
 }
 
