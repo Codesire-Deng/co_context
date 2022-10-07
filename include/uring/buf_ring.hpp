@@ -1,5 +1,6 @@
 #pragma once
 
+#include "uring/barrier.h"
 #include "uring/io_uring.h"
 #include <cstdint>
 
@@ -33,7 +34,7 @@ class buf_ring final : private io_uring_buf_ring {
     }
 
   public:
-    static inline constexpr int mask_of(uint32_t ring_entries) noexcept {
+    static inline constexpr uint32_t mask_of(uint32_t ring_entries) noexcept {
         return ring_entries - 1;
     }
 
