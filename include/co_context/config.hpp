@@ -10,8 +10,19 @@ namespace co_context {
 namespace config {
 
     // ======================== io_uring configuration ========================
-    inline constexpr unsigned io_uring_flags = 0;
-    // inline constexpr unsigned io_uring_flags = IORING_SETUP_SQPOLL;
+    inline constexpr unsigned io_uring_setup_flags = 0;
+    // inline constexpr unsigned io_uring_setup_flags = IORING_SETUP_SQPOLL;
+
+    /**
+     * @brief This tells if `IORING_SETUP_COOP_TASKRUN`
+     * and `IORING_SETUP_TASKRUN_FLAG` should be enabled.
+     *
+     * @note Do not modify this, check `io_uring_setup_flags` instead.
+     */
+    inline constexpr unsigned io_uring_coop_taskrun_flag =
+        bool(io_uring_setup_flags & IORING_SETUP_SQPOLL)
+            ? 0
+            : (IORING_SETUP_COOP_TASKRUN | IORING_SETUP_TASKRUN_FLAG);
     // ========================================================================
 
     // ========================== CPU configuration ===========================
@@ -46,10 +57,10 @@ namespace config {
     /**
      * @brief This tells if a standalone thread will run in kernel space.
      *
-     * @note Do not modify this, check `io_uring_flags` instead.
+     * @note Do not modify this, check `io_uring_setup_flags` instead.
      */
     inline constexpr bool is_using_sqpoll =
-        bool(io_uring_flags & IORING_SETUP_SQPOLL);
+        bool(io_uring_setup_flags & IORING_SETUP_SQPOLL);
 
     /**
      * @brief This number tells how many standalone worker-threads are running
@@ -71,10 +82,6 @@ namespace config {
     inline constexpr tid_size_t workers_number =
         worker_threads_number > 1 ? worker_threads_number : 1;
 
-    inline constexpr bool is_using_standalone_completion_poller = false;
-    static_assert(
-        !is_using_standalone_completion_poller || worker_threads_number > 0
-    );
     // ========================================================================
 
     // ======================= io_context configuration =======================
@@ -139,8 +146,8 @@ namespace config {
     // inline constexpr level log_level = level::debug;
     // inline constexpr level log_level = level::info;
     // inline constexpr level log_level = level::warning;
-    inline constexpr level log_level = level::error;
-    // inline constexpr level log_level = level::no_log;
+    // inline constexpr level log_level = level::error;
+    inline constexpr level log_level = level::no_log;
 
 } // namespace config
 
