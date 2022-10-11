@@ -10,4 +10,5 @@ foreach(v ${all_tests})
     if (mi_version)
         target_link_libraries(${target_name} PUBLIC mimalloc)
     endif()
+    # target_link_libraries(${target_name} PUBLIC uring) // link axboe/liburing
 endforeach()
