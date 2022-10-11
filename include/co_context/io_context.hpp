@@ -39,14 +39,14 @@ class io_context;
 class [[nodiscard]] io_context final {
   private:
     using uring = liburingcxx::uring<
-        config::io_uring_flags
+        config::io_uring_setup_flags
 #if LIBURINGCXX_IS_KERNEL_REACH(5, 19)
         /**
          * @note IORING_SETUP_COOP_TASKRUN is used because only one thread can
          * access the ring
          */
         // PERF check IORING_SETUP_TASKRUN_FLAG
-        | IORING_SETUP_COOP_TASKRUN | IORING_SETUP_TASKRUN_FLAG
+        | config::io_uring_coop_taskrun_flag
 #endif
         >;
 
