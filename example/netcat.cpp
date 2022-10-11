@@ -5,7 +5,7 @@ using Socket = co_context::socket;
 
 // 不断接收字节流并打印到stdout
 task<> recv_session(Socket sock) {
-    char buf[8192];
+    alignas(8192) char buf[8192];
     int nr = co_await sock.recv(buf);
 
     while (nr > 0) {
@@ -17,7 +17,7 @@ task<> recv_session(Socket sock) {
 
 // 将键盘输入发送给对方
 task<> send_session(Socket sock) {
-    char buf[10];
+    alignas(8192) char buf[8192];
     int nr = co_await lazy::read(STDIN_FILENO, buf);
 
     while (nr > 0) {

@@ -655,6 +655,64 @@ void io_context::co_spawn(std::coroutine_handle<> entrance) noexcept {
     forward_task(entrance);
 }
 
+inline void io_context::do_submission_part() noexcept {
+    // if (try_clear_submit_overflow_buf()) {
+    // log::v("ctx poll_submission...\n");
+    if constexpr (config::submit_poll_rounds > 1) {
+        for (uint8_t i = 0; i < config::submit_poll_rounds; ++i) {
+            if (!poll_submission()) {
+                break;
+            }
+        }
+    } else {
+        poll_submission();
+    }
+    // }
+}
+
+inline void io_context::do_completion_part() {
+    // TODO judge the memory order (relaxed may cause bugs)
+    // TODO consider reap_poll_rounds and reap_overflow_buf
+    if (requests_to_reap > 0) [[likely]] {
+        auto num = ring.cq_ready_relaxed();
+
+        // io_context can block itself in the following situation
+        if constexpr (config::worker_threads_number == 0 && config::is_using_wait_and_notify) {
+            if (num == 0 && !has_task_ready) [[unlikely]] {
+                const liburingcxx::cq_entry *_;
+                ring.wait_cq_entry(_);
+                num = ring.cq_ready_relaxed();
+                if constexpr (config::log_level <= config::level::debug) {
+                    if (num == 0) {
+                        log::d("wait_cq_entry() gets 0 cqe.\n");
+                    }
+                }
+            }
+        }
+
+        // TODO enhance perf here: reuse the internal head-tail
+        // infomation of the ring
+        while (num-- > 0) {
+            poll_completion();
+        }
+    } else {
+        if constexpr (config::worker_threads_number == 0) {
+            if (!has_task_ready) [[unlikely]] {
+                will_stop = true;
+            }
+        }
+    }
+}
+
+inline void io_context::do_worker_part() {
+    has_task_ready = false;
+    auto num = worker[0].number_to_schedule_relaxed();
+    log::v("worker run %u times...\n", num);
+    while (num-- > 0) {
+        worker[0].worker_run_once();
+    }
+}
+
 void io_context::run() {
 #ifdef CO_CONTEXT_USE_CPU_AFFINITY
     detail::set_cpu_affinity(detail::this_thread.tid);
@@ -665,19 +723,6 @@ void io_context::run() {
         make_thread_pool();
     } else {
         worker[0].init(0, this);
-    }
-
-    if constexpr (config::is_using_standalone_completion_poller) {
-        std::thread{[this] {
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
-            log::i("ctx completion_poller runs on %d\n", gettid());
-            while (true) {
-                auto num = ring.cq_ready_acquire();
-                while (num--) {
-                    poll_completion();
-                }
-            }
-        }}.detach();
     }
 
     while (!will_stop) {
@@ -703,36 +748,34 @@ void io_context::run() {
         }
         // }
 
-        if constexpr (!config::is_using_standalone_completion_poller) {
-            // TODO judge the memory order (relaxed may cause bugs)
-            // TODO consider reap_poll_rounds and reap_overflow_buf
-            if (requests_to_reap > 0) [[likely]] {
-                auto num = ring.cq_ready_relaxed();
+        // TODO judge the memory order (relaxed may cause bugs)
+        // TODO consider reap_poll_rounds and reap_overflow_buf
+        if (requests_to_reap > 0) [[likely]] {
+            auto num = ring.cq_ready_relaxed();
 
-                // io_context can block itself in the following situation
-                if constexpr (config::worker_threads_number == 0 && config::is_using_wait_and_notify) {
-                    if (num == 0 && !has_task_ready) [[unlikely]] {
-                        const liburingcxx::cq_entry *_;
-                        ring.wait_cq_entry(_);
-                        num = ring.cq_ready_relaxed();
-                        if constexpr (config::log_level <= config::level::debug) {
-                            if (num == 0) {
-                                log::d("wait_cq_entry() gets 0 cqe.\n");
-                            }
+            // io_context can block itself in the following situation
+            if constexpr (config::worker_threads_number == 0 && config::is_using_wait_and_notify) {
+                if (num == 0 && !has_task_ready) [[unlikely]] {
+                    const liburingcxx::cq_entry *_;
+                    ring.wait_cq_entry(_);
+                    num = ring.cq_ready_relaxed();
+                    if constexpr (config::log_level <= config::level::debug) {
+                        if (num == 0) {
+                            log::d("wait_cq_entry() gets 0 cqe.\n");
                         }
                     }
                 }
+            }
 
-                // TODO enhance perf here: reuse the internal head-tail
-                // infomation of the ring
-                while (num--) {
-                    poll_completion();
-                }
-            } else {
-                if constexpr (config::worker_threads_number == 0) {
-                    if (!has_task_ready) [[unlikely]] {
-                        will_stop = true;
-                    }
+            // TODO enhance perf here: reuse the internal head-tail
+            // infomation of the ring
+            while (num--) {
+                poll_completion();
+            }
+        } else {
+            if constexpr (config::worker_threads_number == 0) {
+                if (!has_task_ready) [[unlikely]] {
+                    will_stop = true;
                 }
             }
         }

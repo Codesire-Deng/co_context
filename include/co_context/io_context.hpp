@@ -219,6 +219,12 @@ class [[nodiscard]] io_context final {
 
     friend void co_spawn(task<void> &&entrance) noexcept;
 
+    void do_submission_part() noexcept;
+
+    void do_completion_part();
+
+    void do_worker_part();
+
   public:
     io_context(unsigned io_uring_entries, uring::params &io_uring_params)
         : ring(io_uring_entries, io_uring_params)
