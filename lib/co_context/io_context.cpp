@@ -30,7 +30,7 @@ namespace detail {
 #ifdef CO_CONTEXT_USE_CPU_AFFINITY
         if constexpr (config::worker_threads_number > 0) {
             const unsigned logic_cores = std::thread::hardware_concurrency();
-            if constexpr (config::using_hyper_threading) {
+            if constexpr (config::is_using_hyper_threading) {
                 if (thread_index * 2 < logic_cores) {
                     detail::set_cpu_affinity(thread_index * 2);
                 } else {
