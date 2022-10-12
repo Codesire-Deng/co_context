@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.20.0)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_C_STANDARD 11)
 option(FORCE_TO_USE_MIMALLOC "Force the use of mimalloc version 2.0 or above" OFF)
 
 if (NOT CMAKE_BUILD_TYPE)
@@ -12,7 +11,7 @@ endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-project(co_context VERSION 0.5.0 LANGUAGES C CXX)
+project(co_context VERSION 0.5.0 LANGUAGES CXX)
 
 if (NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
     message(WARNING "co_context only supports Linux currently, but the target OS is ${CMAKE_SYSTEM_NAME}.")
