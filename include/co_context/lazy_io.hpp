@@ -89,7 +89,7 @@ inline namespace lazy {
 #if LIBURINGCXX_IS_KERNEL_REACH(5, 20)
     [[nodiscard("Did you forget to co_await?"
     )]] inline detail::lazy_recvmsg_multishot
-    recvmsg_multishot(int fd, const msghdr *msg, unsigned int flags) noexcept {
+    recvmsg_multishot(int fd, msghdr *msg, unsigned int flags) noexcept {
         return detail::lazy_recvmsg_multishot{fd, msg, flags};
     }
 #endif
