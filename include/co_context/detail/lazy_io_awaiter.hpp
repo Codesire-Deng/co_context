@@ -233,21 +233,20 @@ namespace detail {
     };
 
     struct lazy_poll_remove : lazy_awaiter {
-        inline lazy_poll_remove(int fd, uint64_t user_data) noexcept {
-            sqe->prep_poll_remove(fd, user_data);
+        inline lazy_poll_remove(uint64_t user_data) noexcept {
+            sqe->prep_poll_remove(user_data);
         }
     };
 
     struct lazy_poll_update : lazy_awaiter {
         inline lazy_poll_update(
-            int fd,
             uint64_t old_user_data,
             uint64_t new_user_data,
             unsigned poll_mask,
             unsigned flags
         ) noexcept {
             sqe->prep_poll_update(
-                fd, old_user_data, new_user_data, poll_mask, flags
+                old_user_data, new_user_data, poll_mask, flags
             );
         }
     };
