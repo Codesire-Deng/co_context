@@ -465,12 +465,14 @@ inline namespace lazy {
         return detail::lazy_link{oldpath, newpath, flags};
     }
 
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 18)
     [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_msg_ring
     msg_ring(
         int fd, unsigned int cqe_res, uint64_t cqe_user_data, unsigned int flags
     ) noexcept {
         return detail::lazy_msg_ring{fd, cqe_res, cqe_user_data, flags};
     }
+#endif
 
     [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_getxattr
     getxattr(

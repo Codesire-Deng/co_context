@@ -15,7 +15,7 @@ int times;
 std::atomic_int remain;
 
 constexpr size_t BLOCK_LEN = 4096;
-constexpr unsigned threads = config::worker_threads_number;
+constexpr unsigned threads = config::workers_number;
 constexpr int MAX_ON_FLY = threads * 2;
 
 alignas(512) char buf[MAX_ON_FLY][BLOCK_LEN];
