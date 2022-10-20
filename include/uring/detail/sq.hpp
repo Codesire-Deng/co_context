@@ -70,9 +70,9 @@ namespace detail {
                  * the tail update.
                  */
                 if constexpr (!(uring_flags & IORING_SETUP_SQPOLL)) {
-                    io_uring_smp_store_release(ktail, sqe_tail);
-                } else {
                     IO_URING_WRITE_ONCE(*ktail, sqe_tail);
+                } else {
+                    io_uring_smp_store_release(ktail, sqe_tail);
                 }
             }
             /*
