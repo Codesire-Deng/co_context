@@ -236,7 +236,7 @@ class sq_entry final : private io_uring_sqe {
     }
 
   private:
-    inline unsigned prep_poll_mask(unsigned poll_mask) noexcept {
+    inline static unsigned prep_poll_mask(unsigned poll_mask) noexcept {
 #if __BYTE_ORDER == __BIG_ENDIAN
         poll_mask = __swahw32(poll_mask);
 #endif
@@ -256,14 +256,13 @@ class sq_entry final : private io_uring_sqe {
         return *this;
     }
 
-    inline sq_entry &prep_poll_remove(int fd, uint64_t user_data) noexcept {
+    inline sq_entry &prep_poll_remove(uint64_t user_data) noexcept {
         prep_rw(IORING_OP_POLL_REMOVE, -1, nullptr, 0, 0);
         this->addr = user_data;
         return *this;
     }
 
     inline sq_entry &prep_poll_update(
-        int fd,
         uint64_t old_user_data,
         uint64_t new_user_data,
         unsigned poll_mask,
@@ -657,13 +656,13 @@ class sq_entry final : private io_uring_sqe {
         int fd, unsigned int cqe_res, uint64_t cqe_user_data, unsigned int flags
     ) noexcept {
         prep_rw(IORING_OP_MSG_RING, fd, nullptr, cqe_res, cqe_user_data);
-        this->rw_flags = flags;
+        this->rw_flags = static_cast<int>(flags);
         return *this;
     }
 #endif
 
     inline sq_entry &prep_getxattr(
-        const char *name, char *value, const char *path, size_t len
+        const char *name, char *value, const char *path, unsigned int len
     ) noexcept {
         prep_rw(
             IORING_OP_GETXATTR, 0, name, len,
@@ -675,7 +674,11 @@ class sq_entry final : private io_uring_sqe {
     }
 
     inline sq_entry &prep_setxattr(
-        const char *name, char *value, const char *path, int flags, size_t len
+        const char *name,
+        char *value,
+        const char *path,
+        int flags,
+        unsigned int len
     ) noexcept {
         prep_rw(
             IORING_OP_SETXATTR, 0, name, len,
@@ -686,8 +689,9 @@ class sq_entry final : private io_uring_sqe {
         return *this;
     }
 
-    inline sq_entry &
-    prep_fgetxattr(int fd, const char *name, char *value, size_t len) noexcept {
+    inline sq_entry &prep_fgetxattr(
+        int fd, const char *name, char *value, unsigned int len
+    ) noexcept {
         prep_rw(
             IORING_OP_FGETXATTR, fd, name, len,
             (uint64_t) reinterpret_cast<uintptr_t>(value)
@@ -697,7 +701,7 @@ class sq_entry final : private io_uring_sqe {
     }
 
     inline sq_entry &prep_fsetxattr(
-        int fd, const char *name, const char *value, int flags, size_t len
+        int fd, const char *name, const char *value, int flags, unsigned int len
     ) noexcept {
         prep_rw(
             IORING_OP_FSETXATTR, fd, name, len,
@@ -710,7 +714,7 @@ class sq_entry final : private io_uring_sqe {
     inline sq_entry &
     prep_socket(int domain, int type, int protocol, unsigned int flags) {
         prep_rw(IORING_OP_SOCKET, domain, nullptr, protocol, type);
-        this->rw_flags = flags;
+        this->rw_flags = static_cast<int>(flags);
         return *this;
     }
 
@@ -722,7 +726,7 @@ class sq_entry final : private io_uring_sqe {
         unsigned int flags
     ) {
         prep_rw(IORING_OP_SOCKET, domain, nullptr, protocol, type);
-        this->rw_flags = flags;
+        this->rw_flags = static_cast<int>(flags);
         return set_target_fixed_file(file_index);
     }
 
@@ -730,7 +734,7 @@ class sq_entry final : private io_uring_sqe {
         int domain, int type, int protocol, unsigned int flags
     ) {
         prep_rw(IORING_OP_SOCKET, domain, nullptr, protocol, type);
-        this->rw_flags = flags;
+        this->rw_flags = static_cast<int>(flags);
         return set_target_fixed_file(IORING_FILE_INDEX_ALLOC - 1);
     }
 };

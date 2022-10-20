@@ -111,20 +111,19 @@ inline namespace lazy {
     }
 
     [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_poll_remove
-    poll_remove(int fd, uint64_t user_data) noexcept {
-        return detail::lazy_poll_remove{fd, user_data};
+    poll_remove(uint64_t user_data) noexcept {
+        return detail::lazy_poll_remove{user_data};
     }
 
     [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_poll_update
     poll_update(
-        int fd,
         uint64_t old_user_data,
         uint64_t new_user_data,
         unsigned poll_mask,
         unsigned flags
     ) noexcept {
         return detail::lazy_poll_update{
-            fd, old_user_data, new_user_data, poll_mask, flags};
+            old_user_data, new_user_data, poll_mask, flags};
     }
 
     [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_fsync
