@@ -1,55 +1,54 @@
-[简中](../README.md) | English(in progress)
+[简中](../README.md) | English
 
 # co_context
 
-A coroutine framework aimed at high-concurrency io with reasonable latency, based on [liburingcxx](https://github.com/Codesire-Deng/liburingcxx).
+A C++20 **coroutine** framework aimed at high-concurrency io with reasonable latency, based on Linux [io_uring](https://github.com/axboe/liburing). 
 
-**co_context** 是一个**协程**异步多线程并发框架，以提供可靠的性能为使命，也致力于减轻用户的心智负担，让 C++ 初学者也能轻松写出高并发程序。
+> For performance reasons, we have rewritten [liburing](https://github.com/axboe/liburing), as [liburingcxx](https://github.com/Codesire-Deng/liburingcxx).
 
-## 已有功能
+## Features
 
-1. 支持 `read` `write` `timeout` 等 io_uring 提供的所有系统调用，总计 74 个功能。
-2. 并发支持: `mutex`, `semaphore`, `condition_variable`, `channel`。
-3. 调度提示: `yield`
+1. Syscalls like `read` `write` `accept` `timeout` which are provided by [io_uring](https://github.com/axboe/liburing), 74 in total.
+2. Concurrency support: `mutex`, `semaphore`, `condition_variable`, `channel`. Provides thread-safty between coroutines. 
+3. Dispatch hint: `yield`
 
 ## Requirement
 
-1. [Optional] [mimalloc](https://github.com/microsoft/mimalloc)  从包管理器或源代码安装。
-2. Linux 内核版本 >= 5.6，建议 >= 5.11，越新越好。
-    - 运行 `uname -r` 即可查看你的内核版本。
-    - 由于开发环境是 Linux 5.19，在其他版本下可能出现兼容性错误。如遇问题，请将报错发到[issue](https://github.com/Codesire-Deng/co_context/issues)或B站私信[@等疾风](https://space.bilibili.com/35186937)，非常感谢！
-    - **docker 将继承宿主机的 Linux 内核版本**。 因此，docker 无法解决 Linux 内核版本过低的问题。
+1. [Optional] [mimalloc](https://github.com/microsoft/mimalloc). You may install it by package manager or from source.
+2. **Linux kernel** >= 5.6. The newer the better.
+    - Run `uname -r` to see your kernel version.
+    - Since we are developing under Linux 6.0, if you have met some thing wrong, please open an [issue](https://github.com/Codesire-Deng/co_context/issues) and I would appreciate it very much.
+    - **docker will inherit the Linux kernel of the host**. Therefore, docker does no help to kernel version problems.
 
 ## Example
 
 ### Basic usage
 
-创建一个 `io_context`，用于运行协程：
+Create an `io_context` to run coroutines: 
 
 ```cpp
     using namespace co_context;
     io_context context;
 ```
 
-定义一个 socket 监听协程：
+Define a `task<>` coroutine who listens and accepts socket connections. `task<>` is just like a normal `void` function but you can use `co_await` inside.
 
 ```cpp
 task<> server(uint16_t port) {
     acceptor ac{inet_address{port}};
-    for (int sockfd; (sockfd = co_await ac.accept()) >= 0;) {// 异步接受 client
-        co_spawn(session(co_context::socket{sockfd})); // 每个连接生成一个 worker 任务
+    for (int sockfd; (sockfd = co_await ac.accept()) >= 0;) {// async accept clients
+        co_spawn(session(co_context::socket{sockfd})); // generate a business coroutine for each
     }
 }
 ```
 
-描述业务逻辑（以 netcat 为例）：
+Define another coroutine to describe business logic, e.g. receive from socket and output to stdout.
 
 ```cpp
 task<> session(co_context::socket sock) {
     char buf[8192];
     int nr = co_await sock.recv(buf);
 
-    // 不断接收字节流并打印到stdout
     while (nr > 0) {
         co_await lazy::write(STDOUT_FILENO, {buf, (size_t)nr});
         nr = co_await sock.recv(buf);
@@ -57,7 +56,7 @@ task<> session(co_context::socket sock) {
 }
 ```
 
-`main()` 函数：
+How to write `main()`:
 
 ```cpp
 int main(int argc, const char *argv[]) {
@@ -66,16 +65,16 @@ int main(int argc, const char *argv[]) {
         return 0;
     }
 
-    io_context context;
+    io_context context; // 1. define io_context
 
     int port = atoi(argv[2]);
     if (strcmp(argv[1], "-l") == 0) {
-        context.co_spawn(server(port)); // 创建一个监听协程
+        context.co_spawn(server(port)); // 2. generate at least one coroutine.
     } else {
-        context.co_spawn(client(argv[1], port)); // 直接连接
+        context.co_spawn(client(argv[1], port));
     }
 
-    context.run(); // 启动 io_context（可选单线程或多线程）
+    context.run(); // 3. finally run()
 
     return 0;
 }
@@ -100,14 +99,14 @@ task<> my_clock() {
 ```cpp
 task<> session(co_context::socket peer) {
     char buf[8192];
-    int nr = co_await timeout(peer.recv(buf), 3s); // 限时3秒
+    int nr = co_await timeout(peer.recv(buf), 3s); // time limit 3s
 
     while (nr > 0) {
         co_await lazy::write(STDOUT_FILENO, {buf, (size_t)nr});
-        nr = co_await timeout(peer.recv(buf), 3s); // 限时3秒
+        nr = co_await timeout(peer.recv(buf), 3s); // time limit 3s
     }
 
-    log_error(-nr);
+    log_error(-nr); // check the error
 }
 
 void log_error(int err) {
@@ -124,7 +123,7 @@ void log_error(int err) {
 
 #### Generator
 
-炫到没朋友的生成器，可配合`std::range`。
+An awesome sequence generator which can play with `std::range`.
 
 ```cpp
 co_context::generator<int> gen_iota(int x) {
@@ -138,7 +137,7 @@ int main() {
     for (int x : gen_iota(1) | drop(5) | take(3)) {
         std::cout << x << " ";
     }
-    // 输出 6 7 8
+    // Output 6 7 8
 
     return 0;
 }
@@ -146,7 +145,7 @@ int main() {
 
 #### Linked IO
 
-用 `&&` 来链接两个 I/O。链接 I/O 可以减少重入内核态和调度器，增强性能表现。（默认只返回最后一个返回值。）
+You can use `&&` to link I/Os。Linking I/Os will enhance performance.（But only the last result will be returned by default.）
 
 ```cpp
 nr = co_await (
@@ -155,13 +154,18 @@ nr = co_await (
 );
 ```
 
-此例子利用 link_io 大幅增强 echo_server 的性能
+This example use link_io in an echo_server.
 
 #### channel（experimental）
 
-借鉴自 Go 语言的阻塞队列。
+An blocking queue inspired by Golang.
 
 [example: channel.cpp](https://github.com/Codesire-Deng/co_context/blob/main/test/channel.cpp)
+
+
+<details>
+
+<summary>Development details(not translated yet)</summary>
 
 ## 协程方案的局限场景
 
@@ -185,9 +189,6 @@ nr = co_await (
 
 ---
 
-<details>
-
-<summary>Draft</summary>
 
 ## 协程存在的问题
 

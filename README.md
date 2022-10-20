@@ -1,4 +1,4 @@
-简中 | [English(in progress)](./doc/README_en.md)
+简中 | [English](./doc/README_en.md)
 
 # co_context
 
