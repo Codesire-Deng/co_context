@@ -727,58 +727,12 @@ void io_context::run() {
 
     while (!will_stop) {
         if constexpr (config::worker_threads_number == 0) {
-            has_task_ready = false;
-            auto num = worker[0].number_to_schedule_relaxed();
-            log::v("worker run %u times...\n", num);
-            while (num--) {
-                worker[0].worker_run_once();
-            }
+            do_worker_part();
         }
 
-        // if (try_clear_submit_overflow_buf()) {
-        // log::v("ctx poll_submission...\n");
-        if constexpr (config::submit_poll_rounds > 1) {
-            for (uint8_t i = 0; i < config::submit_poll_rounds; ++i) {
-                if (!poll_submission()) {
-                    break;
-                }
-            }
-        } else {
-            poll_submission();
-        }
-        // }
+        do_submission_part();
 
-        // TODO judge the memory order (relaxed may cause bugs)
-        // TODO consider reap_poll_rounds and reap_overflow_buf
-        if (requests_to_reap > 0) [[likely]] {
-            auto num = ring.cq_ready_relaxed();
-
-            // io_context can block itself in the following situation
-            if constexpr (config::worker_threads_number == 0 && config::is_using_wait_and_notify) {
-                if (num == 0 && !has_task_ready) [[unlikely]] {
-                    const liburingcxx::cq_entry *_;
-                    ring.wait_cq_entry(_);
-                    num = ring.cq_ready_relaxed();
-                    if constexpr (config::log_level <= config::level::debug) {
-                        if (num == 0) {
-                            log::d("wait_cq_entry() gets 0 cqe.\n");
-                        }
-                    }
-                }
-            }
-
-            // TODO enhance perf here: reuse the internal head-tail
-            // infomation of the ring
-            while (num--) {
-                poll_completion();
-            }
-        } else {
-            if constexpr (config::worker_threads_number == 0) {
-                if (!has_task_ready) [[unlikely]] {
-                    will_stop = true;
-                }
-            }
-        }
+        do_completion_part();
     }
 
     log::d("ctx stopped\n");
