@@ -2,7 +2,7 @@
 
 # co_context
 
-A C++20 **coroutine** framework aimed at high-concurrency io with reasonable latency, based on Linux [io_uring](https://github.com/axboe/liburing). 
+A C++20 **coroutine** framework offering highly-concurrent I/O with a reasonable latency, based on Linux [io_uring](https://github.com/axboe/liburing). 
 
 > For performance reasons, we have rewritten [liburing](https://github.com/axboe/liburing), as [liburingcxx](https://github.com/Codesire-Deng/liburingcxx).
 
