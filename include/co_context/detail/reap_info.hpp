@@ -30,10 +30,13 @@ namespace detail {
         reap_info() noexcept : io_info(nullptr), result(0), flags(0) {}
 
         reap_info(task_info *io_info, int32_t result, uint32_t flags) noexcept
-            : io_info(io_info), result(result), flags(flags) {}
+            : io_info(io_info)
+            , result(result)
+            , flags(flags) {}
 
         explicit reap_info(std::coroutine_handle<> handle) noexcept
-            : handle(handle), flags(co_spawn_flag) {}
+            : handle(handle)
+            , flags(co_spawn_flag) {}
 
         bool is_co_spawn() const noexcept { return flags == co_spawn_flag; }
     };

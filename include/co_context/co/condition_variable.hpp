@@ -18,7 +18,8 @@ namespace detail {
         using mutex = co_context::mutex;
 
         explicit cv_wait_awaiter(condition_variable & cv, mutex & mtx) noexcept
-            : lock_awaken_handle(mtx.lock()), cv(cv) {
+            : lock_awaken_handle(mtx.lock())
+            , cv(cv) {
         }
 
         static constexpr bool await_ready() noexcept {
