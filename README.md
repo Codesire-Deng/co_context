@@ -11,13 +11,20 @@ co_context 基于 Linux io_uring，其性能通常优于 epoll。
 2. 并发支持: `mutex`, `semaphore`, `condition_variable`, `channel`。
 3. 调度提示: `yield`
 
-## 编译和运行环境
+## 编译和运行
+
+### 依赖
 
 1. [Optional] [mimalloc](https://github.com/microsoft/mimalloc)  从包管理器或源代码安装。
 2. Linux 内核版本 >= 5.6，建议 >= 5.11，越新越好。
     - 运行 `uname -r` 即可查看你的内核版本。
     - 由于开发环境是 Linux 5.19，在其他版本下可能出现兼容性错误。如遇问题，请将报错发到[issue](https://github.com/Codesire-Deng/co_context/issues)或B站私信[@等疾风](https://space.bilibili.com/35186937)，非常感谢！
     - **docker 将继承宿主机的 Linux 内核版本**。 因此，docker 无法解决 Linux 内核版本过低的问题。
+
+### 编译命令
+
+1. 根目录下执行：`cmake -B build && cmake --build build -j`
+2. 运行代码示例：`build/example/timer`
 
 ## 代码示例
 
