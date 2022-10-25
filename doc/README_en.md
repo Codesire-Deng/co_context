@@ -12,13 +12,22 @@ A C++20 **coroutine** framework offering highly-concurrent I/O with a reasonable
 2. Concurrency support: `mutex`, `semaphore`, `condition_variable`, `channel`. Provides thread-safty between coroutines. 
 3. Dispatch hint: `yield`
 
-## Requirement
+## Build
+
+### Requirement
 
 1. [Optional] [mimalloc](https://github.com/microsoft/mimalloc). You may install it by package manager or from source.
 2. **Linux kernel** >= 5.6. The newer the better.
     - Run `uname -r` to see your kernel version.
     - Since we are developing under Linux 6.0, if you have met some thing wrong, please open an [issue](https://github.com/Codesire-Deng/co_context/issues) and I would appreciate it very much.
     - **docker will inherit the Linux kernel of the host**. Therefore, docker does no help to kernel version problems.
+
+### Build from source
+
+```bash
+cmake -B build && cmake --build build -j
+build/example/timer # Run an example
+```
 
 ## Example
 
