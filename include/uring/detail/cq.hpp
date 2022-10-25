@@ -52,7 +52,7 @@ namespace detail {
     struct cq_entry_getter {
         unsigned submit;
         unsigned wait_num;
-        unsigned getFlags;
+        unsigned get_flags;
         int size;
         void *arg;
     };

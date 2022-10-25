@@ -58,7 +58,7 @@ namespace config {
     constexpr unsigned default_enter_flags =
         default_enter_flags_registered_ring;
 
-};
+}; // namespace config
 
 constexpr uint64_t LIBURING_UDATA_TIMEOUT = -1;
 
@@ -75,6 +75,12 @@ struct uring_params final : io_uring_params {
         std::memset(this, 0, sizeof(*this));
         this->flags = flags;
     }
+};
+
+struct __peek_cq_entry_return_type final {
+    const cq_entry *cqe;
+    unsigned available_num;
+    int err;
 };
 
 template<unsigned uring_flags>
@@ -191,8 +197,9 @@ class [[nodiscard]] uring final {
 
     void buf_ring_cq_advance(buf_ring &br, unsigned count) noexcept;
 
-    auto __peek_cq_entry() noexcept;
+    __peek_cq_entry_return_type __peek_cq_entry() noexcept;
 
+    template<bool has_ts>
     int _get_cq_entry(
         const cq_entry *(&cqe_ptr), detail::cq_entry_getter &data
     ) noexcept;
@@ -261,7 +268,7 @@ inline int uring<uring_flags>::submit_and_wait_timeout(
         .sz = sizeof(arg),
         .arg = &arg};
 
-    return _get_cq_entry(cqe, data);
+    return _get_cq_entry<true>(cqe, data);
 }
 #endif
 
@@ -714,12 +721,9 @@ uring<uring_flags>::buf_ring_cq_advance(buf_ring &br, unsigned count) noexcept {
  * Internal helper, don't use directly in applications.
  */
 template<unsigned uring_flags>
-auto uring<uring_flags>::__peek_cq_entry() noexcept {
-    struct return_type {
-        const cq_entry *cqe;
-        unsigned available_num;
-        int err = 0;
-    } ret;
+__peek_cq_entry_return_type uring<uring_flags>::__peek_cq_entry() noexcept {
+    __peek_cq_entry_return_type ret;
+    ret.err = 0;
 
     constexpr int shift = bool(uring_flags & IORING_SETUP_CQE32) ? 1 : 0;
     const unsigned mask = cq.ring_mask;
@@ -754,45 +758,61 @@ auto uring<uring_flags>::__peek_cq_entry() noexcept {
 }
 
 template<unsigned uring_flags>
+template<bool has_ts>
 int uring<uring_flags>::_get_cq_entry(
     const cq_entry *(&cqe_ptr), detail::cq_entry_getter &data
 ) noexcept {
-    for (bool is_looped = false; true;) {
+    __peek_cq_entry_return_type peek_result;
+    bool is_looped = false;
+    int err = 0;
+
+    do {
         bool is_need_enter = false;
         unsigned flags = 0;
 
-        auto [cqe, available_num, err] = __peek_cq_entry();
+        peek_result = __peek_cq_entry();
 
-        auto end_up = [&]() -> int {
-            cqe_ptr = cqe;
-            return err;
-        };
-
-        if (err) {
-            return end_up();
+        if (peek_result.err != 0) [[unlikely]] {
+            if (err == 0) {
+                err = peek_result.err;
+            }
+            break;
         }
 
-        if (cqe == nullptr && data.wait_num == 0 && data.submit == 0) {
+        if (peek_result.cqe == nullptr && data.wait_num == 0
+            && data.submit == 0) {
             /*
              * If we already looped once, we already entererd
              * the kernel. Since there's nothing to submit or
              * wait for, don't keep retrying.
              */
             if (is_looped || !is_cq_ring_need_enter()) {
-                err = -EAGAIN;
-                return end_up();
+                if (err == 0) {
+                    err = -EAGAIN;
+                }
+                break;
             }
             is_need_enter = true;
         }
-        if (data.wait_num > available_num || is_need_enter) {
-            flags = IORING_ENTER_GETEVENTS | data.getFlags;
+        if (data.wait_num > peek_result.available_num || is_need_enter) {
+            flags = IORING_ENTER_GETEVENTS | data.get_flags;
             is_need_enter = true;
         }
         if (is_sq_ring_need_enter(data.submit, flags)) {
             is_need_enter = true;
         }
         if (!is_need_enter) {
-            return end_up();
+            break;
+        }
+        if constexpr (has_ts) {
+            if (is_looped) {
+                const auto &arg =
+                    *static_cast<io_uring_getevents_arg *>(data.arg);
+                if (peek_result.cqe == nullptr && arg.ts != 0 && err == 0) {
+                    err = -ETIME;
+                }
+                break;
+            }
         }
 
         // HACK this assumes app will use registered ring.
@@ -808,15 +828,23 @@ int uring<uring_flags>::_get_cq_entry(
         );
 
         if (result < 0) [[unlikely]] {
-            err = -result;
-            return end_up();
+            if (err == 0) {
+                err = -result;
+            }
+            break;
         }
         data.submit -= result;
-        if (cqe != nullptr) {
-            return end_up();
+        if (peek_result.cqe != nullptr) {
+            break;
         }
-        is_looped = true;
-    }
+        if (!is_looped) {
+            is_looped = true;
+            err = result;
+        }
+    } while (true);
+
+    cqe_ptr = peek_result.cqe;
+    return err;
 }
 
 template<unsigned uring_flags>
@@ -829,10 +857,10 @@ inline int uring<uring_flags>::__get_cq_entry(
     detail::cq_entry_getter data{
         .submit = submit,
         .wait_num = wait_num,
-        .getFlags = 0,
+        .get_flags = 0,
         .size = _NSIG / 8,
         .arg = sigmask};
-    return _get_cq_entry(cqe_ptr, data);
+    return _get_cq_entry<false>(cqe_ptr, data);
 }
 
 #if LIBURINGCXX_IS_KERNEL_REACH(5, 11)
@@ -855,10 +883,10 @@ inline int uring<uring_flags>::wait_cq_entries_new(
     detail::cq_entry_getter data = {
         .wait_num = wait_num,
         .get_flags = IORING_ENTER_EXT_ARG,
-        .sz = sizeof(arg),
+        .size = sizeof(arg),
         .arg = &arg};
 
-    return _get_cq_entry(cqe_ptr, data);
+    return _get_cq_entry<true>(cqe_ptr, data);
 }
 #endif
 
