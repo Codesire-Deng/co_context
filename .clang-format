@@ -5,6 +5,7 @@ TabWidth: 4
 Language: Cpp
 # AlignAfterOpenBracket: AlwaysBreak # BlockIndent
 AlignAfterOpenBracket: BlockIndent # BlockIndent
+AlignArrayOfStructures: Right
 AlignConsecutiveBitFields: true
 AlignConsecutiveMacros: true
 AlignEscapedNewlines: Left
@@ -40,20 +41,21 @@ Cpp11BracedListStyle: true
 EmptyLineBeforeAccessModifier: Always
 FixNamespaceComments: true
 IndentCaseLabels: true
-InsertBraces: true
 IndentExternBlock: Indent
 IndentGotoLabels: true
 IndentPPDirectives: None
-# IndentPragmas: false
-IndentRequires: true # llvm 14
+IndentRequires: true # clang-format 14
 IndentWrappedFunctionNames: false
+InsertBraces: true # clang-format 15
+LambdaBodyIndentation: Signature
 KeepEmptyLinesAtTheStartOfBlocks: false
 MaxEmptyLinesToKeep: 1
 NamespaceIndentation: Inner
+PackConstructorInitializers: CurrentLine # clang-format 14
 PointerAlignment: Right
 QualifierAlignment: Left
 ReflowComments: true
-# RequiresClausePosition: OwnLine # llvm 15
+RequiresClausePosition: OwnLine # clang-format 15
 SeparateDefinitionBlocks: Always
 ShortNamespaceLines: 5
 SortIncludes:    false

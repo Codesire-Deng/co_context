@@ -233,7 +233,8 @@ class [[nodiscard]] io_context final {
     }
 
     io_context(unsigned io_uring_entries = config::default_io_uring_entries)
-        : ring(io_uring_entries), sqring_entries(io_uring_entries) {
+        : ring(io_uring_entries)
+        , sqring_entries(io_uring_entries) {
         init();
     }
 
