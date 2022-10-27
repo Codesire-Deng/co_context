@@ -260,7 +260,7 @@ class [[nodiscard("Did you forget to co_await?")]] task {
         : handle(current) {
     }
 
-    task(task && other) noexcept : handle(other) {
+    task(task && other) noexcept : handle(other.handle) {
         other.handle = nullptr;
     }
 
