@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.20.0)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(FORCE_TO_USE_MIMALLOC "Force the use of mimalloc version 2.0 or above" OFF)
+option(BUILD_TESTS "Build the tests" OFF)
 
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -65,6 +66,8 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 
 add_subdirectory(./lib)
 
-add_subdirectory(./test)
+if(BUILD_TESTS)
+    add_subdirectory(./test)
+endif()
 
 add_subdirectory(./example)
