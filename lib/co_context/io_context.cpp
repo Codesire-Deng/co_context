@@ -673,6 +673,8 @@ inline void io_context::do_submission_part() noexcept {
 inline void io_context::do_completion_part() {
     // TODO judge the memory order (relaxed may cause bugs)
     // TODO consider reap_poll_rounds and reap_overflow_buf
+    // NOTE in the future: if an IO generates multiple requests_to_reap，
+    // it must be counted carefully
     if (requests_to_reap > 0) [[likely]] {
         auto num = ring.cq_ready_relaxed();
 
@@ -719,6 +721,7 @@ void io_context::run() {
 #endif
     log::i("io_context runs on %d\n", gettid());
 
+    // init {thread pool as workers} or init {this thread as the only worker}
     if constexpr (config::worker_threads_number > 0) {
         make_thread_pool();
     } else {
