@@ -36,7 +36,9 @@ struct reap_info {
         : handle(handle)
         , flags(co_spawn_flag) {}
 
-    [[nodiscard]] bool is_co_spawn() const noexcept { return flags == co_spawn_flag; }
+    [[nodiscard]] bool is_co_spawn() const noexcept {
+        return flags == co_spawn_flag;
+    }
 };
 
 } // namespace co_context::detail

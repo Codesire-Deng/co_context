@@ -32,9 +32,13 @@ class inet_address {
      */
     explicit inet_address(const struct sockaddr &saddr) noexcept;
 
-    [[nodiscard]] sa_family_t family() const noexcept { return addr.sin_family; }
+    [[nodiscard]] sa_family_t family() const noexcept {
+        return addr.sin_family;
+    }
 
-    [[nodiscard]] uint16_t port() const noexcept { return ntohs(addr.sin_port); }
+    [[nodiscard]] uint16_t port() const noexcept {
+        return ntohs(addr.sin_port);
+    }
 
     inet_address &reset_port(uint16_t port) noexcept {
         addr.sin_port = htons(port);
