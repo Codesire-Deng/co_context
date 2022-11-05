@@ -388,9 +388,11 @@ struct lazy_link_timeout : lazy_link_io {
         unsigned int flags
     ) noexcept
         : timer(duration, flags) {
-        // Mark timed_io as normal task type, and set sqe link.
+        // Mark timed_io as normal task type, but set sqe link.
         timed_io.sqe->set_link();
-        // Mark timer as lazy_link_sqe task type, and without sqe link.
+        // Mark timer as lazy_link_sqe task type, but without sqe link.
+        // The purpose is to make io_context to handle the timed_io and ignore
+        // the timer.
         timer.io_info.type = task_info::task_type::lazy_link_sqe;
         // Send the result to timed_io.
         this->last_io = &timed_io;

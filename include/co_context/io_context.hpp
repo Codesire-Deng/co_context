@@ -24,6 +24,7 @@
 #include "co_context/detail/submit_info.hpp"
 #include "co_context/detail/task_info.hpp"
 #include "co_context/detail/thread_meta.hpp"
+#include "co_context/detail/uring_type.hpp"
 #include "co_context/detail/worker_meta.hpp"
 #include "co_context/task.hpp"
 #include <queue>
@@ -37,19 +38,10 @@ using config::cache_line_size;
 class io_context;
 
 class [[nodiscard]] io_context final {
-  private:
-    using uring = liburingcxx::uring<
-        config::io_uring_setup_flags
-#if LIBURINGCXX_IS_KERNEL_REACH(5, 19)
-        /**
-         * @note IORING_SETUP_COOP_TASKRUN is used because only one thread can
-         * access the ring
-         */
-        // PERF check IORING_SETUP_TASKRUN_FLAG
-        | config::io_uring_coop_taskrun_flag
-#endif
-        >;
+  public:
+    using uring = detail::uring;
 
+  private:
     using task_info = detail::task_info;
 
     friend struct detail::worker_meta;

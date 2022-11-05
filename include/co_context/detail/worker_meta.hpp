@@ -5,6 +5,7 @@
 #include "co_context/detail/submit_info.hpp"
 #include "co_context/detail/swap_zone.hpp"
 #include "co_context/detail/thread_meta.hpp"
+#include "co_context/detail/uring_type.hpp"
 #include "co_context/log/log.hpp"
 #include "co_context/task.hpp"
 #include <queue>
@@ -43,7 +44,7 @@ struct worker_meta final {
     alignas(config::cache_line_size) sharing_zone sharing;
 
     alignas(config::cache_line_size) io_context *ctx = nullptr;
-    cur_t local_submit_tail = 0;
+    detail::uring *ring = nullptr;
     tid_t tid;
     std::thread host_thread;
     /*
@@ -52,9 +53,7 @@ struct worker_meta final {
 
     liburingcxx::sq_entry *get_free_sqe() noexcept;
 
-    [[deprecated]] void swap_last_two_sqes() noexcept;
-
-    void submit_sqe() noexcept;
+    void submit_sqe() const noexcept;
 
     void submit_non_sqe(uintptr_t typed_task) noexcept;
 

@@ -131,6 +131,8 @@ class [[nodiscard]] uring final {
 
     [[nodiscard]] sq_entry *get_sq_entry() noexcept;
 
+    template<typename = void>
+        requires(bool(uring_flags &uring_setup::sqe_reorder))
     void append_sq_entry(const sq_entry *sqe) noexcept;
 
     int wait_sq_ring();
@@ -333,8 +335,10 @@ inline sq_entry *uring<uring_flags>::get_sq_entry() noexcept {
  * @param sqe
  */
 template<uint64_t uring_flags>
+template<typename>
+    requires(bool(uring_flags &uring_setup::sqe_reorder))
 void uring<uring_flags>::append_sq_entry(const sq_entry *sqe) noexcept {
-    sq.append_sq_entry(sqe);
+    sq.template append_sq_entry<uring_flags>(sqe);
 }
 
 /**
