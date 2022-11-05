@@ -8,7 +8,7 @@ namespace co_context {
 
 template<std::unsigned_integral T, T capacity>
 struct spsc_cursor {
-    static_assert(is_pow_of_two(capacity));
+    static_assert(std::has_single_bit(capacity));
     // Check config::swap_capacity_size_t if this assertion fails.
     static_assert(std::atomic<T>::is_always_lock_free);
     inline static constexpr T mask = capacity - 1;
