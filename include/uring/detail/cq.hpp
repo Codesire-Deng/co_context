@@ -4,7 +4,7 @@
 
 namespace liburingcxx {
 
-template<unsigned uring_flags>
+template<uint64_t uring_flags>
 class uring;
 
 namespace detail {
@@ -43,7 +43,7 @@ namespace detail {
         }
 
       public:
-        template<unsigned uring_flags>
+        template<uint64_t uring_flags>
         friend class ::liburingcxx::uring;
         completion_queue() noexcept = default;
         ~completion_queue() noexcept = default;

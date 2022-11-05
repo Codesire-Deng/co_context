@@ -6,7 +6,7 @@
 
 namespace liburingcxx {
 
-template<unsigned uring_flags>
+template<uint64_t uring_flags>
 class uring;
 
 class buf_ring final : private io_uring_buf_ring {
@@ -39,7 +39,7 @@ class buf_ring final : private io_uring_buf_ring {
     }
 
   public:
-    template<unsigned uring_flags>
+    template<uint64_t uring_flags>
     friend class ::liburingcxx::uring;
 };
 
