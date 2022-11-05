@@ -53,7 +53,7 @@ class condition_variable final {
     using cv_wait_awaiter = detail::cv_wait_awaiter;
     using task_info = detail::task_info;
     using T = config::condition_variable_counting_t;
-    inline static constexpr T notify_all_flag = bit_top<T>();
+    inline static constexpr T notify_all_flag = bit_top<T>;
 
   public:
     condition_variable() noexcept

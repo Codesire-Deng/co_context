@@ -25,7 +25,7 @@ namespace detail {
         int32_t result;
         uint32_t flags;
 
-        inline static constexpr uint32_t co_spawn_flag = bit_top<uint32_t>();
+        inline static constexpr uint32_t co_spawn_flag = bit_top<uint32_t>;
 
         reap_info() noexcept : io_info(nullptr), result(0), flags(0) {}
 
