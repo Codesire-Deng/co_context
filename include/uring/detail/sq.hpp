@@ -7,7 +7,7 @@
 
 namespace liburingcxx {
 
-template<unsigned uring_flags>
+template<uint64_t uring_flags>
 class uring;
 
 namespace detail {
@@ -57,7 +57,7 @@ namespace detail {
          * @return unsigned number of pending items in the SQ ring, for the
          * shared ring.
          */
-        template<unsigned uring_flags>
+        template<uint64_t uring_flags>
         unsigned flush() noexcept {
             if (sqe_tail != sqe_head) [[likely]] {
                 /*
@@ -94,7 +94,7 @@ namespace detail {
          * @brief Returns number of unconsumed (if SQPOLL) or unsubmitted
          * entries exist in the SQ ring
          */
-        template<unsigned uring_flags>
+        template<uint64_t uring_flags>
         inline unsigned pending() const noexcept {
             /*
              * Without a barrier, we could miss an update and think the SQ
@@ -131,7 +131,7 @@ namespace detail {
          * The sqes from sqe_free_head(included) to khead(not included) are all
          * free and available for application.
          */
-        template<unsigned uring_flags>
+        template<uint64_t uring_flags>
         [[nodiscard]] inline sq_entry *get_sq_entry() noexcept {
             constexpr int shift =
                 bool(uring_flags & IORING_SETUP_SQE128) ? 1 : 0;
@@ -156,7 +156,7 @@ namespace detail {
         }
 
       public:
-        template<unsigned uring_flags>
+        template<uint64_t uring_flags>
         friend class ::liburingcxx::uring;
         submission_queue() noexcept = default;
         ~submission_queue() noexcept = default;

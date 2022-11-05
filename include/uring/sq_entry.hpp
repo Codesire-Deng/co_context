@@ -16,12 +16,12 @@ struct statx;
 
 namespace liburingcxx {
 
-template<unsigned uring_flags>
+template<uint64_t uring_flags>
 class uring;
 
 class sq_entry final : private io_uring_sqe {
   public:
-    template<unsigned uring_flags>
+    template<uint64_t uring_flags>
     friend class ::liburingcxx::uring;
 
     inline sq_entry &clone_from(const sq_entry &other) noexcept {
