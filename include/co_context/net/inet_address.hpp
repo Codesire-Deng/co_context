@@ -25,30 +25,30 @@ class inet_address {
     /**
      * @brief for listening
      */
-    inet_address(uint16_t port, bool is_ipv6 = false) noexcept;
+    explicit inet_address(uint16_t port, bool is_ipv6 = false) noexcept;
 
     /**
      * @brief for Sockets API
      */
     explicit inet_address(const struct sockaddr &saddr) noexcept;
 
-    sa_family_t family() const noexcept { return addr.sin_family; }
+    [[nodiscard]] sa_family_t family() const noexcept { return addr.sin_family; }
 
-    uint16_t port() const noexcept { return ntohs(addr.sin_port); }
+    [[nodiscard]] uint16_t port() const noexcept { return ntohs(addr.sin_port); }
 
     inet_address &reset_port(uint16_t port) noexcept {
         addr.sin_port = htons(port);
         return *this;
     }
 
-    std::string to_ip() const;
-    std::string to_ip_port() const;
+    [[nodiscard]] std::string to_ip() const;
+    [[nodiscard]] std::string to_ip_port() const;
 
-    const struct sockaddr *get_sockaddr() const noexcept {
+    [[nodiscard]] const struct sockaddr *get_sockaddr() const noexcept {
         return reinterpret_cast<const struct sockaddr *>(&addr6);
     }
 
-    socklen_t length() const noexcept {
+    [[nodiscard]] socklen_t length() const noexcept {
         return family() == AF_INET6 ? sizeof(addr6) : sizeof(addr);
     }
 

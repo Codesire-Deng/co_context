@@ -1,3 +1,4 @@
+#include <bits/align.h>
 #ifdef USE_MIMALLOC
 #include <mimalloc-new-delete.h>
 #endif
@@ -241,8 +242,8 @@ void io_context::forward_task(std::coroutine_handle<> handle) noexcept {
     has_task_ready = true;
     // TODO optimize scheduling strategy
     if (try_find_reap_worker_relaxed()) [[likely]] {
-        auto &cur = worker[r_cur].sharing.reap_cur;
-        auto &reap_swap = worker[r_cur].sharing.reap_swap;
+        auto &cur = workers[r_cur].sharing.reap_cur;
+        auto &reap_swap = workers[r_cur].sharing.reap_swap;
         log::v(
             "ctx forward_task to [%u][%u]: %lx\n", r_cur, cur.tail(),
             handle.address()
@@ -326,10 +327,11 @@ void io_context::handle_condition_variable_notify(task_info *cv_notify
 
 bool io_context::try_find_submit_worker_relaxed() noexcept {
     if constexpr (config::workers_number == 1) {
-        return !this->worker[0].sharing.submit_cur.is_empty_load_tail_relaxed();
+        return !this->workers[0].sharing.submit_cur.is_empty_load_tail_relaxed(
+        );
     } else {
         for (config::tid_t i = 0; i < config::workers_number; ++i) {
-            if (!this->worker[s_cur]
+            if (!this->workers[s_cur]
                      .sharing.submit_cur.is_empty_load_tail_relaxed()) {
                 return true;
             }
@@ -341,10 +343,10 @@ bool io_context::try_find_submit_worker_relaxed() noexcept {
 
 [[deprecated]] bool io_context::try_find_submit_worker_acquire() noexcept {
     if constexpr (config::workers_number == 1) {
-        return !this->worker[0].sharing.submit_cur.is_empty_load_tail();
+        return !this->workers[0].sharing.submit_cur.is_empty_load_tail();
     } else {
         for (config::tid_t i = 0; i < config::workers_number; ++i) {
-            if (!this->worker[s_cur].sharing.submit_cur.is_empty_load_tail()) {
+            if (!this->workers[s_cur].sharing.submit_cur.is_empty_load_tail()) {
                 return true;
             }
             cur_next(s_cur);
@@ -355,10 +357,11 @@ bool io_context::try_find_submit_worker_relaxed() noexcept {
 
 [[deprecated]] bool io_context::try_find_reap_worker_acquire() noexcept {
     if constexpr (config::workers_number == 1) {
-        return this->worker[0].sharing.reap_cur.is_available_load_head();
+        return this->workers[0].sharing.reap_cur.is_available_load_head();
     } else {
         for (config::tid_t i = 0; i < config::workers_number; ++i) {
-            if (this->worker[r_cur].sharing.reap_cur.is_available_load_head()) {
+            if (this->workers[r_cur].sharing.reap_cur.is_available_load_head(
+                )) {
                 return true;
             }
             cur_next(r_cur);
@@ -369,10 +372,10 @@ bool io_context::try_find_submit_worker_relaxed() noexcept {
 
 bool io_context::try_find_reap_worker_relaxed() noexcept {
     if constexpr (config::workers_number == 1) {
-        return this->worker[0].sharing.reap_cur.is_available();
+        return this->workers[0].sharing.reap_cur.is_available();
     } else {
         for (config::tid_t i = 0; i < config::workers_number; ++i) {
-            if (this->worker[r_cur].sharing.reap_cur.is_available()) {
+            if (this->workers[r_cur].sharing.reap_cur.is_available()) {
                 return true;
             }
             cur_next(r_cur);
@@ -431,8 +434,8 @@ bool io_context::poll_submission() noexcept {
     if (!try_find_submit_worker_relaxed()) {
         return false;
     }
-    auto &cur = worker[s_cur].sharing.submit_cur;
-    auto &swap = worker[s_cur].sharing.submit_swap;
+    auto &cur = workers[s_cur].sharing.submit_cur;
+    auto &swap = workers[s_cur].sharing.submit_swap;
 
     log::v("ctx found submission start from [%u][%u]\n", s_cur, cur.head());
 
@@ -483,8 +486,8 @@ bool io_context::try_reap(detail::reap_info info) noexcept {
         return false;
     }
 
-    auto &cur = worker[r_cur].sharing.reap_cur;
-    auto &reap_swap = worker[r_cur].sharing.reap_swap;
+    auto &cur = workers[r_cur].sharing.reap_cur;
+    auto &reap_swap = workers[r_cur].sharing.reap_swap;
 
     log::v("ctx try_reap at [%u][%u]\n", r_cur, cur.tail());
     reap_swap.push_notify(cur, info);
@@ -545,9 +548,10 @@ inline void io_context::poll_completion() noexcept {
 
     if constexpr (config::enable_eager_io) {
         if (user_data & uint64_t(task_type::eager_sqe)) [[unlikely]] {
-            task_info *const eager_io_info = reinterpret_cast<task_info *>(
-                user_data ^ uint64_t(task_type::eager_sqe)
-            );
+            auto *const eager_io_info =
+                std::assume_aligned<8>(reinterpret_cast /*NOLINT*/<task_info *>(
+                    user_data ^ uint64_t(task_type::eager_sqe)
+                ));
             eager_io_info->result = result;
             if (eager_io_need_awake(eager_io_info)) [[likely]] {
                 reap_or_overflow(detail::reap_info{eager_io_info->handle});
@@ -610,9 +614,9 @@ void io_context::init() {
         }
     }
 
-    for (unsigned i = 0; i < config::workers_number; ++i) {
+    for (auto &worker : workers) {
         for (unsigned j = 0; j < config::swap_capacity; ++j) {
-            worker[i].sharing.submit_swap[j] = detail::submit_info{
+            worker.sharing.submit_swap[j] = detail::submit_info{
                 .address = 0UL, .available_sqe = ring.get_sq_entry()};
         }
     }
@@ -625,7 +629,7 @@ void io_context::probe() const {
     log::i("size of io_context: %u\n", sizeof(io_context));
     log::i("size of uring: %u\n", sizeof(uring));
     log::i("atomic::is_lock_free: %d\n", std::atomic<void *>{}.is_lock_free());
-    log::i("size of each worker: %u\n", sizeof(worker[0]));
+    log::i("size of each worker: %u\n", sizeof(workers[0]));
     log::i("number of worker_threads: %u\n", worker_threads_number);
     log::i("number of workers: %u\n", workers_number);
     log::i("swap_capacity per thread: %u\n", swap_capacity);
@@ -637,8 +641,8 @@ inline void io_context::make_thread_pool() {
     log::v("ctx make_thread_pool()...\n");
 
     for (config::tid_t i = 0; i < config::worker_threads_number; ++i) {
-        worker[i].host_thread =
-            std::thread{&worker_meta::worker_run_loop, worker + i, i, this};
+        workers[i].host_thread =
+            std::thread{&worker_meta::worker_run_loop, workers + i, i, this};
     }
 
     log::v("ctx make_thread_pool()...OK\n");
@@ -708,10 +712,10 @@ inline void io_context::do_completion_part() {
 
 inline void io_context::do_worker_part() {
     has_task_ready = false;
-    auto num = worker[0].number_to_schedule_relaxed();
+    auto num = workers[0].number_to_schedule_relaxed();
     log::v("worker run %u times...\n", num);
     while (num-- > 0) {
-        worker[0].worker_run_once();
+        workers[0].worker_run_once();
     }
 }
 
@@ -725,7 +729,7 @@ void io_context::run() {
     if constexpr (config::worker_threads_number > 0) {
         make_thread_pool();
     } else {
-        worker[0].init(0, this);
+        workers[0].init(0, this);
     }
 
     while (!will_stop) {

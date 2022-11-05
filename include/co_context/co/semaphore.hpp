@@ -70,7 +70,7 @@ class counting_semaphore final {
     task_info awaken_task;
 
   public:
-    static consteval auto __task_offset() noexcept {
+    static consteval auto __task_offset() /*NOLINT*/ noexcept {
         return offsetof(counting_semaphore, awaken_task);
     }
 };

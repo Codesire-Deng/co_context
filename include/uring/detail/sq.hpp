@@ -37,6 +37,7 @@ namespace detail {
 
       private:
         void set_offset(const io_sqring_offsets &off) noexcept {
+            // NOLINTBEGIN
             khead = (unsigned *)((uintptr_t)ring_ptr + off.head);
             ktail = (unsigned *)((uintptr_t)ring_ptr + off.tail);
             ring_mask = *(unsigned *)((uintptr_t)ring_ptr + off.ring_mask);
@@ -45,6 +46,7 @@ namespace detail {
             kflags = (unsigned *)((uintptr_t)ring_ptr + off.flags);
             kdropped = (unsigned *)((uintptr_t)ring_ptr + off.dropped);
             array = (unsigned *)((uintptr_t)ring_ptr + off.array);
+            // NOLINTEND
         }
 
         void init_free_queue() noexcept {
@@ -95,7 +97,7 @@ namespace detail {
          * entries exist in the SQ ring
          */
         template<uint64_t uring_flags>
-        inline unsigned pending() const noexcept {
+        [[nodiscard]] inline unsigned pending() const noexcept {
             /*
              * Without a barrier, we could miss an update and think the SQ
              * wasn't ready. We don't need the load acquire for non-SQPOLL since

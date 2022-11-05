@@ -1,6 +1,7 @@
 #pragma once
 
 #include "uring/io_uring.h"
+#include "uring/uring_define.hpp"
 #include <bit>
 #include <cstddef>
 #include <cstdint>
@@ -9,7 +10,7 @@ namespace co_context {
 
 namespace config {
 
-    // ======================== io_uring configuration ========================
+    // ================== io_uring/liburingcxx configuration ==================
     inline constexpr unsigned io_uring_setup_flags = 0;
     // inline constexpr unsigned io_uring_setup_flags = IORING_SETUP_SQPOLL;
 
@@ -23,6 +24,8 @@ namespace config {
         bool(io_uring_setup_flags & IORING_SETUP_SQPOLL)
             ? 0
             : (IORING_SETUP_COOP_TASKRUN | IORING_SETUP_TASKRUN_FLAG);
+
+    inline constexpr uint64_t uring_setup_flags = 0;
     // ========================================================================
 
     // ========================== CPU configuration ===========================

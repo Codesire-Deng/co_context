@@ -6,6 +6,7 @@
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/detail/worker_meta.hpp"
 #include "co_context/utility/as_atomic.hpp"
+#include <cstdint>
 #include <memory>
 #include <span>
 
@@ -15,7 +16,7 @@ namespace detail {
 
     class eager_awaiter {
       public:
-        inline bool is_ready() const noexcept {
+        [[nodiscard]] inline bool is_ready() const noexcept {
             return bool(
                 as_atomic(shared_io_info->eager_io_state)
                     .load(std::memory_order_acquire)
@@ -23,7 +24,7 @@ namespace detail {
             );
         }
 
-        bool await_ready() const noexcept { return is_ready(); }
+        [[nodiscard]] bool await_ready() const noexcept { return is_ready(); }
 
         // std::coroutine_handle<>
         bool await_suspend(std::coroutine_handle<> current) noexcept {
@@ -217,7 +218,7 @@ namespace detail {
     };
 
     struct eager_close : eager_awaiter {
-        inline eager_close(int fd) noexcept {
+        inline explicit eager_close(int fd) noexcept {
             sqe->prep_close(fd);
             submit();
         }
@@ -398,7 +399,7 @@ namespace detail {
             ts.tv_sec = duration / 1s;
             duration -= chrono::seconds(ts.tv_sec);
             ts.tv_nsec =
-                duration_cast<chrono::duration<long long, std::nano>>(duration)
+                duration_cast<chrono::duration<uint64_t, std::nano>>(duration)
                     .count();
             sqe->prep_timeout(ts, 0, flags);
             submit();

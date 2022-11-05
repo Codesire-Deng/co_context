@@ -37,7 +37,7 @@ class alignas(128 /*std::hardware_destructive_interference_size*/) Guide {
         started_at = std::chrono::high_resolution_clock::now();
     }
 
-    task<void> initial_delay() { co_await timeout(delay * time_tick); }
+    task<void> initial_delay() const { co_await timeout(delay * time_tick); }
 
     task<void> occupy_sema() {
         wait_on_sema = static_cast<unsigned>(

@@ -66,7 +66,7 @@ class [[nodiscard]] io_context final {
     alignas(cache_line_size) uring ring;
 
     // The meta data of worker(s)
-    alignas(cache_line_size) worker_meta worker[config::workers_number];
+    alignas(cache_line_size) worker_meta workers[config::workers_number];
 
     /**
      * ---------------------------------------------------
@@ -232,7 +232,9 @@ class [[nodiscard]] io_context final {
         init();
     }
 
-    io_context(unsigned io_uring_entries = config::default_io_uring_entries)
+    explicit io_context(
+        unsigned io_uring_entries = config::default_io_uring_entries
+    )
         : ring(io_uring_entries)
         , sqring_entries(io_uring_entries) {
         init();
@@ -253,9 +255,9 @@ class [[nodiscard]] io_context final {
 
     ~io_context() noexcept {
         for (int i = 0; i < config::worker_threads_number; ++i) {
-            std::thread &t = worker[i].host_thread;
-            if (t.joinable()) {
-                t.join();
+            std::thread &worker_thread = workers[i].host_thread;
+            if (worker_thread.joinable()) {
+                worker_thread.join();
             }
         }
     }
