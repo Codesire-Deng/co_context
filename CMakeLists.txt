@@ -30,6 +30,10 @@ add_compile_definitions(LIBURINGCXX_KERNEL_VERSION_MAJOR=${kernel_version_major}
 add_compile_definitions(LIBURINGCXX_KERNEL_VERSION_PATCHLEVEL=${kernel_version_patchlevel})
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "11.3.0")
+        message(FATAL_ERROR "Insufficient gcc version, requires gcc 11.3 or above")
+    endif()
+
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 
     if (${CMAKE_BUILD_TYPE} MATCHES Debug)
