@@ -239,7 +239,8 @@ class [[nodiscard("Did you forget to co_await?")]] task {
     struct awaiter_base {
         std::coroutine_handle<promise_type> handle;
 
-        explicit awaiter_base(std::coroutine_handle<promise_type> current) noexcept
+        explicit awaiter_base(std::coroutine_handle<promise_type> current
+        ) noexcept
             : handle(current) {}
 
         [[nodiscard]] inline bool await_ready() const noexcept {

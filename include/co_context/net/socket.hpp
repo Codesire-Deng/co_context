@@ -65,15 +65,18 @@ class socket {
         return lazy::recv(sockfd, buf, flags);
     }
 
-    [[nodiscard]] auto eager_recv(std::span<char> buf, int flags = 0) const noexcept {
+    [[nodiscard]] auto
+    eager_recv(std::span<char> buf, int flags = 0) const noexcept {
         return eager::recv(sockfd, buf, flags);
     }
 
-    [[nodiscard]] auto send(std::span<const char> buf, int flags = 0) const noexcept {
+    [[nodiscard]] auto
+    send(std::span<const char> buf, int flags = 0) const noexcept {
         return lazy::send(sockfd, buf, flags);
     }
 
-    [[nodiscard]] auto eager_send(std::span<const char> buf, int flags = 0) const noexcept {
+    [[nodiscard]] auto
+    eager_send(std::span<const char> buf, int flags = 0) const noexcept {
         return eager::send(sockfd, buf, flags);
     }
 
