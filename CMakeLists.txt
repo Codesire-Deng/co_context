@@ -50,7 +50,7 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 
     message("CMAKE_CXX_FLAGS = ${CMAKE_CXX_FLAGS}")
 else()
-    message(WARNING "Not using GNU g++ for CXX, the compiler id is ${CMAKE_CXX_COMPILER_ID}.")
+    message(FATAL_ERROR "GNU g++ is required, but the compiler id is ${CMAKE_CXX_COMPILER_ID}.\nPS: Neither Clang nor MSVC are supported yet.")
 endif()
 
 if (FORCE_TO_USE_MIMALLOC)
