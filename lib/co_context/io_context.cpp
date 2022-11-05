@@ -1,13 +1,15 @@
-#include <bits/align.h>
 #ifdef USE_MIMALLOC
 #include <mimalloc-new-delete.h>
 #endif
-#include "co_context/io_context.hpp"
+#include "co_context/config.hpp"
 #include "co_context/co/condition_variable.hpp"
 #include "co_context/co/semaphore.hpp"
 #include "co_context/detail/eager_io_state.hpp"
+#include "co_context/io_context.hpp"
 #include "co_context/utility/set_cpu_affinity.hpp"
+#include "uring/uring_define.hpp"
 #include <atomic>
+#include <memory>
 
 // fold level = 3 (ctrl+a, ctrl+k, ctrl+3 in vscode)
 // unfold all (ctrl+a, ctrl+k, ctrl+j in vscode)
@@ -24,9 +26,11 @@ namespace detail {
         assert(submit_overflow_buf.empty());
         */
         detail::this_thread.ctx = context;
+        detail::this_thread.ring = std::addressof(context->ring);
         detail::this_thread.worker = this;
         detail::this_thread.tid = thread_index;
         this->ctx = context;
+        this->ring = std::addressof(context->ring);
         this->tid = thread_index;
 #ifdef CO_CONTEXT_USE_CPU_AFFINITY
         if constexpr (config::worker_threads_number > 0) {
@@ -48,82 +52,34 @@ namespace detail {
     }
 
     liburingcxx::sq_entry *worker_meta::get_free_sqe() noexcept {
-        // may acquire the cur.head
         auto &swap = this->sharing.submit_swap;
-        const auto &cur = this->sharing.submit_cur;
-        // TODO check this memory order
-        cur.wait_for_available();
-        /*
-        while (!cur.is_available_load_head()) [[unlikely]] {
-                log::d(
-                    "worker[%u] sleep because get_free_sqe overflow! "
-                    "(io_context is too slow)\n",
-                    tid
-                );
-                std::this_thread::sleep_for(std::chrono::microseconds(1));
-            }
-        */
-        submit_info &submit_tail = swap[local_submit_tail++ & cur.mask];
-        assert(submit_tail.available_sqe != nullptr);
-        submit_tail.address = 0UL;
-        return submit_tail.available_sqe;
-    }
-
-    void worker_meta::swap_last_two_sqes() noexcept {
-        // may acquire the cur.head
-        auto &swap = this->sharing.submit_swap;
-        const auto &cur = this->sharing.submit_cur;
-        auto &sqe_0 = swap[(local_submit_tail - 1) & cur.mask].available_sqe;
-        auto &sqe_1 = swap[(local_submit_tail - 2) & cur.mask].available_sqe;
-        std::swap(sqe_0, sqe_1);
-    }
-
-    void worker_meta::submit_sqe() noexcept {
-        [[maybe_unused]] const auto &swap = this->sharing.submit_swap;
         auto &cur = this->sharing.submit_cur;
-        // assert(swap[cur.tail()].sqe == info.sqe);
-        // cur.push(1);
-        cur.store_raw_tail(local_submit_tail);
-        log::v(
-            "worker[%u] submit_sqe to [%u]\n", this_thread.tid,
-            (local_submit_tail - 1U) & cur.mask
-        );
+
+        cur.wait_for_available();
+        const auto tail = cur.tail();
+
+        swap[tail].address = 0UL;
+        log::v("worker[%u] get_free_sqe at [%u]\n", this_thread.tid, tail);
+        cur.push(1);
+        return this->ring->get_sq_entry();
+    }
+
+    void worker_meta::submit_sqe() const noexcept {
+        const auto &cur = this->sharing.submit_cur;
+        const auto tail = cur.tail();
+        log::v("worker[%u] submit_sqe(s) at [%u]\n", this_thread.tid, tail);
     }
 
     void worker_meta::submit_non_sqe(uintptr_t typed_task) noexcept {
         auto &swap = this->sharing.submit_swap;
         auto &cur = this->sharing.submit_cur;
-        // std::cerr << cur.slot << " " << tid << cur.off << std::endl;
+
         cur.wait_for_available();
-        /*
-        while (!cur.is_available_load_head()) [[unlikely]] {
-                log::d(
-                    "worker[%u] sleep because submit_non_sqe overflow! "
-                    "(io_context is too slow)\n",
-                    tid
-                );
-                std::this_thread::sleep_for(std::chrono::microseconds(1));
-            }
-        */
+        const auto tail = cur.tail();
 
-        swap[cur.tail()].address = typed_task;
+        swap[tail].address = typed_task;
+        log::v("worker[%u] submit_non_sqe at [%u]\n", this_thread.tid, tail);
         cur.push(1);
-        log::v(
-            "worker[%u] submit_non_sqe at [%u]\n", this_thread.tid,
-            local_submit_tail & cur.mask
-        );
-        ++local_submit_tail;
-        assert(local_submit_tail == cur.raw_tail());
-
-        /*
-        if (submit_overflow_buf.empty() && cur.is_available()) [[likely]] {
-            log::v("worker[%u] submit at [%u]\n", tid, cur.tail());
-            swap.push(cur, info);
-        } else {
-            this->submit_overflow_buf.push(info);
-            log::d("worker[%u] submit to OF (io_context is too slow)\n", tid);
-        }
-        */
     }
 
     /*
@@ -390,21 +346,17 @@ void io_context::try_submit(detail::submit_info &info) noexcept {
         // submit to ring
         ++requests_to_reap;
         log::v(
-            "ring.append_sq_entry()"
+            "io_context::try_submit"
             " with requests_to_reap=%d...\n",
             requests_to_reap
         );
         need_ring_submit = true;
-        ring.append_sq_entry(info.submit_sqe);
-        auto *const victim_sqe = ring.get_sq_entry();
-        assert(victim_sqe != nullptr && "ring.get_sq_entry() returns nullptr!");
-        // log::e("victim_sqe OK\n");
-        info.available_sqe = victim_sqe;
-        log::v("ring.append_sq_entry()...OK\n");
         return;
     } else {
         using submit_type = detail::submit_type;
-        task_info *const io_info = detail::raw_task_info_ptr(info.address);
+        task_info *const io_info = std::assume_aligned<alignof(task_info)>(
+            detail::raw_task_info_ptr(info.address)
+        );
 
         // PERF May call cur.pop() to make worker start sooner.
         switch (uint32_t(info.address) & 0b111U) {
@@ -568,7 +520,9 @@ inline void io_context::poll_completion() noexcept {
         }
     }
 
-    task_info *const io_info = detail::raw_task_info_ptr(user_data);
+    task_info *const io_info = std::assume_aligned<alignof(task_info)>(
+        detail::raw_task_info_ptr(user_data)
+    );
     reap_or_overflow(detail::reap_info{io_info, result, flags});
 }
 
@@ -616,8 +570,7 @@ void io_context::init() {
 
     for (auto &worker : workers) {
         for (unsigned j = 0; j < config::swap_capacity; ++j) {
-            worker.sharing.submit_swap[j] = detail::submit_info{
-                .address = 0UL, .available_sqe = ring.get_sq_entry()};
+            worker.sharing.submit_swap[j] = detail::submit_info{.address = 0UL};
         }
     }
     // probe();

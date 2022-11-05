@@ -20,11 +20,6 @@ struct submit_info {
         uintptr_t sem_rel_task;
         uintptr_t cv_notify_task;
     };
-
-    union {
-        liburingcxx::sq_entry *available_sqe;
-        liburingcxx::sq_entry *submit_sqe;
-    };
 };
 
 enum submit_type : uint8_t { co_spawn, sem_rel, cv_notify };

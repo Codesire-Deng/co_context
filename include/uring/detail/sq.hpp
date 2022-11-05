@@ -2,6 +2,7 @@
 
 #include "uring/barrier.h"
 #include "uring/sq_entry.hpp"
+#include "uring/uring_define.hpp"
 #include <cassert>
 #include <numeric>
 
@@ -95,6 +96,8 @@ namespace detail {
         /**
          * @brief Returns number of unconsumed (if SQPOLL) or unsubmitted
          * entries exist in the SQ ring
+         *
+         * same effect as `io_uring_sq_ready`
          */
         template<uint64_t uring_flags>
         [[nodiscard]] inline unsigned pending() const noexcept {
@@ -145,13 +148,24 @@ namespace detail {
                 head = io_uring_smp_load_acquire(khead);
             }
 
-            if (sqe_free_head - head < ring_entries) [[likely]] {
-                return &sqes[(array[sqe_free_head++ & ring_mask]) << shift];
+            if constexpr (uring_flags & uring_setup::sqe_reorder) {
+                if (sqe_free_head - head < ring_entries) [[likely]] {
+                    return &sqes[(array[sqe_free_head++ & ring_mask]) << shift];
+                } else {
+                    return nullptr;
+                }
             } else {
-                return nullptr;
+                // if `sqe_reorder` is not enabled:
+                if (sqe_tail - head < ring_entries) [[likely]] {
+                    return &sqes[(sqe_tail++ & ring_mask) << shift];
+                } else {
+                    return nullptr;
+                }
             }
         }
 
+        template<uint64_t uring_flags>
+            requires(bool(uring_flags &uring_setup::sqe_reorder))
         inline void append_sq_entry(const sq_entry *const sqe) noexcept {
             array[sqe_tail++ & ring_mask] = sqe - sqes;
             assert(sqe_tail - *khead <= ring_entries);
