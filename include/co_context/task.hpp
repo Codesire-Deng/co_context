@@ -239,10 +239,10 @@ class [[nodiscard("Did you forget to co_await?")]] task {
     struct awaiter_base {
         std::coroutine_handle<promise_type> handle;
 
-        awaiter_base(std::coroutine_handle<promise_type> current) noexcept
+        explicit awaiter_base(std::coroutine_handle<promise_type> current) noexcept
             : handle(current) {}
 
-        inline bool await_ready() const noexcept {
+        [[nodiscard]] inline bool await_ready() const noexcept {
             return !handle || handle.done();
         }
 
@@ -286,7 +286,7 @@ class [[nodiscard("Did you forget to co_await?")]] task {
         }
     }
 
-    inline bool is_ready() const noexcept {
+    [[nodiscard]] inline bool is_ready() const noexcept {
         return !handle || handle.done();
     }
 
@@ -332,7 +332,7 @@ class [[nodiscard("Did you forget to co_await?")]] task {
     /**
      * @brief wait for the task<> to complete, but do not get the result
      */
-    auto when_ready() const noexcept {
+    [[nodiscard]] auto when_ready() const noexcept {
         struct awaiter : awaiter_base {
             using awaiter_base::awaiter_base;
 

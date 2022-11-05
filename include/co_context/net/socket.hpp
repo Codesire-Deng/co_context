@@ -39,7 +39,7 @@ class socket {
         other.sockfd = tmp;
     }
 
-    int fd() const noexcept { return sockfd; }
+    [[nodiscard]] int fd() const noexcept { return sockfd; }
 
     socket &bind(const inet_address &addr);
 
@@ -49,51 +49,51 @@ class socket {
 
     socket &set_tcp_no_delay(bool on);
 
-    inet_address get_local_addr() const;
+    [[nodiscard]] inet_address get_local_addr() const;
 
-    inet_address get_peer_addr() const;
+    [[nodiscard]] inet_address get_peer_addr() const;
 
-    auto connect(const inet_address &addr) const noexcept {
+    [[nodiscard]] auto connect(const inet_address &addr) const noexcept {
         return lazy::connect(sockfd, addr.get_sockaddr(), addr.length());
     }
 
-    auto eager_connect(const inet_address &addr) const noexcept {
+    [[nodiscard]] auto eager_connect(const inet_address &addr) const noexcept {
         return eager::connect(sockfd, addr.get_sockaddr(), addr.length());
     }
 
-    auto recv(std::span<char> buf, int flags = 0) const noexcept {
+    [[nodiscard]] auto recv(std::span<char> buf, int flags = 0) const noexcept {
         return lazy::recv(sockfd, buf, flags);
     }
 
-    auto eager_recv(std::span<char> buf, int flags = 0) const noexcept {
+    [[nodiscard]] auto eager_recv(std::span<char> buf, int flags = 0) const noexcept {
         return eager::recv(sockfd, buf, flags);
     }
 
-    auto send(std::span<const char> buf, int flags = 0) const noexcept {
+    [[nodiscard]] auto send(std::span<const char> buf, int flags = 0) const noexcept {
         return lazy::send(sockfd, buf, flags);
     }
 
-    auto eager_send(std::span<const char> buf, int flags = 0) const noexcept {
+    [[nodiscard]] auto eager_send(std::span<const char> buf, int flags = 0) const noexcept {
         return eager::send(sockfd, buf, flags);
     }
 
-    auto close() noexcept {
+    [[nodiscard]] auto close() noexcept {
         const int tmp = sockfd;
         sockfd = -1;
         return lazy::close(tmp);
     }
 
-    auto eager_close() noexcept {
+    [[nodiscard]] auto eager_close() noexcept {
         const int tmp = sockfd;
         sockfd = -1;
         return eager::close(tmp);
     }
 
-    auto shutdown_write() const noexcept {
+    [[nodiscard]] auto shutdown_write() const noexcept {
         return lazy::shutdown(sockfd, SHUT_WR);
     }
 
-    auto eager_shutdown_write() const noexcept {
+    [[nodiscard]] auto eager_shutdown_write() const noexcept {
         return eager::shutdown(sockfd, SHUT_WR);
     }
 

@@ -1,8 +1,9 @@
 #pragma once
 
 #include "../io_uring.h"
-#include <sys/socket.h>
+#include <cstdint>
 #include <span>
+#include <sys/socket.h>
 
 namespace liburingcxx {
 
@@ -58,10 +59,10 @@ static inline void *recvmsg_payload(io_uring_recvmsg_out *o, msghdr *msgh) {
 
 static inline unsigned int
 recvmsg_payload_length(io_uring_recvmsg_out *o, int buf_len, msghdr *msgh) {
-    unsigned long payload_start, payload_end;
+    uint64_t payload_start, payload_end;
 
-    payload_start = (unsigned long)recvmsg_payload(o, msgh);
-    payload_end = (unsigned long)o + buf_len;
+    payload_start = (uint64_t)recvmsg_payload(o, msgh);
+    payload_end = (uint64_t)o + buf_len;
     return (unsigned int)(payload_end - payload_start);
 }
 

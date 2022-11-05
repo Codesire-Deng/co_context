@@ -11,42 +11,46 @@ namespace co_context {
 
 class condition_variable;
 
-namespace detail {
+} // namespace co_context
 
-    class [[nodiscard("Did you forget to co_await?")]] cv_wait_awaiter final {
-      public:
-        using mutex = co_context::mutex;
+namespace co_context::detail {
 
-        explicit cv_wait_awaiter(condition_variable & cv, mutex & mtx) noexcept
-            : lock_awaken_handle(mtx.lock())
-            , cv(cv) {
-        }
+class [[nodiscard("Did you forget to co_await?")]] cv_wait_awaiter final {
+  public:
+    using mutex = co_context::mutex;
 
-        static constexpr bool await_ready() noexcept {
-            return false;
-        }
+    explicit cv_wait_awaiter(condition_variable & cv, mutex & mtx) noexcept
+        : lock_awaken_handle(mtx.lock())
+        , cv(cv) {
+    }
 
-        void await_suspend(std::coroutine_handle<> current) noexcept;
+    static constexpr bool await_ready() noexcept {
+        return false;
+    }
 
-        /**
-         * @detail the lock must be held, when io_context resume me.
-         * @detail io_context will call mutex::lock_awaiter::register_awaiting
-         **/
-        constexpr void await_resume() const noexcept {
-        }
+    void await_suspend(std::coroutine_handle<> current) noexcept;
 
-      private:
-        mutex::lock_awaiter lock_awaken_handle;
-        condition_variable &cv;
-        // mutex &mtx;
-        // std::coroutine_handle<> handle;
+    /**
+     * @detail the lock must be held, when io_context resume me.
+     * @detail io_context will call mutex::lock_awaiter::register_awaiting
+     **/
+    constexpr void await_resume() const noexcept {
+    }
 
-        cv_wait_awaiter *next = nullptr;
-        friend class ::co_context::condition_variable;
-        friend class ::co_context::io_context;
-    };
+  private:
+    mutex::lock_awaiter lock_awaken_handle;
+    condition_variable &cv;
+    // mutex &mtx;
+    // std::coroutine_handle<> handle;
 
-} // namespace detail
+    cv_wait_awaiter *next = nullptr;
+    friend class ::co_context::condition_variable;
+    friend class ::co_context::io_context;
+};
+
+} // namespace co_context::detail
+
+namespace co_context {
 
 class condition_variable final {
   private:
@@ -101,7 +105,7 @@ class condition_variable final {
     void to_resume_fetch_all() noexcept;
 
   public:
-    static consteval auto __task_offset() noexcept {
+    static consteval auto __task_offset() /*NOLINT*/ noexcept {
         return offsetof(condition_variable, notify_task);
     }
 };

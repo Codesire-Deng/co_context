@@ -15,15 +15,15 @@ class acceptor {
     acceptor(acceptor &&) = default;
     acceptor &operator=(acceptor &&) = default;
 
-    auto accept(int flags = 0) noexcept {
+    [[nodiscard]] auto accept(int flags = 0) noexcept {
         return lazy::accept(listen_socket.fd(), nullptr, nullptr, flags);
     }
 
-    auto eager_accept(int flags = 0) noexcept {
+    [[nodiscard]] auto eager_accept(int flags = 0) noexcept {
         return eager::accept(listen_socket.fd(), nullptr, nullptr, flags);
     }
 
-    int listen_fd() const noexcept { return listen_socket.fd(); }
+    [[nodiscard]] int listen_fd() const noexcept { return listen_socket.fd(); }
 
     // socket acceptSocketOrDie();
 

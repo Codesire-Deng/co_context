@@ -13,7 +13,7 @@ overloaded(F...) -> overloaded<F...>;
 
 // CRTP
 template<typename T, template<typename> class Interface>
-struct CRTP {
+struct CRTP /*NOLINT*/ {
     T &self() { return static_cast<T &>(*this); }
 
     const T &self() const { return static_cast<const T &>(*this); }

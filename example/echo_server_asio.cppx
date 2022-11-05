@@ -1,4 +1,5 @@
 #include <boost/asio.hpp>
+#include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <memory>
@@ -8,7 +9,7 @@ using boost::asio::ip::tcp;
 
 class session : public std::enable_shared_from_this<session> {
   public:
-    session(tcp::socket socket) : socket_(std::move(socket)) {}
+    explicit session(tcp::socket socket) : socket_(std::move(socket)) {}
 
     void start() { do_read(); }
 
@@ -46,7 +47,7 @@ class session : public std::enable_shared_from_this<session> {
 
 class server {
   public:
-    server(boost::asio::io_context &io_context, short port)
+    server(boost::asio::io_context &io_context, uint16_t port)
         : acceptor_(io_context, tcp::endpoint(tcp::v4(), port)) {
         do_accept();
     }

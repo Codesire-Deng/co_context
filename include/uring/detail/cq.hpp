@@ -30,6 +30,7 @@ namespace detail {
 
       private:
         void set_offset(const io_cqring_offsets &off) noexcept {
+            // NOLINTBEGIN
             khead = (unsigned *)((uintptr_t)ring_ptr + off.head);
             ktail = (unsigned *)((uintptr_t)ring_ptr + off.tail);
             ring_mask = *(unsigned *)((uintptr_t)ring_ptr + off.ring_mask);
@@ -40,6 +41,7 @@ namespace detail {
             }
             koverflow = (unsigned *)((uintptr_t)ring_ptr + off.overflow);
             cqes = (cq_entry *)((uintptr_t)ring_ptr + off.cqes);
+            // NOLINTEND
         }
 
       public:

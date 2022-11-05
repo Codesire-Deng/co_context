@@ -495,7 +495,7 @@ class sq_entry final : private io_uring_sqe {
 
     inline sq_entry &
     prep_send_set_addr(const sockaddr *dest_addr, uint16_t addr_len) {
-        this->addr2 = reinterpret_cast<unsigned long>(dest_addr);
+        this->addr2 = reinterpret_cast<uint64_t>(dest_addr);
         this->addr_len = addr_len;
         return *this;
     }

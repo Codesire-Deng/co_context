@@ -6,786 +6,753 @@
 #include "co_context/detail/worker_meta.hpp"
 #include <cassert>
 #include <chrono>
+#include <cstdint>
 #include <span>
 
-namespace co_context {
+namespace co_context::detail {
 
-namespace detail {
+struct lazy_link_io {
+    class lazy_awaiter *last_io;
 
-    struct lazy_link_io {
-        class lazy_awaiter *last_io;
+    static constexpr bool await_ready() noexcept { return false; }
 
-        static constexpr bool await_ready() noexcept { return false; }
+    void await_suspend(std::coroutine_handle<> current) const noexcept;
 
-        void await_suspend(std::coroutine_handle<> current) const noexcept;
+    /*NOLINT*/ int32_t await_resume() const noexcept;
+};
 
-        int32_t await_resume() const noexcept;
-    };
+class lazy_awaiter {
+  public:
+    static constexpr bool await_ready() noexcept { return false; }
 
-    class lazy_awaiter {
-      public:
-        static constexpr bool await_ready() noexcept { return false; }
-
-        void await_suspend(std::coroutine_handle<> current) noexcept {
-            io_info.handle = current;
-            submit();
-        }
-
-        int32_t await_resume() const noexcept { return io_info.result; }
-
-      protected:
-        friend struct lazy_link_io;
-        friend struct lazy_link_timeout;
-        liburingcxx::sq_entry *sqe;
-        task_info io_info;
-
-        static inline void submit() noexcept {
-            worker_meta *const worker = detail::this_thread.worker;
-            worker->submit_sqe();
-        }
-
-        friend lazy_link_io
-        operator&&(lazy_awaiter &&lhs, lazy_awaiter &&rhs) noexcept;
-
-        friend lazy_link_io &&
-        operator&&(lazy_link_io &&lhs, lazy_awaiter &&rhs) noexcept;
-
-        friend lazy_link_io &&
-        operator&&(lazy_link_io &&lhs, lazy_link_io &&rhs) noexcept;
-
-        friend lazy_link_io &&
-        operator&&(lazy_awaiter &&lhs, struct lazy_link_timeout &&rhs) noexcept;
-
-        friend void set_link_awaiter(lazy_awaiter &awaiter) noexcept;
-
-        lazy_awaiter() noexcept : io_info(task_info::task_type::lazy_sqe) {
-            io_info.tid_hint = detail::this_thread.tid;
-            sqe = this_thread.worker->get_free_sqe();
-            assert(sqe != nullptr);
-            sqe->set_data(io_info.as_user_data());
-        }
-
-#ifndef __INTELLISENSE__
-
-      public:
-        lazy_awaiter(const lazy_awaiter &) = delete;
-        lazy_awaiter(lazy_awaiter &&) = delete;
-        lazy_awaiter &operator=(const lazy_awaiter &) = delete;
-        lazy_awaiter &operator=(lazy_awaiter &&) = delete;
-#endif
-    };
-
-    inline void set_link_sqe(liburingcxx::sq_entry *sqe) noexcept {
-        sqe->set_link();
-        sqe->fetch_data() |= __u64(task_info::task_type::lazy_link_sqe);
+    void await_suspend(std::coroutine_handle<> current) noexcept {
+        io_info.handle = current;
+        submit();
     }
 
-    inline void set_link_awaiter(lazy_awaiter &awaiter) noexcept {
-        set_link_sqe(awaiter.sqe);
-        awaiter.io_info.type = task_info::task_type::lazy_link_sqe;
-    }
+    /*NOLINT*/ int32_t await_resume() const noexcept { return io_info.result; }
 
-    inline void set_link_link_io(lazy_link_io &link_io) noexcept {
-        set_link_awaiter(*link_io.last_io);
-    }
+  protected:
+    friend struct lazy_link_io;
+    friend struct lazy_link_timeout;
+    liburingcxx::sq_entry *sqe;
+    task_info io_info;
 
-    inline lazy_link_io
-    operator&&(lazy_awaiter &&lhs, lazy_awaiter &&rhs) noexcept {
-        set_link_awaiter(lhs);
-        return lazy_link_io{.last_io = &rhs};
-    }
-
-    inline lazy_link_io &&
-    operator&&(lazy_link_io &&lhs, lazy_awaiter &&rhs) noexcept {
-        set_link_link_io(lhs);
-        lhs.last_io = &rhs;
-        return static_cast<lazy_link_io &&>(lhs);
-    }
-
-    inline lazy_link_io &&
-    operator&&(lazy_link_io &&lhs, lazy_link_io &&rhs) noexcept {
-        set_link_link_io(lhs);
-        return static_cast<lazy_link_io &&>(rhs);
-    }
-
-    inline void lazy_link_io::await_suspend(std::coroutine_handle<> current
-    ) const noexcept {
-        this->last_io->io_info.handle = current;
+    static inline void submit() noexcept {
         worker_meta *const worker = detail::this_thread.worker;
         worker->submit_sqe();
     }
 
-    inline int32_t lazy_link_io::await_resume() const noexcept {
-        return this->last_io->io_info.result;
+    friend lazy_link_io
+    operator&&(lazy_awaiter &&lhs, lazy_awaiter &&rhs) noexcept;
+
+    friend lazy_link_io &&
+    operator&&(lazy_link_io &&lhs, lazy_awaiter &&rhs) noexcept;
+
+    friend lazy_link_io &&
+    operator&&(lazy_link_io &&lhs, lazy_link_io &&rhs) noexcept;
+
+    friend lazy_link_io &&
+    operator&&(lazy_awaiter &&lhs, struct lazy_link_timeout &&rhs) noexcept;
+
+    friend void set_link_awaiter(lazy_awaiter &awaiter) noexcept;
+
+    lazy_awaiter() noexcept : io_info(task_info::task_type::lazy_sqe) {
+        io_info.tid_hint = detail::this_thread.tid;
+        sqe = this_thread.worker->get_free_sqe();
+        assert(sqe != nullptr);
+        sqe->set_data(io_info.as_user_data());
     }
 
-    struct lazy_splice : lazy_awaiter {
-        inline lazy_splice(
-            int fd_in,
-            int64_t off_in,
-            int fd_out,
-            int64_t off_out,
-            unsigned int nbytes,
-            unsigned int splice_flags
-        ) noexcept {
-            sqe->prep_splice(
-                fd_in, off_in, fd_out, off_out, nbytes, splice_flags
-            );
-        }
-    };
+#ifndef __INTELLISENSE__
 
-    struct lazy_tee : lazy_awaiter {
-        inline lazy_tee(
-            int fd_in,
-            int fd_out,
-            unsigned int nbytes,
-            unsigned int splice_flags
-        ) noexcept {
-            sqe->prep_tee(fd_in, fd_out, nbytes, splice_flags);
-        }
-    };
+  public:
+    lazy_awaiter(const lazy_awaiter &) = delete;
+    lazy_awaiter(lazy_awaiter &&) = delete;
+    lazy_awaiter &operator=(const lazy_awaiter &) = delete;
+    lazy_awaiter &operator=(lazy_awaiter &&) = delete;
+#endif
+};
 
-    struct lazy_readv : lazy_awaiter {
-        inline lazy_readv(
-            int fd, std::span<const iovec> iovecs, uint64_t offset
-        ) noexcept {
-            sqe->prep_readv(fd, iovecs, offset);
-        }
-    };
+inline void set_link_sqe(liburingcxx::sq_entry *sqe) noexcept {
+    sqe->set_link();
+    sqe->fetch_data() |= __u64(task_info::task_type::lazy_link_sqe);
+}
 
-    struct lazy_readv2 : lazy_awaiter {
-        inline lazy_readv2(
-            int fd, std::span<const iovec> iovecs, uint64_t offset, int flags
-        ) noexcept {
-            sqe->prep_readv2(fd, iovecs, offset, flags);
-        }
-    };
+inline void set_link_awaiter(lazy_awaiter &awaiter) noexcept {
+    set_link_sqe(awaiter.sqe);
+    awaiter.io_info.type = task_info::task_type::lazy_link_sqe;
+}
 
-    struct lazy_read_fixed : lazy_awaiter {
-        inline lazy_read_fixed(
-            int fd, std::span<char> buf, uint64_t offset, uint16_t buf_index
-        ) noexcept {
-            sqe->prep_read_fixed(fd, buf, offset, buf_index);
-        }
-    };
+inline void set_link_link_io(lazy_link_io &link_io) noexcept {
+    set_link_awaiter(*link_io.last_io);
+}
 
-    struct lazy_writev : lazy_awaiter {
-        inline lazy_writev(
-            int fd, std::span<const iovec> iovecs, uint64_t offset
-        ) noexcept {
-            sqe->prep_writev(fd, iovecs, offset);
-        }
-    };
+inline lazy_link_io
+operator&&(lazy_awaiter &&lhs, lazy_awaiter &&rhs) noexcept {
+    set_link_awaiter(lhs);
+    return lazy_link_io{.last_io = &rhs};
+}
 
-    struct lazy_writev2 : lazy_awaiter {
-        inline lazy_writev2(
-            int fd, std::span<const iovec> iovecs, uint64_t offset, int flags
-        ) noexcept {
-            sqe->prep_writev2(fd, iovecs, offset, flags);
-        }
-    };
+inline lazy_link_io &&
+operator&&(lazy_link_io &&lhs, lazy_awaiter &&rhs) noexcept {
+    set_link_link_io(lhs);
+    lhs.last_io = &rhs;
+    return static_cast<lazy_link_io &&>(lhs);
+}
 
-    struct lazy_write_fixed : lazy_awaiter {
-        inline lazy_write_fixed(
-            int fd,
-            std::span<const char> buf,
-            uint64_t offset,
-            uint16_t buf_index
-        ) noexcept {
-            sqe->prep_write_fixed(fd, buf, offset, buf_index);
-        }
-    };
+inline lazy_link_io &&
+operator&&(lazy_link_io &&lhs, lazy_link_io &&rhs) noexcept {
+    set_link_link_io(lhs);
+    return static_cast<lazy_link_io &&>(rhs);
+}
 
-    struct lazy_recvmsg : lazy_awaiter {
-        inline lazy_recvmsg(int fd, msghdr *msg, unsigned flags) noexcept {
-            sqe->prep_recvmsg(fd, msg, flags);
-        }
-    };
+inline void lazy_link_io::await_suspend(std::coroutine_handle<> current
+) const noexcept {
+    this->last_io->io_info.handle = current;
+    worker_meta *const worker = detail::this_thread.worker;
+    worker->submit_sqe();
+}
+
+inline int32_t lazy_link_io::await_resume() const noexcept {
+    return this->last_io->io_info.result;
+}
+
+struct lazy_splice : lazy_awaiter {
+    inline lazy_splice(
+        int fd_in,
+        int64_t off_in,
+        int fd_out,
+        int64_t off_out,
+        unsigned int nbytes,
+        unsigned int splice_flags
+    ) noexcept {
+        sqe->prep_splice(fd_in, off_in, fd_out, off_out, nbytes, splice_flags);
+    }
+};
+
+struct lazy_tee : lazy_awaiter {
+    inline lazy_tee(
+        int fd_in, int fd_out, unsigned int nbytes, unsigned int splice_flags
+    ) noexcept {
+        sqe->prep_tee(fd_in, fd_out, nbytes, splice_flags);
+    }
+};
+
+struct lazy_readv : lazy_awaiter {
+    inline lazy_readv(
+        int fd, std::span<const iovec> iovecs, uint64_t offset
+    ) noexcept {
+        sqe->prep_readv(fd, iovecs, offset);
+    }
+};
+
+struct lazy_readv2 : lazy_awaiter {
+    inline lazy_readv2(
+        int fd, std::span<const iovec> iovecs, uint64_t offset, int flags
+    ) noexcept {
+        sqe->prep_readv2(fd, iovecs, offset, flags);
+    }
+};
+
+struct lazy_read_fixed : lazy_awaiter {
+    inline lazy_read_fixed(
+        int fd, std::span<char> buf, uint64_t offset, uint16_t buf_index
+    ) noexcept {
+        sqe->prep_read_fixed(fd, buf, offset, buf_index);
+    }
+};
+
+struct lazy_writev : lazy_awaiter {
+    inline lazy_writev(
+        int fd, std::span<const iovec> iovecs, uint64_t offset
+    ) noexcept {
+        sqe->prep_writev(fd, iovecs, offset);
+    }
+};
+
+struct lazy_writev2 : lazy_awaiter {
+    inline lazy_writev2(
+        int fd, std::span<const iovec> iovecs, uint64_t offset, int flags
+    ) noexcept {
+        sqe->prep_writev2(fd, iovecs, offset, flags);
+    }
+};
+
+struct lazy_write_fixed : lazy_awaiter {
+    inline lazy_write_fixed(
+        int fd, std::span<const char> buf, uint64_t offset, uint16_t buf_index
+    ) noexcept {
+        sqe->prep_write_fixed(fd, buf, offset, buf_index);
+    }
+};
+
+struct lazy_recvmsg : lazy_awaiter {
+    inline lazy_recvmsg(int fd, msghdr *msg, unsigned flags) noexcept {
+        sqe->prep_recvmsg(fd, msg, flags);
+    }
+};
 
 #if LIBURINGCXX_IS_KERNEL_REACH(5, 20)
-    struct lazy_recvmsg_multishot : lazy_awaiter {
-        inline lazy_recvmsg_multishot(
-            int fd, msghdr *msg, unsigned flags
-        ) noexcept {
-            sqe->prep_recvmsg_multishot(fd, msg, flags);
-        }
-    };
+struct lazy_recvmsg_multishot : lazy_awaiter {
+    inline lazy_recvmsg_multishot(
+        int fd, msghdr *msg, unsigned flags
+    ) noexcept {
+        sqe->prep_recvmsg_multishot(fd, msg, flags);
+    }
+};
 #endif
 
-    struct lazy_sendmsg : lazy_awaiter {
-        inline lazy_sendmsg(
-            int fd, const msghdr *msg, unsigned int flags
-        ) noexcept {
-            sqe->prep_sendmsg(fd, msg, flags);
-        }
-    };
+struct lazy_sendmsg : lazy_awaiter {
+    inline lazy_sendmsg(
+        int fd, const msghdr *msg, unsigned int flags
+    ) noexcept {
+        sqe->prep_sendmsg(fd, msg, flags);
+    }
+};
 
-    struct lazy_poll_add : lazy_awaiter {
-        inline lazy_poll_add(int fd, unsigned poll_mask) noexcept {
-            sqe->prep_poll_add(fd, poll_mask);
-        }
-    };
+struct lazy_poll_add : lazy_awaiter {
+    inline lazy_poll_add(int fd, unsigned poll_mask) noexcept {
+        sqe->prep_poll_add(fd, poll_mask);
+    }
+};
 
-    struct lazy_poll_multishot : lazy_awaiter {
-        inline lazy_poll_multishot(int fd, unsigned poll_mask) noexcept {
-            sqe->prep_poll_multishot(fd, poll_mask);
-        }
-    };
+struct lazy_poll_multishot : lazy_awaiter {
+    inline lazy_poll_multishot(int fd, unsigned poll_mask) noexcept {
+        sqe->prep_poll_multishot(fd, poll_mask);
+    }
+};
 
-    struct lazy_poll_remove : lazy_awaiter {
-        inline lazy_poll_remove(uint64_t user_data) noexcept {
-            sqe->prep_poll_remove(user_data);
-        }
-    };
+struct lazy_poll_remove : lazy_awaiter {
+    inline explicit lazy_poll_remove(uint64_t user_data) noexcept {
+        sqe->prep_poll_remove(user_data);
+    }
+};
 
-    struct lazy_poll_update : lazy_awaiter {
-        inline lazy_poll_update(
-            uint64_t old_user_data,
-            uint64_t new_user_data,
-            unsigned poll_mask,
-            unsigned flags
-        ) noexcept {
-            sqe->prep_poll_update(
-                old_user_data, new_user_data, poll_mask, flags
+struct lazy_poll_update : lazy_awaiter {
+    inline lazy_poll_update(
+        uint64_t old_user_data,
+        uint64_t new_user_data,
+        unsigned poll_mask,
+        unsigned flags
+    ) noexcept {
+        sqe->prep_poll_update(old_user_data, new_user_data, poll_mask, flags);
+    }
+};
+
+struct lazy_fsync : lazy_awaiter {
+    inline lazy_fsync(int fd, uint32_t fsync_flags) noexcept {
+        sqe->prep_fsync(fd, fsync_flags);
+    }
+};
+
+struct lazy_uring_nop : lazy_awaiter {
+    inline lazy_uring_nop() noexcept { sqe->prep_nop(); }
+};
+
+struct lazy_timeout_timespec : lazy_awaiter {
+  public:
+    inline lazy_timeout_timespec(
+        const __kernel_timespec &ts, unsigned int count, unsigned int flags
+    ) noexcept {
+        sqe->prep_timeout(ts, count, flags);
+    }
+
+  protected:
+    inline lazy_timeout_timespec() noexcept = default;
+};
+
+struct lazy_timeout_base : lazy_awaiter {
+  protected:
+    __kernel_timespec ts;
+
+  public:
+    template<class Rep, class Period = std::ratio<1>>
+    void set_ts(std::chrono::duration<Rep, Period> duration) noexcept {
+        using namespace std;
+        using namespace std::literals;
+        ts.tv_sec = duration / 1s;
+        duration -= chrono::seconds(ts.tv_sec);
+        ts.tv_nsec =
+            duration_cast<chrono::duration<int64_t, std::nano>>(duration).count(
             );
-        }
-    };
+    }
 
-    struct lazy_fsync : lazy_awaiter {
-        inline lazy_fsync(int fd, uint32_t fsync_flags) noexcept {
-            sqe->prep_fsync(fd, fsync_flags);
-        }
-    };
+    template<class Rep, class Period = std::ratio<1>>
+    // Should not be used directly
+    inline explicit lazy_timeout_base(
+        std::chrono::duration<Rep, Period> duration
+    ) noexcept {
+        set_ts(duration);
+    }
+};
 
-    struct lazy_uring_nop : lazy_awaiter {
-        inline lazy_uring_nop() noexcept { sqe->prep_nop(); }
-    };
+struct lazy_timeout : lazy_timeout_base {
+    template<class Rep, class Period = std::ratio<1>>
+    inline lazy_timeout(
+        std::chrono::duration<Rep, Period> duration, unsigned int flags
+    ) noexcept
+        : lazy_timeout_base(duration) {
+        sqe->prep_timeout(ts, 0, flags);
+    }
+};
 
-    struct lazy_timeout_timespec : lazy_awaiter {
-      public:
-        inline lazy_timeout_timespec(
-            const __kernel_timespec &ts, unsigned int count, unsigned int flags
-        ) noexcept {
-            sqe->prep_timeout(ts, count, flags);
-        }
+struct lazy_timeout_remove : lazy_awaiter {
+    inline lazy_timeout_remove(uint64_t user_data, unsigned flags) noexcept {
+        sqe->prep_timeout_remove(user_data, flags);
+    }
+};
 
-      protected:
-        inline lazy_timeout_timespec() noexcept = default;
-    };
+struct lazy_timeout_update : lazy_timeout_base {
+    template<class Rep, class Period = std::ratio<1>>
+    inline lazy_timeout_update(
+        std::chrono::duration<Rep, Period> duration,
+        uint64_t user_data,
+        unsigned flags
+    ) noexcept
+        : lazy_timeout_base(duration) {
+        sqe->prep_timeout_update(ts, user_data, flags);
+    }
+};
 
-    struct lazy_timeout_base : lazy_awaiter {
-      protected:
-        __kernel_timespec ts;
+struct lazy_accept : lazy_awaiter {
+    inline lazy_accept(
+        int fd, sockaddr *addr, socklen_t *addrlen, int flags
+    ) noexcept {
+        sqe->prep_accept(fd, addr, addrlen, flags);
+    }
+};
 
-      public:
-        template<class Rep, class Period = std::ratio<1>>
-        void set_ts(std::chrono::duration<Rep, Period> duration) noexcept {
-            using namespace std;
-            using namespace std::literals;
-            ts.tv_sec = duration / 1s;
-            duration -= chrono::seconds(ts.tv_sec);
-            ts.tv_nsec =
-                duration_cast<chrono::duration<long long, std::nano>>(duration)
-                    .count();
-        }
-
-        template<class Rep, class Period = std::ratio<1>>
-        // Should not be used directly
-        inline lazy_timeout_base(std::chrono::duration<Rep, Period> duration
-        ) noexcept {
-            set_ts(duration);
-        }
-    };
-
-    struct lazy_timeout : lazy_timeout_base {
-        template<class Rep, class Period = std::ratio<1>>
-        inline lazy_timeout(
-            std::chrono::duration<Rep, Period> duration, unsigned int flags
-        ) noexcept
-            : lazy_timeout_base(duration) {
-            sqe->prep_timeout(ts, 0, flags);
-        }
-    };
-
-    struct lazy_timeout_remove : lazy_awaiter {
-        inline lazy_timeout_remove(
-            uint64_t user_data, unsigned flags
-        ) noexcept {
-            sqe->prep_timeout_remove(user_data, flags);
-        }
-    };
-
-    struct lazy_timeout_update : lazy_timeout_base {
-        template<class Rep, class Period = std::ratio<1>>
-        inline lazy_timeout_update(
-            std::chrono::duration<Rep, Period> duration,
-            uint64_t user_data,
-            unsigned flags
-        ) noexcept
-            : lazy_timeout_base(duration) {
-            sqe->prep_timeout_update(ts, user_data, flags);
-        }
-    };
-
-    struct lazy_accept : lazy_awaiter {
-        inline lazy_accept(
-            int fd, sockaddr *addr, socklen_t *addrlen, int flags
-        ) noexcept {
-            sqe->prep_accept(fd, addr, addrlen, flags);
-        }
-    };
-
-    struct lazy_accept_direct : lazy_awaiter {
-        inline lazy_accept_direct(
-            int fd,
-            sockaddr *addr,
-            socklen_t *addrlen,
-            int flags,
-            uint32_t file_index
-        ) noexcept {
-            sqe->prep_accept_direct(fd, addr, addrlen, flags, file_index);
-        }
-    };
+struct lazy_accept_direct : lazy_awaiter {
+    inline lazy_accept_direct(
+        int fd,
+        sockaddr *addr,
+        socklen_t *addrlen,
+        int flags,
+        uint32_t file_index
+    ) noexcept {
+        sqe->prep_accept_direct(fd, addr, addrlen, flags, file_index);
+    }
+};
 
 #if LIBURINGCXX_IS_KERNEL_REACH(5, 19)
-    struct lazy_multishot_accept : lazy_awaiter {
-        inline lazy_multishot_accept(
-            int fd, sockaddr *addr, socklen_t *addrlen, int flags
-        ) noexcept {
-            sqe->prep_multishot_accept(fd, addr, addrlen, flags);
-        }
-    };
+struct lazy_multishot_accept : lazy_awaiter {
+    inline lazy_multishot_accept(
+        int fd, sockaddr *addr, socklen_t *addrlen, int flags
+    ) noexcept {
+        sqe->prep_multishot_accept(fd, addr, addrlen, flags);
+    }
+};
 #endif
 
 #if LIBURINGCXX_IS_KERNEL_REACH(5, 19)
-    struct lazy_multishot_accept_direct : lazy_awaiter {
-        inline lazy_multishot_accept_direct(
-            int fd, sockaddr *addr, socklen_t *addrlen, int flags
-        ) noexcept {
-            sqe->prep_multishot_accept_direct(fd, addr, addrlen, flags);
-        }
-    };
+struct lazy_multishot_accept_direct : lazy_awaiter {
+    inline lazy_multishot_accept_direct(
+        int fd, sockaddr *addr, socklen_t *addrlen, int flags
+    ) noexcept {
+        sqe->prep_multishot_accept_direct(fd, addr, addrlen, flags);
+    }
+};
 #endif
 
-    struct lazy_cancel : lazy_awaiter {
-        inline lazy_cancel(uint64_t user_data, int flags) noexcept {
-            sqe->prep_cancle(user_data, flags);
-        }
-    };
+struct lazy_cancel : lazy_awaiter {
+    inline lazy_cancel(uint64_t user_data, int flags) noexcept {
+        sqe->prep_cancle(user_data, flags);
+    }
+};
 
-    struct lazy_cancel_fd : lazy_awaiter {
-        inline lazy_cancel_fd(int fd, unsigned int flags) noexcept {
-            sqe->prep_cancle_fd(fd, flags);
-        }
-    };
+struct lazy_cancel_fd : lazy_awaiter {
+    inline lazy_cancel_fd(int fd, unsigned int flags) noexcept {
+        sqe->prep_cancle_fd(fd, flags);
+    }
+};
 
-    struct lazy_link_timeout_base : lazy_timeout_base {
-        template<class Rep, class Period = std::ratio<1>>
-        // Should not be used directly
-        inline lazy_link_timeout_base(
-            std::chrono::duration<Rep, Period> duration, unsigned int flags
-        ) noexcept
-            : lazy_timeout_base(duration) {
-            sqe->prep_link_timeout(this->ts, flags);
-        }
-    };
+struct lazy_link_timeout_base : lazy_timeout_base {
+    template<class Rep, class Period = std::ratio<1>>
+    // Should not be used directly
+    inline lazy_link_timeout_base(
+        std::chrono::duration<Rep, Period> duration, unsigned int flags
+    ) noexcept
+        : lazy_timeout_base(duration) {
+        sqe->prep_link_timeout(this->ts, flags);
+    }
+};
 
-    struct lazy_link_timeout : lazy_link_io {
-        lazy_link_timeout_base timer;
+struct lazy_link_timeout : lazy_link_io {
+    lazy_link_timeout_base timer;
 
-        template<class Rep, class Period = std::ratio<1>>
-        inline lazy_link_timeout(
-            lazy_awaiter &&timed_io,
-            std::chrono::duration<Rep, Period> duration,
-            unsigned int flags
-        ) noexcept
-            : timer(duration, flags) {
-            // Mark timed_io as normal task type, and set sqe link.
-            timed_io.sqe->set_link();
-            // Mark timer as lazy_link_sqe task type, and without sqe link.
-            timer.io_info.type = task_info::task_type::lazy_link_sqe;
-            // Send the result to timed_io.
-            this->last_io = &timed_io;
-        }
-    };
+    template<class Rep, class Period = std::ratio<1>>
+    inline lazy_link_timeout(
+        lazy_awaiter &&timed_io,
+        std::chrono::duration<Rep, Period> duration,
+        unsigned int flags
+    ) noexcept
+        : timer(duration, flags) {
+        // Mark timed_io as normal task type, and set sqe link.
+        timed_io.sqe->set_link();
+        // Mark timer as lazy_link_sqe task type, and without sqe link.
+        timer.io_info.type = task_info::task_type::lazy_link_sqe;
+        // Send the result to timed_io.
+        this->last_io = &timed_io;
+    }
+};
 
-    struct lazy_connect : lazy_awaiter {
-        inline lazy_connect(
-            int sockfd, const sockaddr *addr, socklen_t addrlen
-        ) noexcept {
-            sqe->prep_connect(sockfd, addr, addrlen);
-        }
-    };
+struct lazy_connect : lazy_awaiter {
+    inline lazy_connect(
+        int sockfd, const sockaddr *addr, socklen_t addrlen
+    ) noexcept {
+        sqe->prep_connect(sockfd, addr, addrlen);
+    }
+};
 
-    struct lazy_files_update : lazy_awaiter {
-        inline lazy_files_update(std::span<int> fds, int offset) noexcept {
-            sqe->prep_files_update(fds, offset);
-        }
-    };
+struct lazy_files_update : lazy_awaiter {
+    inline lazy_files_update(std::span<int> fds, int offset) noexcept {
+        sqe->prep_files_update(fds, offset);
+    }
+};
 
-    struct lazy_fallocate : lazy_awaiter {
-        inline lazy_fallocate(
-            int fd, int mode, off_t offset, off_t len
-        ) noexcept {
-            sqe->prep_fallocate(fd, mode, offset, len);
-        }
-    };
+struct lazy_fallocate : lazy_awaiter {
+    inline lazy_fallocate(int fd, int mode, off_t offset, off_t len) noexcept {
+        sqe->prep_fallocate(fd, mode, offset, len);
+    }
+};
 
-    struct lazy_openat : lazy_awaiter {
-        inline lazy_openat(
-            int dfd, const char *path, int flags, mode_t mode
-        ) noexcept {
-            sqe->prep_openat(dfd, path, flags, mode);
-        }
-    };
+struct lazy_openat : lazy_awaiter {
+    inline lazy_openat(
+        int dfd, const char *path, int flags, mode_t mode
+    ) noexcept {
+        sqe->prep_openat(dfd, path, flags, mode);
+    }
+};
 
-    /* open directly into the fixed file table */
-    struct lazy_openat_direct : lazy_awaiter {
-        inline lazy_openat_direct(
-            int dfd,
-            const char *path,
-            int flags,
-            mode_t mode,
-            unsigned file_index
-        ) noexcept {
-            sqe->prep_openat_direct(dfd, path, flags, mode, file_index);
-        }
-    };
+/* open directly into the fixed file table */
+struct lazy_openat_direct : lazy_awaiter {
+    inline lazy_openat_direct(
+        int dfd, const char *path, int flags, mode_t mode, unsigned file_index
+    ) noexcept {
+        sqe->prep_openat_direct(dfd, path, flags, mode, file_index);
+    }
+};
 
-    struct lazy_close : lazy_awaiter {
-        inline lazy_close(int fd) noexcept { sqe->prep_close(fd); }
-    };
+struct lazy_close : lazy_awaiter {
+    inline explicit lazy_close(int fd) noexcept { sqe->prep_close(fd); }
+};
 
-    struct lazy_close_direct : lazy_awaiter {
-        inline lazy_close_direct(unsigned file_index) noexcept {
-            sqe->prep_close_direct(file_index);
-        }
-    };
+struct lazy_close_direct : lazy_awaiter {
+    inline explicit lazy_close_direct(unsigned file_index) noexcept {
+        sqe->prep_close_direct(file_index);
+    }
+};
 
-    struct lazy_read : lazy_awaiter {
-        inline lazy_read(
-            int fd, std::span<char> buf, uint64_t offset
-        ) noexcept {
-            sqe->prep_read(fd, buf, offset);
-        }
-    };
+struct lazy_read : lazy_awaiter {
+    inline lazy_read(int fd, std::span<char> buf, uint64_t offset) noexcept {
+        sqe->prep_read(fd, buf, offset);
+    }
+};
 
-    struct lazy_write : lazy_awaiter {
-        inline lazy_write(
-            int fd, std::span<const char> buf, uint64_t offset
-        ) noexcept {
-            sqe->prep_write(fd, buf, offset);
-        }
-    };
+struct lazy_write : lazy_awaiter {
+    inline lazy_write(
+        int fd, std::span<const char> buf, uint64_t offset
+    ) noexcept {
+        sqe->prep_write(fd, buf, offset);
+    }
+};
 
-    struct lazy_statx : lazy_awaiter {
-        inline lazy_statx(
-            int dfd,
-            const char *path,
-            int flags,
-            unsigned int mask,
-            struct statx *statxbuf
-        ) noexcept {
-            sqe->prep_statx(dfd, path, flags, mask, statxbuf);
-        }
-    };
+struct lazy_statx : lazy_awaiter {
+    inline lazy_statx(
+        int dfd,
+        const char *path,
+        int flags,
+        unsigned int mask,
+        struct statx *statxbuf
+    ) noexcept {
+        sqe->prep_statx(dfd, path, flags, mask, statxbuf);
+    }
+};
 
-    struct lazy_fadvise : lazy_awaiter {
-        inline lazy_fadvise(
-            int fd, uint64_t offset, off_t len, int advice
-        ) noexcept {
-            sqe->prep_fadvise(fd, offset, len, advice);
-        }
-    };
+struct lazy_fadvise : lazy_awaiter {
+    inline lazy_fadvise(
+        int fd, uint64_t offset, off_t len, int advice
+    ) noexcept {
+        sqe->prep_fadvise(fd, offset, len, advice);
+    }
+};
 
-    struct lazy_madvise : lazy_awaiter {
-        inline lazy_madvise(void *addr, off_t length, int advice) noexcept {
-            sqe->prep_madvise(addr, length, advice);
-        }
-    };
+struct lazy_madvise : lazy_awaiter {
+    inline lazy_madvise(void *addr, off_t length, int advice) noexcept {
+        sqe->prep_madvise(addr, length, advice);
+    }
+};
 
-    struct lazy_send : lazy_awaiter {
-        inline lazy_send(
-            int sockfd, std::span<const char> buf, int flags
-        ) noexcept {
-            sqe->prep_send(sockfd, buf, flags);
-        }
-    };
+struct lazy_send : lazy_awaiter {
+    inline lazy_send(
+        int sockfd, std::span<const char> buf, int flags
+    ) noexcept {
+        sqe->prep_send(sockfd, buf, flags);
+    }
+};
 
-    struct lazy_send_zc : lazy_awaiter {
-        inline lazy_send_zc(
-            int sockfd, std::span<const char> buf, int flags, unsigned zc_flags
-        ) noexcept {
-            sqe->prep_send_zc(sockfd, buf, flags, zc_flags);
-        }
-    };
+struct lazy_send_zc : lazy_awaiter {
+    inline lazy_send_zc(
+        int sockfd, std::span<const char> buf, int flags, unsigned zc_flags
+    ) noexcept {
+        sqe->prep_send_zc(sockfd, buf, flags, zc_flags);
+    }
+};
 
-    struct lazy_send_zc_fixed : lazy_awaiter {
-        inline lazy_send_zc_fixed(
-            int sockfd,
-            std::span<const char> buf,
-            int flags,
-            unsigned zc_flags,
-            unsigned buf_index
-        ) noexcept {
-            sqe->prep_send_zc_fixed(sockfd, buf, flags, zc_flags, buf_index);
-        }
-    };
+struct lazy_send_zc_fixed : lazy_awaiter {
+    inline lazy_send_zc_fixed(
+        int sockfd,
+        std::span<const char> buf,
+        int flags,
+        unsigned zc_flags,
+        unsigned buf_index
+    ) noexcept {
+        sqe->prep_send_zc_fixed(sockfd, buf, flags, zc_flags, buf_index);
+    }
+};
 
-    struct lazy_sendmsg_zc : lazy_awaiter {
-        inline lazy_sendmsg_zc(
-            int fd, const msghdr *msg, unsigned flags
-        ) noexcept {
-            sqe->prep_sendmsg_zc(fd, msg, flags);
-        }
-    };
+struct lazy_sendmsg_zc : lazy_awaiter {
+    inline lazy_sendmsg_zc(int fd, const msghdr *msg, unsigned flags) noexcept {
+        sqe->prep_sendmsg_zc(fd, msg, flags);
+    }
+};
 
-    // TODO deal with prep_send_set_addr()
+// TODO deal with prep_send_set_addr()
 
-    struct lazy_recv : lazy_awaiter {
-        inline lazy_recv(int sockfd, std::span<char> buf, int flags) noexcept {
-            sqe->prep_recv(sockfd, buf, flags);
-        }
-    };
+struct lazy_recv : lazy_awaiter {
+    inline lazy_recv(int sockfd, std::span<char> buf, int flags) noexcept {
+        sqe->prep_recv(sockfd, buf, flags);
+    }
+};
 
 #if LIBURINGCXX_IS_KERNEL_REACH(5, 20)
-    struct lazy_recv_multishot : lazy_awaiter {
-        inline lazy_recv_multishot(
-            int sockfd, std::span<char> buf, int flags
-        ) noexcept {
-            sqe->prep_recv_multishot(sockfd, buf, flags);
-        }
-    };
+struct lazy_recv_multishot : lazy_awaiter {
+    inline lazy_recv_multishot(
+        int sockfd, std::span<char> buf, int flags
+    ) noexcept {
+        sqe->prep_recv_multishot(sockfd, buf, flags);
+    }
+};
 #endif
 
-    struct lazy_openat2 : lazy_awaiter {
-        inline lazy_openat2(int dfd, const char *path, open_how *how) noexcept {
-            sqe->prep_openat2(dfd, path, how);
-        }
-    };
+struct lazy_openat2 : lazy_awaiter {
+    inline lazy_openat2(int dfd, const char *path, open_how *how) noexcept {
+        sqe->prep_openat2(dfd, path, how);
+    }
+};
 
-    /* open directly into the fixed file table */
-    struct lazy_openat2_direct : lazy_awaiter {
-        inline lazy_openat2_direct(
-            int dfd, const char *path, open_how *how, unsigned int file_index
-        ) noexcept {
-            sqe->prep_openat2_direct(dfd, path, how, file_index);
-        }
-    };
+/* open directly into the fixed file table */
+struct lazy_openat2_direct : lazy_awaiter {
+    inline lazy_openat2_direct(
+        int dfd, const char *path, open_how *how, unsigned int file_index
+    ) noexcept {
+        sqe->prep_openat2_direct(dfd, path, how, file_index);
+    }
+};
 
-    struct lazy_epoll_ctl : lazy_awaiter {
-        inline lazy_epoll_ctl(
-            int epfd, int fd, int op, epoll_event *ev
-        ) noexcept {
-            sqe->prep_epoll_ctl(epfd, fd, op, ev);
-        }
-    };
+struct lazy_epoll_ctl : lazy_awaiter {
+    inline lazy_epoll_ctl(int epfd, int fd, int op, epoll_event *ev) noexcept {
+        sqe->prep_epoll_ctl(epfd, fd, op, ev);
+    }
+};
 
-    struct lazy_provide_buffers : lazy_awaiter {
-        inline lazy_provide_buffers(
-            const void *addr, int len, int nr, int bgid, int bid
-        ) noexcept {
-            sqe->prep_provide_buffers(addr, len, nr, bgid, bid);
-        }
-    };
+struct lazy_provide_buffers : lazy_awaiter {
+    inline lazy_provide_buffers(
+        const void *addr, int len, int nr, int bgid, int bid
+    ) noexcept {
+        sqe->prep_provide_buffers(addr, len, nr, bgid, bid);
+    }
+};
 
-    struct lazy_remove_buffers : lazy_awaiter {
-        inline lazy_remove_buffers(int nr, int bgid) noexcept {
-            sqe->prep_remove_buffers(nr, bgid);
-        }
-    };
+struct lazy_remove_buffers : lazy_awaiter {
+    inline lazy_remove_buffers(int nr, int bgid) noexcept {
+        sqe->prep_remove_buffers(nr, bgid);
+    }
+};
 
-    struct lazy_shutdown : lazy_awaiter {
-        inline lazy_shutdown(int fd, int how) noexcept {
-            sqe->prep_shutdown(fd, how);
-        }
-    };
+struct lazy_shutdown : lazy_awaiter {
+    inline lazy_shutdown(int fd, int how) noexcept {
+        sqe->prep_shutdown(fd, how);
+    }
+};
 
-    struct lazy_unlinkat : lazy_awaiter {
-        inline lazy_unlinkat(int dfd, const char *path, int flags) noexcept {
-            sqe->prep_unlinkat(dfd, path, flags);
-        }
-    };
+struct lazy_unlinkat : lazy_awaiter {
+    inline lazy_unlinkat(int dfd, const char *path, int flags) noexcept {
+        sqe->prep_unlinkat(dfd, path, flags);
+    }
+};
 
-    struct lazy_unlink : lazy_awaiter {
-        inline lazy_unlink(const char *path, int flags) noexcept {
-            sqe->prep_unlink(path, flags);
-        }
-    };
+struct lazy_unlink : lazy_awaiter {
+    inline lazy_unlink(const char *path, int flags) noexcept {
+        sqe->prep_unlink(path, flags);
+    }
+};
 
-    struct lazy_renameat : lazy_awaiter {
-        inline lazy_renameat(
-            int olddfd,
-            const char *oldpath,
-            int newdfd,
-            const char *newpath,
-            int flags
-        ) noexcept {
-            sqe->prep_renameat(olddfd, oldpath, newdfd, newpath, flags);
-        }
-    };
+struct lazy_renameat : lazy_awaiter {
+    inline lazy_renameat(
+        int olddfd,
+        const char *oldpath,
+        int newdfd,
+        const char *newpath,
+        int flags
+    ) noexcept {
+        sqe->prep_renameat(olddfd, oldpath, newdfd, newpath, flags);
+    }
+};
 
-    struct lazy_rename : lazy_awaiter {
-        inline lazy_rename(const char *oldpath, const char *newpath) noexcept {
-            sqe->prep_rename(oldpath, newpath);
-        }
-    };
+struct lazy_rename : lazy_awaiter {
+    inline lazy_rename(const char *oldpath, const char *newpath) noexcept {
+        sqe->prep_rename(oldpath, newpath);
+    }
+};
 
-    struct lazy_sync_file_range : lazy_awaiter {
-        inline lazy_sync_file_range(
-            int fd, uint32_t len, uint64_t offset, int flags
-        ) noexcept {
-            sqe->prep_sync_file_range(fd, len, offset, flags);
-        }
-    };
+struct lazy_sync_file_range : lazy_awaiter {
+    inline lazy_sync_file_range(
+        int fd, uint32_t len, uint64_t offset, int flags
+    ) noexcept {
+        sqe->prep_sync_file_range(fd, len, offset, flags);
+    }
+};
 
-    struct lazy_mkdirat : lazy_awaiter {
-        inline lazy_mkdirat(int dfd, const char *path, mode_t mode) noexcept {
-            sqe->prep_mkdirat(dfd, path, mode);
-        }
-    };
+struct lazy_mkdirat : lazy_awaiter {
+    inline lazy_mkdirat(int dfd, const char *path, mode_t mode) noexcept {
+        sqe->prep_mkdirat(dfd, path, mode);
+    }
+};
 
-    struct lazy_mkdir : lazy_awaiter {
-        inline lazy_mkdir(const char *path, mode_t mode) noexcept {
-            sqe->prep_mkdir(path, mode);
-        }
-    };
+struct lazy_mkdir : lazy_awaiter {
+    inline lazy_mkdir(const char *path, mode_t mode) noexcept {
+        sqe->prep_mkdir(path, mode);
+    }
+};
 
-    struct lazy_symlinkat : lazy_awaiter {
-        inline lazy_symlinkat(
-            const char *target, int newdirfd, const char *linkpath
-        ) noexcept {
-            sqe->prep_symlinkat(target, newdirfd, linkpath);
-        }
-    };
+struct lazy_symlinkat : lazy_awaiter {
+    inline lazy_symlinkat(
+        const char *target, int newdirfd, const char *linkpath
+    ) noexcept {
+        sqe->prep_symlinkat(target, newdirfd, linkpath);
+    }
+};
 
-    struct lazy_symlink : lazy_awaiter {
-        inline lazy_symlink(const char *target, const char *linkpath) noexcept {
-            sqe->prep_symlink(target, linkpath);
-        }
-    };
+struct lazy_symlink : lazy_awaiter {
+    inline lazy_symlink(const char *target, const char *linkpath) noexcept {
+        sqe->prep_symlink(target, linkpath);
+    }
+};
 
-    struct lazy_linkat : lazy_awaiter {
-        inline lazy_linkat(
-            int olddfd,
-            const char *oldpath,
-            int newdfd,
-            const char *newpath,
-            int flags
-        ) noexcept {
-            sqe->prep_linkat(olddfd, oldpath, newdfd, newpath, flags);
-        }
-    };
+struct lazy_linkat : lazy_awaiter {
+    inline lazy_linkat(
+        int olddfd,
+        const char *oldpath,
+        int newdfd,
+        const char *newpath,
+        int flags
+    ) noexcept {
+        sqe->prep_linkat(olddfd, oldpath, newdfd, newpath, flags);
+    }
+};
 
-    struct lazy_link : lazy_awaiter {
-        inline lazy_link(
-            const char *oldpath, const char *newpath, int flags
-        ) noexcept {
-            sqe->prep_link(oldpath, newpath, flags);
-        }
-    };
+struct lazy_link : lazy_awaiter {
+    inline lazy_link(
+        const char *oldpath, const char *newpath, int flags
+    ) noexcept {
+        sqe->prep_link(oldpath, newpath, flags);
+    }
+};
 
 #if LIBURINGCXX_IS_KERNEL_REACH(5, 18)
-    struct lazy_msg_ring : lazy_awaiter {
-        inline lazy_msg_ring(
-            int fd,
-            unsigned int cqe_res,
-            uint64_t cqe_user_data,
-            unsigned int flags
-        ) noexcept {
-            sqe->prep_msg_ring(fd, cqe_res, cqe_user_data, flags);
-        }
-    };
+struct lazy_msg_ring : lazy_awaiter {
+    inline lazy_msg_ring(
+        int fd, unsigned int cqe_res, uint64_t cqe_user_data, unsigned int flags
+    ) noexcept {
+        sqe->prep_msg_ring(fd, cqe_res, cqe_user_data, flags);
+    }
+};
 #endif
 
-    struct lazy_getxattr : lazy_awaiter {
-        inline lazy_getxattr(
-            const char *name, char *value, const char *path, size_t len
-        ) noexcept {
-            sqe->prep_getxattr(name, value, path, len);
-        }
-    };
+struct lazy_getxattr : lazy_awaiter {
+    inline lazy_getxattr(
+        const char *name, char *value, const char *path, size_t len
+    ) noexcept {
+        sqe->prep_getxattr(name, value, path, len);
+    }
+};
 
-    struct lazy_setxattr : lazy_awaiter {
-        inline lazy_setxattr(
-            const char *name,
-            char *value,
-            const char *path,
-            int flags,
-            size_t len
-        ) noexcept {
-            sqe->prep_setxattr(name, value, path, flags, len);
-        }
-    };
+struct lazy_setxattr : lazy_awaiter {
+    inline lazy_setxattr(
+        const char *name, char *value, const char *path, int flags, size_t len
+    ) noexcept {
+        sqe->prep_setxattr(name, value, path, flags, len);
+    }
+};
 
-    struct lazy_fgetxattr : lazy_awaiter {
-        inline lazy_fgetxattr(
-            int fd, const char *name, char *value, size_t len
-        ) noexcept {
-            sqe->prep_fgetxattr(fd, name, value, len);
-        }
-    };
+struct lazy_fgetxattr : lazy_awaiter {
+    inline lazy_fgetxattr(
+        int fd, const char *name, char *value, size_t len
+    ) noexcept {
+        sqe->prep_fgetxattr(fd, name, value, len);
+    }
+};
 
-    struct lazy_fsetxattr : lazy_awaiter {
-        inline lazy_fsetxattr(
-            int fd, const char *name, const char *value, int flags, size_t len
-        ) noexcept {
-            sqe->prep_fsetxattr(fd, name, value, flags, len);
-        }
-    };
+struct lazy_fsetxattr : lazy_awaiter {
+    inline lazy_fsetxattr(
+        int fd, const char *name, const char *value, int flags, size_t len
+    ) noexcept {
+        sqe->prep_fsetxattr(fd, name, value, flags, len);
+    }
+};
 
-    struct lazy_socket : lazy_awaiter {
-        inline lazy_socket(
-            int domain, int type, int protocol, unsigned int flags
-        ) noexcept {
-            sqe->prep_socket(domain, type, protocol, flags);
-        }
-    };
+struct lazy_socket : lazy_awaiter {
+    inline lazy_socket(
+        int domain, int type, int protocol, unsigned int flags
+    ) noexcept {
+        sqe->prep_socket(domain, type, protocol, flags);
+    }
+};
 
-    struct lazy_socket_direct : lazy_awaiter {
-        inline lazy_socket_direct(
-            int domain,
-            int type,
-            int protocol,
-            unsigned file_index,
-            unsigned int flags
-        ) noexcept {
-            sqe->prep_socket_direct(domain, type, protocol, file_index, flags);
-        }
-    };
+struct lazy_socket_direct : lazy_awaiter {
+    inline lazy_socket_direct(
+        int domain,
+        int type,
+        int protocol,
+        unsigned file_index,
+        unsigned int flags
+    ) noexcept {
+        sqe->prep_socket_direct(domain, type, protocol, file_index, flags);
+    }
+};
 
-    struct lazy_socket_direct_alloc : lazy_awaiter {
-        inline lazy_socket_direct_alloc(
-            int domain, int type, int protocol, unsigned int flags
-        ) noexcept {
-            sqe->prep_socket_direct_alloc(domain, type, protocol, flags);
-        }
-    };
+struct lazy_socket_direct_alloc : lazy_awaiter {
+    inline lazy_socket_direct_alloc(
+        int domain, int type, int protocol, unsigned int flags
+    ) noexcept {
+        sqe->prep_socket_direct_alloc(domain, type, protocol, flags);
+    }
+};
 
-    struct lazy_yield {
-        static constexpr bool await_ready() noexcept { return false; }
+struct lazy_yield {
+    static constexpr bool await_ready() noexcept { return false; }
 
-        static void await_suspend(std::coroutine_handle<> current) noexcept {
-            auto &worker = *detail::this_thread.worker;
-            worker.co_spawn(current);
-        }
-
-        constexpr void await_resume() const noexcept {}
-
-        constexpr lazy_yield() noexcept = default;
-    };
-
-    /****************************
-     *    Helper for link_io    *
-     ****************************
-     */
-
-    inline lazy_link_io &&
-    operator&&(lazy_awaiter &&lhs, struct lazy_link_timeout &&rhs) noexcept {
-        set_link_awaiter(lhs);
-        return std::move(rhs);
+    static void await_suspend(std::coroutine_handle<> current) noexcept {
+        auto &worker = *detail::this_thread.worker;
+        worker.co_spawn(current);
     }
 
-} // namespace detail
+    constexpr void await_resume() const noexcept {}
 
-} // namespace co_context
+    constexpr lazy_yield() noexcept = default;
+};
+
+/****************************
+ *    Helper for link_io    *
+ ****************************
+ */
+
+inline lazy_link_io &&
+operator&&(lazy_awaiter &&lhs, struct lazy_link_timeout &&rhs) noexcept {
+    set_link_awaiter(lhs);
+    return std::move(rhs);
+}
+
+} // namespace co_context::detail
