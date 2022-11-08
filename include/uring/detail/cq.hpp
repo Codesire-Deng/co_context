@@ -49,6 +49,21 @@ namespace detail {
         friend class ::liburingcxx::uring;
         completion_queue() noexcept = default;
         ~completion_queue() noexcept = default;
+
+        template<uint64_t uring_flags>
+        [[nodiscard]] cq_entry &cqe_at(unsigned offset) noexcept {
+            constexpr int shift =
+                bool(uring_flags & IORING_SETUP_CQE32) ? 1 : 0;
+            return cqes[(offset & ring_mask) << shift];
+        }
+
+        template<uint64_t uring_flags>
+        [[nodiscard]] const cq_entry &const_cqe_at(unsigned offset
+        ) const noexcept {
+            constexpr int shift =
+                bool(uring_flags & IORING_SETUP_CQE32) ? 1 : 0;
+            return cqes[(offset & ring_mask) << shift];
+        }
     };
 
     struct cq_entry_getter {
