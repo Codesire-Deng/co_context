@@ -164,8 +164,6 @@ namespace detail {
             }
         }
 
-        template<uint64_t uring_flags>
-            requires(bool(uring_flags &uring_setup::sqe_reorder))
         inline void append_sq_entry(const sq_entry *const sqe) noexcept {
             array[sqe_tail++ & ring_mask] = sqe - sqes;
             assert(sqe_tail - *khead <= ring_entries);

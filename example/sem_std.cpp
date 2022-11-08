@@ -1,3 +1,4 @@
+//NOLINTBEGIN
 #include <array>
 #include <chrono>
 #include <cstddef>
@@ -84,13 +85,18 @@ void workerThread(unsigned id) {
 }
 
 int main() {
-    std::vector<std::jthread> threads;
+    std::vector<std::thread> threads;
     threads.reserve(max_threads);
 
     Guide::show_info();
     Guide::start_time();
 
     for (auto id{0U}; id != max_threads; ++id) {
-        threads.push_back(std::jthread(workerThread, id));
+        threads.push_back(std::thread(workerThread, id));
+    }
+
+    for (auto &thread : threads) {
+        thread.join();
     }
 }
+//NOLINTEND
