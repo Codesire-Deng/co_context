@@ -490,7 +490,7 @@ inline void io_context::handle_cq_entry(const liburingcxx::cq_entry *const cqe
     const int32_t result = cqe->res;
     [[maybe_unused]] const uint32_t flags = cqe->flags;
 
-    if (config::log_level <= config::level::debug && result < 0) {
+    if (config::is_log_d && result < 0) {
         log::d(
             "cqe reports error: user_data=%lx, result=%d, flags=%u\n"
             "message: %s\n",
@@ -650,7 +650,7 @@ inline void io_context::do_completion_part() {
                 num = ring.for_each_cqe([this](const cq_entry *cqe) {
                     this->handle_cq_entry(cqe);
                 });
-                if constexpr (config::log_level <= config::level::debug) {
+                if constexpr (config::is_log_d) {
                     if (num == 0) [[unlikely]] {
                         log::d("wait_cq_entry() gets 0 cqe.\n");
                     }
