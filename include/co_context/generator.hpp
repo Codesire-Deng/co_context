@@ -3,7 +3,13 @@
 // Authors: Casey Carter, Lewis Baker, Corentin Jabot.
 // https://godbolt.org/z/5hcaPcfvP
 //
-
+// NOLINTBEGIN
+#pragma once
+#if !defined(__GNUG__) || defined(__clang__)
+#error Up to now this header can only be compiled by g++.
+#error PS: Clang 14 is known to be not happy with this header.
+#endif
+#pragma GCC system_header
 #include <algorithm>
 #include <cassert>
 #include <coroutine>
@@ -588,3 +594,4 @@ class generator
         : _Coro(_Coro_) {}
 };
 } // namespace co_context
+// NOLINTEND

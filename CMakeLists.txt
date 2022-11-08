@@ -49,8 +49,31 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     endif()
 
     message("CMAKE_CXX_FLAGS = ${CMAKE_CXX_FLAGS}")
+
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "14.0.0")
+        message(FATAL_ERROR "Insufficient clang version, requires clang 14.0 or above")
+    endif()
+
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsized-deallocation -std=c++20")
+
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+
+    if (${CMAKE_BUILD_TYPE} MATCHES Debug)
+        message("Enable -fsanitize for clang")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=undefined,address")
+    else()
+        message(${CMAKE_BUILD_TYPE})
+        message("Disable -fsanitize for clang")
+    endif()
+
+    if (${CMAKE_BUILD_TYPE} MATCHES Release)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -flto")
+    endif()
+
+    message("CMAKE_CXX_FLAGS = ${CMAKE_CXX_FLAGS}")
 else()
-    message(FATAL_ERROR "GNU g++ is required, but the compiler id is ${CMAKE_CXX_COMPILER_ID}.\nPS: Neither Clang nor MSVC are supported yet.")
+    message(FATAL_ERROR "[g++/clang] is required, but the compiler id is ${CMAKE_CXX_COMPILER_ID}.")
 endif()
 
 if (FORCE_TO_USE_MIMALLOC)

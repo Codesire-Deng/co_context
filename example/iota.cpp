@@ -1,3 +1,5 @@
+#if defined(__GNUG__) && !defined(__clang__)
+
 #include <co_context/generator.hpp>
 #include <iostream>
 #include <cassert>
@@ -18,3 +20,15 @@ int main() {
 
     return 0;
 }
+
+#else
+
+#include <iostream>
+
+int main() {
+    std::cout << "This program requires g++ as the compiler. exit..."
+              << std::endl;
+    return 0;
+}
+
+#endif

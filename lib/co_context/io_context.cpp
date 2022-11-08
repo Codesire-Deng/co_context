@@ -4,6 +4,7 @@
 #include "co_context/config.hpp"
 #include "co_context/co/condition_variable.hpp"
 #include "co_context/co/semaphore.hpp"
+#include "co_context/compat.hpp"
 #include "co_context/detail/eager_io_state.hpp"
 #include "co_context/io_context.hpp"
 #include "co_context/utility/set_cpu_affinity.hpp"
@@ -354,9 +355,8 @@ void io_context::try_submit(detail::submit_info &info) noexcept {
         return;
     } else {
         using submit_type = detail::submit_type;
-        task_info *const io_info = std::assume_aligned<alignof(task_info)>(
-            detail::raw_task_info_ptr(info.address)
-        );
+        task_info *const io_info = CO_CONTEXT_ASSUME_ALIGNED(alignof(task_info)
+        )(detail::raw_task_info_ptr(info.address));
 
         // PERF May call cur.pop() to make worker start sooner.
         switch (uint32_t(info.address) & 0b111U) {
@@ -500,10 +500,10 @@ inline void io_context::poll_completion() noexcept {
 
     if constexpr (config::enable_eager_io) {
         if (user_data & uint64_t(task_type::eager_sqe)) [[unlikely]] {
-            auto *const eager_io_info =
-                std::assume_aligned<8>(reinterpret_cast /*NOLINT*/<task_info *>(
-                    user_data ^ uint64_t(task_type::eager_sqe)
-                ));
+            auto *const eager_io_info = CO_CONTEXT_ASSUME_ALIGNED(8
+            )(reinterpret_cast /*NOLINT*/<task_info *>(
+                user_data ^ uint64_t(task_type::eager_sqe)
+            ));
             eager_io_info->result = result;
             if (eager_io_need_awake(eager_io_info)) [[likely]] {
                 reap_or_overflow(detail::reap_info{eager_io_info->handle});
@@ -520,9 +520,8 @@ inline void io_context::poll_completion() noexcept {
         }
     }
 
-    task_info *const io_info = std::assume_aligned<alignof(task_info)>(
-        detail::raw_task_info_ptr(user_data)
-    );
+    task_info *const io_info = CO_CONTEXT_ASSUME_ALIGNED(alignof(task_info)
+    )(detail::raw_task_info_ptr(user_data));
     reap_or_overflow(detail::reap_info{io_info, result, flags});
 }
 

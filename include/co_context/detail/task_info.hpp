@@ -1,5 +1,6 @@
 #pragma once
 #include "co_context/config.hpp"
+#include "co_context/compat.hpp"
 #include "co_context/log/log.hpp"
 #include <coroutine>
 #include <memory>
@@ -76,7 +77,7 @@ inline constexpr uintptr_t raw_task_info_mask =
 static_assert((~raw_task_info_mask) == 0x7);
 
 inline task_info *raw_task_info_ptr(uintptr_t info) noexcept {
-    return std::assume_aligned<alignof(task_info)>(
+    return  CO_CONTEXT_ASSUME_ALIGNED(alignof(task_info))(
         reinterpret_cast /*NOLINT*/<task_info *>(info & raw_task_info_mask)
     );
 }
