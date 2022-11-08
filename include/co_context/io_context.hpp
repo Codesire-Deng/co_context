@@ -218,7 +218,7 @@ class [[nodiscard]] io_context final {
 
     void do_submission_part() noexcept;
 
-    void do_completion_part();
+    void do_completion_part() noexcept;
 
     void do_worker_part();
 

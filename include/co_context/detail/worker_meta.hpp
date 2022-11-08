@@ -76,7 +76,7 @@ struct worker_meta final {
 
     void co_spawn(std::coroutine_handle<> entrance) noexcept;
 
-    void worker_run_loop(int thread_index, io_context *context);
+    [[deprecated]] void worker_run_loop(int thread_index, io_context *context);
 
     void worker_run_once();
 };

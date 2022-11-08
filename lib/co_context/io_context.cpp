@@ -454,7 +454,7 @@ inline void io_context::reap_or_overflow(detail::reap_info info) noexcept {
     }
 }
 
-static bool eager_io_need_awake(detail::task_info *io_info) {
+static bool eager_io_need_awake(detail::task_info *io_info) noexcept {
     using io_state_t = eager::io_state_t;
     const io_state_t old_state =
         as_atomic(io_info->eager_io_state)
@@ -631,14 +631,14 @@ inline void io_context::do_submission_part() noexcept {
     // }
 }
 
-inline void io_context::do_completion_part() {
+inline void io_context::do_completion_part() noexcept {
     // TODO judge the memory order (relaxed may cause bugs)
     // TODO consider reap_poll_rounds and reap_overflow_buf
     // NOTE in the future: if an IO generates multiple requests_to_reap，
     // it must be counted carefully
     if (requests_to_reap > 0) [[likely]] {
         using cq_entry = liburingcxx::cq_entry;
-        auto num = ring.for_each_cqe([this](const cq_entry *cqe) {
+        auto num = ring.for_each_cqe([this](const cq_entry *cqe) noexcept {
             this->handle_cq_entry(cqe);
         });
 
@@ -647,7 +647,7 @@ inline void io_context::do_completion_part() {
             if (num == 0 && !has_task_ready) [[unlikely]] {
                 const cq_entry *_;
                 ring.wait_cq_entry(_);
-                num = ring.for_each_cqe([this](const cq_entry *cqe) {
+                num = ring.for_each_cqe([this](const cq_entry *cqe) noexcept {
                     this->handle_cq_entry(cqe);
                 });
                 if constexpr (config::is_log_d) {

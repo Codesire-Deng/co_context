@@ -516,7 +516,9 @@ inline int uring<uring_flags>::wait_cq_entries(
 #endif
 
 template<uint64_t uring_flags>
-inline void uring<uring_flags>::seen_cq_entry(const cq_entry *cqe) noexcept {
+inline void
+uring<uring_flags>::seen_cq_entry([[maybe_unused]] const cq_entry *cqe
+) noexcept {
     assert(cqe != nullptr);
     cq_advance(1);
 }
