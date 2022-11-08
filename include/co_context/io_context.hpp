@@ -193,7 +193,12 @@ class [[nodiscard]] io_context final {
     /**
      * @brief poll the completion inside the io_uring
      */
-    void poll_completion() noexcept;
+    [[deprecated]] void poll_completion() noexcept;
+
+    /**
+     * @brief handle an non-null cq_entry from the cq of io_uring
+     */
+    void handle_cq_entry(const liburingcxx::cq_entry *) noexcept;
 
     /**
      * @brief forward the completion waiting in the overflow buffer.

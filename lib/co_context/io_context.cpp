@@ -478,12 +478,17 @@ inline void io_context::poll_completion() noexcept {
         return;
     }
 
+    handle_cq_entry(polling_cqe);
+}
+
+inline void io_context::handle_cq_entry(const liburingcxx::cq_entry *const cqe
+) noexcept {
     --requests_to_reap;
     log::v("ctx poll_completion found, remaining=%d\n", requests_to_reap);
 
-    const uint64_t user_data = polling_cqe->user_data;
-    const int32_t result = polling_cqe->res;
-    [[maybe_unused]] const uint32_t flags = polling_cqe->flags;
+    const uint64_t user_data = cqe->user_data;
+    const int32_t result = cqe->res;
+    [[maybe_unused]] const uint32_t flags = cqe->flags;
 
     if (config::log_level <= config::level::debug && result < 0) {
         log::d(
@@ -493,7 +498,7 @@ inline void io_context::poll_completion() noexcept {
         );
     }
 
-    ring.seen_cq_entry(polling_cqe);
+    ring.seen_cq_entry(cqe);
     assert(flags != detail::reap_info::co_spawn_flag);
 
     using task_type = task_info::task_type;
@@ -632,26 +637,25 @@ inline void io_context::do_completion_part() {
     // NOTE in the future: if an IO generates multiple requests_to_reap，
     // it must be counted carefully
     if (requests_to_reap > 0) [[likely]] {
-        auto num = ring.cq_ready_relaxed();
+        using cq_entry = liburingcxx::cq_entry;
+        auto num = ring.for_each_cqe([this](const cq_entry *cqe) {
+            this->handle_cq_entry(cqe);
+        });
 
         // io_context can block itself in the following situation
         if constexpr (config::worker_threads_number == 0 && config::is_using_wait_and_notify) {
             if (num == 0 && !has_task_ready) [[unlikely]] {
-                const liburingcxx::cq_entry *_;
+                const cq_entry *_;
                 ring.wait_cq_entry(_);
-                num = ring.cq_ready_relaxed();
+                num = ring.for_each_cqe([this](const cq_entry *cqe) {
+                    this->handle_cq_entry(cqe);
+                });
                 if constexpr (config::log_level <= config::level::debug) {
-                    if (num == 0) {
+                    if (num == 0) [[unlikely]] {
                         log::d("wait_cq_entry() gets 0 cqe.\n");
                     }
                 }
             }
-        }
-
-        // TODO enhance perf here: reuse the internal head-tail
-        // infomation of the ring
-        while (num-- > 0) {
-            poll_completion();
         }
     } else {
         if constexpr (config::worker_threads_number == 0) {

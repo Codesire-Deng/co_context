@@ -17,14 +17,18 @@
  */
 #pragma once
 
-#include <cstdint>
 #ifndef _XOPEN_SOURCE
 #define _XOPEN_SOURCE 500 /* Required for glibc to expose sigset_t */
 #endif
 
-#include "uring/compat.h"
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE /* Required for musl to expose cpu_set_t */
+#endif
+
+#include "uring/cq_entry.hpp"
 #include "uring/barrier.h"
 #include "uring/buf_ring.hpp"
+#include "uring/compat.h"
 #include "uring/detail/cq.hpp"
 #include "uring/detail/int_flags.h"
 #include "uring/detail/sq.hpp"
@@ -32,10 +36,13 @@
 #include "uring/syscall.hpp"
 #include "uring/uring_define.hpp"
 #include "uring/utility/kernel_version.hpp"
+#include <algorithm>
 #include <cassert>
 #include <cerrno>
 #include <cinttypes>
+#include <concepts>
 #include <csignal>
+#include <cstdint>
 #include <ctime>
 #include <linux/swab.h>
 #include <sched.h>
@@ -44,6 +51,8 @@
 #include <sys/stat.h>
 #include <sys/uio.h>
 #include <system_error>
+#include <type_traits>
+#include <utility>
 
 struct statx;
 
@@ -156,6 +165,20 @@ class [[nodiscard]] uring final {
         sigset_t *sigmask
     ) noexcept;
 #endif
+
+    template<typename F>
+        requires std::regular_invocable<F, cq_entry *>
+                 && std::is_void_v<std::invoke_result_t<F, cq_entry *>>
+    unsigned for_each_cqe(F f) noexcept(noexcept(f(std::declval<cq_entry *>()))
+    ) {
+        unsigned count = 0;
+        for (auto head = *cq.khead; head != io_uring_smp_load_acquire(cq.ktail);
+             ++head, ++count) {
+            cq_entry *const cqe = &cq.cqe_at<uring_flags>(head);
+            f(cqe);
+        }
+        return count;
+    }
 
     void cq_advance(unsigned num) noexcept;
 
@@ -737,9 +760,6 @@ __peek_cq_entry_return_type uring<uring_flags>::__peek_cq_entry() noexcept {
     __peek_cq_entry_return_type ret;
     ret.err = 0;
 
-    constexpr int shift = bool(uring_flags & IORING_SETUP_CQE32) ? 1 : 0;
-    const unsigned mask = cq.ring_mask;
-
     while (true) {
         const unsigned tail = io_uring_smp_load_acquire(cq.ktail);
         const unsigned head = *cq.khead;
@@ -750,7 +770,7 @@ __peek_cq_entry_return_type uring<uring_flags>::__peek_cq_entry() noexcept {
             break;
         }
 
-        ret.cqe = cq.cqes + ((head & mask) << shift);
+        ret.cqe = &cq.cqe_at<uring_flags>(head);
         if (!(this->features & IORING_FEAT_EXT_ARG)
             && ret.cqe->user_data == LIBURING_UDATA_TIMEOUT) [[unlikely]] {
             if (ret.cqe->res < 0) [[unlikely]] {
