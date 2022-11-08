@@ -16,7 +16,7 @@ A C++20 **coroutine** framework offering highly-concurrent I/O with a reasonable
 
 ### Requirement
 
-1. GCC 11.3.0 or above.
+1. GCC 11.3.0 or Clang 14 or above.
 2. [Optional] [mimalloc](https://github.com/microsoft/mimalloc). You may install it by package manager or from source.
 3. **Linux kernel** >= 5.6. The newer the better.
     - Run `uname -r` to see your kernel version.
@@ -133,7 +133,7 @@ void log_error(int err) {
 
 #### Generator
 
-An awesome sequence generator which can play with `std::range`.
+An awesome sequence generator which can play with `std::range`. *Requires g++*
 
 ```cpp
 co_context::generator<int> gen_iota(int x) {

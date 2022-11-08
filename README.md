@@ -15,7 +15,7 @@ co_context 基于 Linux io_uring，其性能通常优于 epoll。
 
 ### 依赖
 
-1. GCC 11.3.0 或更高。
+1. GCC 11.3.0 或 Clang 14 或更高。
 2. [可选] [mimalloc](https://github.com/microsoft/mimalloc)  从包管理器或源代码安装。
 3. Linux 内核版本 >= 5.6，建议 >= 5.11，越新越好。
     - 运行 `uname -r` 即可查看你的内核版本。
@@ -133,7 +133,7 @@ void log_error(int err) {
 
 #### Generator
 
-炫到没朋友的生成器，可配合`std::range`。
+炫到没朋友的生成器，可配合`std::range`。 *需要 g++*
 
 ```cpp
 co_context::generator<int> gen_iota(int x) {
