@@ -33,7 +33,8 @@ int main() {
         ctx.co_spawn(run());
     }
 
-    ctx.run();
+    ctx.start();
+    ctx.join();
 
     return 0;
 }

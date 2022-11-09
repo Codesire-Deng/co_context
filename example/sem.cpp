@@ -98,5 +98,6 @@ int main() {
     Guide::show_info();
     Guide::start_time();
 
-    ctx.run();
+    ctx.start();
+    ctx.join();
 }

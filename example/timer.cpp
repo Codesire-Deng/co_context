@@ -13,6 +13,7 @@ int main() {
     io_context ctx;
     ctx.co_spawn(cycle(1, "1 sec"));
     ctx.co_spawn(cycle(3, "\t3 sec"));
-    ctx.run();
+    ctx.start();
+    ctx.join();
     return 0;
 }

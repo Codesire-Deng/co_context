@@ -51,7 +51,8 @@ int main(int argc, char *argv[]) {
         exit(0);
     }());
 
-    io_context.run();
+    io_context.start();
+    context.join();
 
     return 0;
 }

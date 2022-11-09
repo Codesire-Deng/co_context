@@ -58,7 +58,7 @@ class lazy_awaiter {
     friend void set_link_awaiter(lazy_awaiter &awaiter) noexcept;
 
     lazy_awaiter() noexcept : io_info(task_info::task_type::lazy_sqe) {
-        io_info.tid_hint = detail::this_thread.tid;
+        io_info.ctx_id_hint = detail::this_thread.ctx_id;
         sqe = this_thread.worker->get_free_sqe();
         assert(sqe != nullptr);
         sqe->set_data(io_info.as_user_data());
@@ -738,7 +738,7 @@ struct lazy_yield {
 
     static void await_suspend(std::coroutine_handle<> current) noexcept {
         auto &worker = *detail::this_thread.worker;
-        worker.co_spawn(current);
+        worker.co_spawn_unsafe(current);
     }
 
     constexpr void await_resume() const noexcept {}

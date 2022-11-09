@@ -49,7 +49,8 @@ int main(int argc, char *argv[]) {
         context.co_spawn(gen_task());
     }
 
-    context.run();
+    context.start();
+    context.join();
 
     return 0;
 }

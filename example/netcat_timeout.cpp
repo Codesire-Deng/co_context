@@ -72,7 +72,8 @@ int main(int argc, const char *argv[]) {
         context.co_spawn(client(argv[1], port));
     }
 
-    context.run();
+    context.start();
+    context.join();
 
     return 0;
 }

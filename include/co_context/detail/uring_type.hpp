@@ -1,6 +1,7 @@
 #pragma once
 
 #include "co_context/config.hpp"
+#include "uring/io_uring.h"
 #include "uring/uring.hpp"
 
 namespace co_context::detail {
@@ -15,6 +16,9 @@ using uring = liburingcxx::uring<
      */
     // PERF check IORING_SETUP_TASKRUN_FLAG
     | config::io_uring_coop_taskrun_flag
+#endif
+#if LIBURINGCXX_IS_KERNEL_REACH(6, 0)
+    | IORING_SETUP_SINGLE_ISSUER
 #endif
     >;
 

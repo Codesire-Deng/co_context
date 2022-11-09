@@ -32,7 +32,7 @@ struct [[nodiscard]] task_info {
     };
 
     union {
-        config::tid_t tid_hint;
+        config::ctx_id_t ctx_id_hint;
         config::eager_io_state_t eager_io_state; // for eager_io
     };
 
@@ -77,9 +77,8 @@ inline constexpr uintptr_t raw_task_info_mask =
 static_assert((~raw_task_info_mask) == 0x7);
 
 inline task_info *raw_task_info_ptr(uintptr_t info) noexcept {
-    return  CO_CONTEXT_ASSUME_ALIGNED(alignof(task_info))(
-        reinterpret_cast /*NOLINT*/<task_info *>(info & raw_task_info_mask)
-    );
+    return CO_CONTEXT_ASSUME_ALIGNED(alignof(task_info)
+    )(reinterpret_cast /*NOLINT*/<task_info *>(info & raw_task_info_mask));
 }
 
 } // namespace co_context::detail

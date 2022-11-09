@@ -23,6 +23,7 @@ int main() {
     io_context ctx;
     ctx.co_spawn(prod());
     ctx.co_spawn(cons());
-    ctx.run();
+    ctx.start();
+    ctx.join();
     return 0;
 }

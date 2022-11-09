@@ -24,7 +24,8 @@ inline static void send_task(std::coroutine_handle<> awaken_coro) noexcept {
     assert(
         worker != nullptr && "mutex::unlock() must run inside an io_context"
     );
-    worker->co_spawn(awaken_coro);
+    // TODO forward to other io_context?
+    worker->co_spawn_unsafe(awaken_coro);
 }
 
 void mutex::unlock() noexcept {

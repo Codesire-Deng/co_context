@@ -81,7 +81,8 @@ int main(int argc, char *argv[]) {
     file_size = argc == 5 ? atoll(argv[4]) : 60'000'000;
     context.co_spawn(client(argv[1], port, concurrency));
 
-    context.run();
+    context.start();
+    context.join();
 
     return 0;
 }

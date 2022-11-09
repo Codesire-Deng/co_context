@@ -79,7 +79,8 @@ int main(int argc, char *argv[]) {
 
         server s(io_context, std::atoi(argv[1]));
 
-        io_context.run();
+        io_context.start();
+        context.join();
     } catch (std::exception &e) {
         std::cerr << "Exception: " << e.what() << "\n";
     }

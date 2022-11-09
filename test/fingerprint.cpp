@@ -86,7 +86,8 @@ int main(int argc, char *argv[]) {
     io_context context;
     context.co_spawn(server(port, argv[2]));
 
-    context.run();
+    context.start();
+    context.join();
 
     return 0;
 }

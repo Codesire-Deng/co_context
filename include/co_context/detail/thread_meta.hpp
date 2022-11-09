@@ -14,10 +14,11 @@ namespace co_context::detail {
 struct worker_meta;
 
 struct alignas(config::cache_line_size) thread_meta {
-    io_context *ctx;
-    uring *ring;
-    worker_meta *worker;
-    config::tid_t tid;
+    // The running io_context on this thread.
+    io_context *ctx = nullptr;
+    worker_meta *worker = nullptr; // ctx + offset = worker
+
+    config::ctx_id_t ctx_id = -1;
 };
 
 extern thread_local thread_meta this_thread;

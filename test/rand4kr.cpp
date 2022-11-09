@@ -103,7 +103,8 @@ int main(int argc, char *argv[]) {
         co_await eager::nop();
     }());
 
-    context.run();
+    context.start();
+    context.join();
 
     return 0;
 }

@@ -49,11 +49,8 @@ namespace config {
     // ========================================================================
 
     // ====================== Thread model configuration ======================
-    using threads_number_size_t = uint16_t;
-
-    using tid_size_t = threads_number_size_t;
-
-    using tid_t = tid_size_t;
+    // At most 255 threads/io_contexts.
+    using ctx_id_t = uint8_t;
 
     inline constexpr bool is_using_hyper_threading = true;
 
@@ -73,16 +70,16 @@ namespace config {
      * @note If your program is CPU-bound, try to increase this. Otherwise,
      * decreasing this and use more io_contexts will benefit IO-bound program.
      */
-    inline constexpr tid_size_t worker_threads_number = 0;
-    // inline constexpr tid_size_t worker_threads_number = 1;
-    // inline constexpr tid_size_t worker_threads_number = 2;
-    // inline constexpr tid_size_t worker_threads_number = 3;
-    // inline constexpr tid_size_t worker_threads_number = 4;
+    inline constexpr ctx_id_t worker_threads_number = 0;
+    // inline constexpr ctx_id_t worker_threads_number = 1;
+    // inline constexpr ctx_id_t worker_threads_number = 2;
+    // inline constexpr ctx_id_t worker_threads_number = 3;
+    // inline constexpr ctx_id_t worker_threads_number = 4;
 
     /**
      * @note Do not modify this, check `worker_threads_number` instead.
      */
-    inline constexpr tid_size_t workers_number =
+    inline constexpr ctx_id_t workers_number =
         worker_threads_number > 1 ? worker_threads_number : 1;
 
     // ========================================================================
@@ -114,9 +111,9 @@ namespace config {
     inline constexpr uint32_t default_io_uring_entries =
         std::bit_ceil<uint32_t>(swap_capacity * 2U * workers_number);
 
-    inline constexpr uint8_t submit_poll_rounds = 1;
+    [[deprecated]] inline constexpr uint8_t submit_poll_rounds = 1;
 
-    inline constexpr uint8_t reap_poll_rounds = 1;
+    [[deprecated]] inline constexpr uint8_t reap_poll_rounds = 1;
     // ========================================================================
 
     // ========================== net configuration ===========================

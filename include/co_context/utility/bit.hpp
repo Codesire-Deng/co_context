@@ -14,8 +14,4 @@ inline constexpr T lowbit(T x) noexcept {
     return x & (-x);
 }
 
-template<typename T>
-concept trival_ptr = std::is_trivially_copyable_v<T>
-                     && sizeof(T) == sizeof(std::uintptr_t);
-
 } // namespace co_context

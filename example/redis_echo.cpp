@@ -22,6 +22,7 @@ task<> server() {
 int main() {
     io_context ctx;
     ctx.co_spawn(server());
-    ctx.run();
+    ctx.start();
+    ctx.join();
     return 0;
 }
