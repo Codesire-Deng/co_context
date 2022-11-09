@@ -47,7 +47,8 @@ int main() {
         ctx.co_spawn(client(hostname, port));
     }
 
-    ctx.run();
+    ctx.start();
+    ctx.join();
 
     return 0;
 }

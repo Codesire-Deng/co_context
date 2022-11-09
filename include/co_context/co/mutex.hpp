@@ -1,6 +1,7 @@
 #pragma once
 
 #include "co_context/detail/task_info.hpp"
+#include "co_context/detail/thread_meta.hpp"
 #include <atomic>
 #include <cassert>
 #include <coroutine>
@@ -58,7 +59,7 @@ class mutex final {
         friend class mutex;
         friend class locked_mutex;
         friend class detail::cv_wait_awaiter;
-        friend class io_context;
+        friend struct detail::worker_meta;
     };
 
     class [[nodiscard("Did you forget to co_await?")]] lock_guard_awaiter final

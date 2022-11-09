@@ -45,7 +45,7 @@ class [[nodiscard("Did you forget to co_await?")]] cv_wait_awaiter final {
 
     cv_wait_awaiter *next = nullptr;
     friend class ::co_context::condition_variable;
-    friend class ::co_context::io_context;
+    friend struct detail::worker_meta;
 };
 
 } // namespace co_context::detail
@@ -93,7 +93,7 @@ class condition_variable final {
 
   private:
     friend class detail::cv_wait_awaiter;
-    friend class io_context;
+    friend struct detail::worker_meta;
 
     std::atomic<cv_wait_awaiter *> awaiting;
     cv_wait_awaiter *to_resume_head = nullptr;

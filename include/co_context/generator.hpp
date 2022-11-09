@@ -594,4 +594,5 @@ class generator
         : _Coro(_Coro_) {}
 };
 } // namespace co_context
+
 // NOLINTEND

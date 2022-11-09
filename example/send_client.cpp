@@ -36,6 +36,7 @@ task<> client() {
 int main() {
     io_context ctx;
     ctx.co_spawn(client());
-    ctx.run();
+    ctx.start();
+    ctx.join();
     return 0;
 }

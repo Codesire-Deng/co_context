@@ -33,6 +33,7 @@ task<> coro(S s) {
 int main() {
     io_context ctx;
     ctx.co_spawn(coro(S{1}));
-    ctx.run();
+    ctx.start();
+    ctx.join();
     return 0;
 }

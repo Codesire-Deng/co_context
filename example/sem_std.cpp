@@ -1,4 +1,4 @@
-//NOLINTBEGIN
+// NOLINTBEGIN
 #include <array>
 #include <chrono>
 #include <cstddef>
@@ -99,4 +99,5 @@ int main() {
         thread.join();
     }
 }
-//NOLINTEND
+
+// NOLINTEND

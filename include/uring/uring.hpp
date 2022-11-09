@@ -106,7 +106,7 @@ class [[nodiscard]] uring final {
     submission_queue sq;
     completion_queue cq;
     // unsigned flags; // is now uring_flags
-    int ring_fd;
+    int ring_fd = -1;
 
     unsigned features;
     int enter_ring_fd;
@@ -189,12 +189,16 @@ class [[nodiscard]] uring final {
     int unregister_ring_fd();
 
   public:
-    uring(unsigned entries, params &params);
+    /**
+     * @brief Init the io_uring.
+     * @note Must be call on the Corresponding thread. (Ring per thread)
+     * @param entries The size of sq ring. Must be pow of 2.
+     */
+    void init(unsigned entries);
+    void init(unsigned entries, params &params);
+    void init(unsigned entries, params &&params);
 
-    uring(unsigned entries, params &&params) : uring(entries, params) {}
-
-    explicit uring(unsigned entries)
-        : uring(entries, params{static_cast<uint32_t>(uring_flags)}) {}
+    explicit uring() noexcept = default;
 
     /**
      * ban all copying or moving
@@ -571,9 +575,12 @@ int uring<uring_flags>::unregister_ring_fd() {
 }
 
 template<uint64_t uring_flags>
-uring<uring_flags>::uring(unsigned entries, params &params) {
+void uring<uring_flags>::init(unsigned entries, params &params) {
+    assert(this->ring_fd == -1 && "The uring may be inited twice.");
+
     // override the params.flags
     params.flags = static_cast<uint32_t>(uring_flags);
+
     const int fd = __sys_io_uring_setup(entries, &params);
     if (fd < 0) [[unlikely]] {
         throw std::system_error{
@@ -581,7 +588,7 @@ uring<uring_flags>::uring(unsigned entries, params &params) {
     }
 
     std::memset(this, 0, sizeof(*this)); // NOLINT
-    // this->flags = params.flags;
+
     this->ring_fd = this->enter_ring_fd = fd;
     this->features = params.features;
     this->int_flags = 0;
@@ -598,7 +605,20 @@ uring<uring_flags>::uring(unsigned entries, params &params) {
 }
 
 template<uint64_t uring_flags>
+void uring<uring_flags>::init(unsigned entries, params &&params) {
+    init(entries, params);
+}
+
+template<uint64_t uring_flags>
+void uring<uring_flags>::init(unsigned entries) {
+    init(entries, params{static_cast<uint32_t>(uring_flags)});
+}
+
+template<uint64_t uring_flags>
 uring<uring_flags>::~uring() noexcept {
+    if (this->ring_fd == -1) {
+        return;
+    }
     __sys_munmap(sq.sqes, sq.ring_entries * sizeof(io_uring_sqe));
     unmap_rings();
     __sys_close(ring_fd);

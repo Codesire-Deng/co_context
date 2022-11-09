@@ -46,7 +46,8 @@ int main() {
     ctx.co_spawn(waits());
     ctx.co_spawn(waits());
     ctx.co_spawn(signals());
-    ctx.run();
+    ctx.start();
+    ctx.join();
 
     return 0;
 }

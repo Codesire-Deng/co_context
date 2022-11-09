@@ -3,9 +3,9 @@
 #include "co_context/config.hpp"
 #include "co_context/detail/reap_info.hpp"
 #include "co_context/detail/submit_info.hpp"
-#include "co_context/detail/swap_zone.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/detail/uring_type.hpp"
+#include "co_context/lockfree/spsc_cursor.hpp"
 #include "co_context/log/log.hpp"
 #include "co_context/task.hpp"
 #include <queue>
@@ -19,37 +19,35 @@ class io_context;
 
 namespace co_context::detail {
 
+using config::cache_line_size;
+
 struct worker_meta final {
+    // An instant of io_uring
+    alignas(cache_line_size) uring ring;
+
+    alignas(cache_line_size
+    ) std::array<detail::submit_info, config::swap_capacity> submit_swap;
+
+    std::array<detail::reap_info, config::swap_capacity> reap_swap;
+
     using cur_t = config::cur_t;
 
-    /**
-     * @brief sharing zone with main thread
-     */
-    struct sharing_zone {
-        alignas(config::cache_line_size
-        ) spsc_cursor<cur_t, config::swap_capacity> submit_cur;
+    spsc_cursor<cur_t, config::swap_capacity, false> submit_cur;
 
-        alignas(config::cache_line_size
-        ) worker_swap_zone<detail::submit_info> submit_swap;
+    spsc_cursor<cur_t, config::swap_capacity, false> reap_cur;
 
-        alignas(config::cache_line_size
-        ) spsc_cursor<cur_t, config::swap_capacity> reap_cur;
+    // number of I/O tasks running inside io_uring
+    int32_t requests_to_reap = 0;
 
-        alignas(config::cache_line_size
-        ) worker_swap_zone<detail::reap_info> reap_swap;
-    };
+    // if there is at least one entry to submit to io_uring
+    bool need_ring_submit = false;
 
-    using tid_t = config::threads_number_size_t;
+    // if there is at least one task newly spawned or forwarded
+    [[nodiscard]] bool has_task_ready() const noexcept {
+        return !reap_cur.is_empty();
+    }
 
-    alignas(config::cache_line_size) sharing_zone sharing;
-
-    alignas(config::cache_line_size) io_context *ctx = nullptr;
-    detail::uring *ring = nullptr;
-    tid_t tid;
-    std::thread host_thread;
-    /*
-    std::queue<submit_info> submit_overflow_buf;
-    */
+    config::ctx_id_t ctx_id;
 
     liburingcxx::sq_entry *get_free_sqe() noexcept;
 
@@ -57,42 +55,102 @@ struct worker_meta final {
 
     void submit_non_sqe(uintptr_t typed_task) noexcept;
 
-    /*
-    void try_clear_submit_overflow_buf() noexcept;
-    */
+    void wait_uring() noexcept;
 
-    std::coroutine_handle<> schedule() noexcept;
-
-    [[nodiscard]] cur_t number_to_schedule_relaxed() const noexcept {
-        const auto &cur = this->sharing.reap_cur;
+    [[nodiscard]] cur_t number_to_schedule() const noexcept {
+        const auto &cur = this->reap_cur;
         return cur.size();
     }
 
-    std::coroutine_handle<> try_schedule() noexcept;
+    // Get a coroutine to run. May return nullptr.
+    [[nodiscard]] std::coroutine_handle<> schedule() noexcept;
 
-    void init(int thread_index, io_context *context);
+    void init(unsigned io_uring_entries);
 
-    void co_spawn(task<void> &&entrance) noexcept;
+    void co_spawn_unsafe(std::coroutine_handle<> entrance) noexcept;
 
-    void co_spawn(std::coroutine_handle<> entrance) noexcept;
+    void co_spawn_safe_lazy(std::coroutine_handle<> entrance) noexcept;
 
-    [[deprecated]] void worker_run_loop(int thread_index, io_context *context);
+    void co_spawn_safe_eager(std::coroutine_handle<> entrance) noexcept;
 
-    void worker_run_once();
+    void work_once();
+
+    /**
+     * @brief poll the submission swap zone
+     */
+    void poll_submission() noexcept;
+
+    /**
+     * @brief poll the uring completion queue
+     *
+     * @return number of cqes handled by worker
+     */
+    uint32_t poll_completion() noexcept;
+
+    /**
+     * @brief forward a coroutine to a random worker. If failed (because workers
+     * are full), forward to the overflow buffer.
+     */
+    void forward_task(std::coroutine_handle<> handle) noexcept;
+
+    /**
+     * @brief handler where io_context finds a semaphore::release task
+     */
+    void handle_semaphore_release(task_info *sem_release) noexcept;
+
+    /**
+     * @brief handler where io_context finds a condition_variable::notify_* task
+     */
+    void handle_condition_variable_notify(task_info *cv_notify) noexcept;
+
+    /**
+     * @brief handle the submission from the worker.
+     */
+    void submit(detail::submit_info &info) noexcept;
+
+    /**
+     * @brief forward the completion from the io_uring to a worker. If failed
+     * (because workers are full), do nothing.
+     */
+    void reap(detail::reap_info info) noexcept;
+
+    /**
+     * @brief handle an non-null cq_entry from the cq of io_uring
+     */
+    void handle_cq_entry(const liburingcxx::cq_entry *) noexcept;
+
+    explicit worker_meta() = default;
+
+  private:
+    [[nodiscard]] bool check_init(unsigned expect_sqring_size) const noexcept;
 };
 
-inline void worker_meta::co_spawn(std::coroutine_handle<> entrance) noexcept {
-    assert(entrance.address() != nullptr);
+inline void worker_meta::co_spawn_unsafe(std::coroutine_handle<> entrance
+) noexcept {
     log::v(
-        "worker[%u] co_spawn coro %lx\n", this_thread.tid, entrance.address()
+        "worker[%u] co_spawn_unsafe coro(%lx)\n", ctx_id, entrance.address()
     );
-    this->submit_non_sqe(reinterpret_cast<uintptr_t>(entrance.address()));
+    forward_task(entrance);
 }
 
-inline void worker_meta::co_spawn(task<void> &&entrance) noexcept {
-    assert(entrance.get_handle().address() != nullptr);
-    this->co_spawn(entrance.get_handle());
-    entrance.detach();
+inline void worker_meta::co_spawn_safe_lazy(std::coroutine_handle<> entrance
+) noexcept {
+    assert(false && "todo");
+}
+
+inline void worker_meta::co_spawn_safe_eager(std::coroutine_handle<> entrance
+) noexcept {
+    assert(false && "todo");
+}
+
+inline uint32_t worker_meta::poll_completion() noexcept {
+    using cq_entry = liburingcxx::cq_entry;
+
+    uint32_t num = ring.for_each_cqe([this](const cq_entry *cqe) noexcept {
+        this->handle_cq_entry(cqe);
+    });
+
+    return num;
 }
 
 } // namespace co_context::detail

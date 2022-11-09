@@ -1,6 +1,7 @@
 #pragma once
 
 #include "co_context/detail/task_info.hpp"
+#include "co_context/detail/thread_meta.hpp"
 #include "co_context/utility/as_atomic.hpp"
 #include <type_traits>
 
@@ -32,7 +33,7 @@ class counting_semaphore final {
         acquire_awaiter *next;
         std::coroutine_handle<> handle;
         friend class counting_semaphore;
-        friend class io_context;
+        friend struct detail::worker_meta;
     };
 
   public:
@@ -59,7 +60,7 @@ class counting_semaphore final {
     void release(T update = 1) noexcept;
 
   private:
-    friend class io_context;
+    friend struct detail::worker_meta;
     std::coroutine_handle<> try_release() noexcept;
 
   private:

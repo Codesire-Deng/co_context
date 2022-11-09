@@ -71,7 +71,7 @@ namespace detail {
         // PERF memory allocation
         eager_awaiter()
             : shared_io_info(new task_info{task_info::task_type::eager_sqe}) {
-            shared_io_info->eager_io_state = 0; // instead of tid_hint
+            shared_io_info->eager_io_state = 0; // instead of ctx_id_hint
             sqe = this_thread.worker->get_free_sqe();
             sqe->set_data(shared_io_info->as_eager_user_data());
         }

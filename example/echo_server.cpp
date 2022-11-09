@@ -1,13 +1,13 @@
 #include "co_context/net.hpp"
 using namespace co_context;
 
-task<> session(int sock) {
-    co_context::socket sock_{sock};
+task<> session(int sockfd) {
+    co_context::socket sock{sockfd};
     char buf[1000];
 
     while (true) {
-        int nr = co_await sock_.recv(buf);
-        co_await sock_.send({buf, (size_t)nr});
+        int nr = co_await sock.recv(buf);
+        co_await sock.send({buf, (size_t)nr});
     }
 }
 
@@ -21,6 +21,7 @@ task<> server(const uint16_t port) {
 int main() {
     io_context ctx;
     ctx.co_spawn(server(1234));
-    ctx.run();
+    ctx.start();
+    ctx.join();
     return 0;
 }

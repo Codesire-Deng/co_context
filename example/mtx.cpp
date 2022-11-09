@@ -19,5 +19,6 @@ int main() {
     for (int i = 0; i < 1000; ++i) {
         ctx.co_spawn(add());
     }
-    ctx.run();
+    ctx.start();
+    ctx.join();
 }

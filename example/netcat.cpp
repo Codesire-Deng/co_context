@@ -10,7 +10,7 @@ task<> recv_session(Socket sock) {
 
     while (nr > 0) {
         nr = co_await (
-            lazy::write(STDOUT_FILENO, {buf, (size_t)nr}) && sock.recv(buf)
+            /*lazy::write(STDOUT_FILENO, {buf, (size_t)nr}) &&*/ sock.recv(buf)
         );
     }
 }
@@ -68,7 +68,8 @@ int main(int argc, const char *argv[]) {
         context.co_spawn(client(argv[1], port));
     }
 
-    context.run();
+    context.start();
+    context.join();
 
     return 0;
 }

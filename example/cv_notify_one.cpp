@@ -66,6 +66,7 @@ int main() {
     ctx.co_spawn(worker_thread());
     ctx.co_spawn(main_thread());
 
-    ctx.run();
+    ctx.start();
+    ctx.join();
     return 0;
 }

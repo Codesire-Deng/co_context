@@ -88,7 +88,8 @@ int main(int argc, char *argv[]) {
         context.co_spawn(run());
     }
 
-    context.run();
+    context.start();
+    context.join();
 
     return 0;
 }
