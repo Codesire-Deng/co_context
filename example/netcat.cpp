@@ -10,7 +10,7 @@ task<> recv_session(Socket sock) {
 
     while (nr > 0) {
         nr = co_await (
-            /*lazy::write(STDOUT_FILENO, {buf, (size_t)nr}) &&*/ sock.recv(buf)
+            lazy::write(STDOUT_FILENO, {buf, (size_t)nr}) && sock.recv(buf)
         );
     }
 }
