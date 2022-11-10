@@ -78,7 +78,7 @@ liburingcxx::sq_entry *worker_meta::get_free_sqe() noexcept {
     auto &swap = this->submit_swap;
     auto &cur = this->submit_cur;
 
-    cur.wait_for_available();
+    assert(cur.is_available());
     const auto tail = cur.tail();
 
     swap[tail].address = 0UL;
@@ -97,7 +97,7 @@ void worker_meta::submit_non_sqe(uintptr_t typed_task) noexcept {
     auto &swap = this->submit_swap;
     auto &cur = this->submit_cur;
 
-    cur.wait_for_available();
+    assert(cur.is_available());
     const auto tail = cur.tail();
 
     swap[tail].address = typed_task;
