@@ -75,22 +75,17 @@ bool worker_meta::check_init(unsigned expect_sqring_size) const noexcept {
 }
 
 liburingcxx::sq_entry *worker_meta::get_free_sqe() noexcept {
-    auto &swap = this->submit_swap;
-    auto &cur = this->submit_cur;
+    log::v("worker[%u] get_free_sqe\n", this_thread.ctx_id);
+    ++requests_to_reap; // NOTE may required no reap or required multi-reap.
+    need_ring_submit = true;
 
-    assert(cur.is_available());
-    const auto tail = cur.tail();
-
-    swap[tail].address = 0UL;
-    log::v("worker[%u] get_free_sqe at [%u]\n", this_thread.ctx_id, tail);
-    cur.push(1);
-    return this->ring.get_sq_entry();
+    auto *sqe = this->ring.get_sq_entry();
+    assert(sqe != nullptr);
+    return sqe;
 }
 
 void worker_meta::submit_sqe() const noexcept {
-    const auto &cur = this->submit_cur;
-    const auto tail = cur.tail();
-    log::v("worker[%u] submit_sqe(s) at [%u]\n", this_thread.ctx_id, tail);
+    log::v("worker[%u] submit_sqe(s)\n", this_thread.ctx_id);
 }
 
 void worker_meta::submit_non_sqe(uintptr_t typed_task) noexcept {
@@ -103,11 +98,6 @@ void worker_meta::submit_non_sqe(uintptr_t typed_task) noexcept {
     swap[tail].address = typed_task;
     log::v("worker[%u] submit_non_sqe at [%u]\n", this_thread.ctx_id, tail);
     cur.push(1);
-}
-
-void worker_meta::wait_uring() noexcept {
-    [[maybe_unused]] const liburingcxx::cq_entry *_;
-    ring.wait_cq_entry(_);
 }
 
 std::coroutine_handle<> worker_meta::schedule() noexcept {
@@ -156,13 +146,22 @@ void worker_meta::poll_submission() noexcept {
     auto &cur = submit_cur;
     auto &swap = submit_swap;
 
+    // submit sqes
+    if (need_ring_submit) [[likely]] {
+        uint8_t will_wait =
+            uint8_t(!has_task_ready()) & uint8_t(cur.is_empty());
+        [[maybe_unused]] int res = ring.submit_and_wait(will_wait);
+        assert(res >= 0 && "exception at uring::submit");
+        need_ring_submit = false;
+    }
+
     if (cur.is_empty()) {
-        log::v("worker[%u] found NO submission\n", ctx_id);
+        log::v("worker[%u] found NO non-sqe submission\n", ctx_id);
         return;
     }
 
     log::v(
-        "worker[%u] found submissions [%u,%u] (%u in total)\n", ctx_id,
+        "worker[%u] found non-sqe submissions [%u,%u] (%u in total)\n", ctx_id,
         cur.head(), cur.tail() - 1, cur.size()
     );
 
@@ -171,52 +170,35 @@ void worker_meta::poll_submission() noexcept {
 
     for (; head != tail; ++head) {
         const auto i{head & cur.mask};
-        log::v("ctx submit(swap[%d])\n", i);
+        log::v("worker[%u] submit(swap[%d])\n", ctx_id, i);
         submit(swap[i]); // always success (currently).
     }
 
-    cur.m_head = tail;
-
-    if (need_ring_submit) [[likely]] {
-        [[maybe_unused]] int res = ring.submit();
-        assert(res >= 0 && "exception at uring::submit");
-        need_ring_submit = false;
-    }
+    cur.m_head = tail; // consume submit_cur
 }
 
 void worker_meta::submit(submit_info &info) noexcept {
-    // lazy_sqe or eager_sqe
-    if (info.address == 0) [[likely]] {
-        // submit to ring
-        ++requests_to_reap;
-        log::v(
-            "worker[%u] submit to io_uring"
-            " with requests_to_reap=%d ...\n",
-            ctx_id, requests_to_reap
-        );
-        need_ring_submit = true;
-        return;
-    } else {
-        using submit_type = detail::submit_type;
-        task_info *const io_info = CO_CONTEXT_ASSUME_ALIGNED(alignof(task_info)
-        )(detail::raw_task_info_ptr(info.address));
+    assert(info.address != 0); // sqe is impossible.
 
-        // PERF May call cur.pop() to make worker start sooner.
-        switch (uint32_t(info.address) & 0b111) {
-            case submit_type::co_spawn:
-                forward_task(std::coroutine_handle<>::from_address(info.ptr));
-                return;
-            case submit_type::sem_rel:
-                handle_semaphore_release(io_info);
-                return;
-            case submit_type::cv_notify:
-                handle_condition_variable_notify(io_info);
-                return;
-            default:
-                log::e("submit_info.address==%lx\n", info.address);
-                assert(false && "submit(): unknown task_type");
-                return;
-        }
+    using submit_type = detail::submit_type;
+    task_info *const io_info = CO_CONTEXT_ASSUME_ALIGNED(alignof(task_info)
+    )(detail::raw_task_info_ptr(info.address));
+
+    // PERF May call cur.pop() to make worker start sooner.
+    switch (uint32_t(info.address) & 0b111) {
+        case submit_type::co_spawn:
+            forward_task(std::coroutine_handle<>::from_address(info.ptr));
+            return;
+        case submit_type::sem_rel:
+            handle_semaphore_release(io_info);
+            return;
+        case submit_type::cv_notify:
+            handle_condition_variable_notify(io_info);
+            return;
+        default:
+            log::e("submit_info.address==%lx\n", info.address);
+            assert(false && "submit(): unknown task_type");
+            return;
     }
 }
 

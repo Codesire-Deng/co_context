@@ -60,7 +60,6 @@ class lazy_awaiter {
     lazy_awaiter() noexcept : io_info(task_info::task_type::lazy_sqe) {
         io_info.ctx_id_hint = detail::this_thread.ctx_id;
         sqe = this_thread.worker->get_free_sqe();
-        assert(sqe != nullptr);
         sqe->set_data(io_info.as_user_data());
     }
 
