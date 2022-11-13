@@ -59,7 +59,7 @@ void io_context::run() {
 #endif
     log::i("io_context[%u] runs on %d\n", this->id, this->tid);
 
-    while (!will_stop) {
+    while (!will_stop) [[likely]] {
         do_worker_part();
 
         do_submission_part();
@@ -67,7 +67,7 @@ void io_context::run() {
         do_completion_part();
     }
 
-    log::d("ctx stopped\n");
+    log::d("io_context[%u] stopped\n", this->id);
 }
 
 } // namespace co_context

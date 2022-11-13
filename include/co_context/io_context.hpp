@@ -28,6 +28,7 @@
 #include "co_context/detail/worker_meta.hpp"
 #include "co_context/task.hpp"
 #include <condition_variable>
+#include <cstdint>
 #include <mutex>
 #include <queue>
 #include <sys/types.h>
@@ -199,12 +200,14 @@ inline void io_context::do_completion_part() noexcept {
         auto num = worker.poll_completion();
 
         // io_context will block itself here
-        if (num == 0 && !worker.has_task_ready()) [[unlikely]] {
+        uint32_t will_not_wait =
+            num | worker.has_task_ready() | worker.need_ring_submit;
+        if (will_not_wait == 0) [[unlikely]] {
             worker.wait_uring();
             num = worker.poll_completion();
-            if constexpr (config::is_log_d) {
+            if constexpr (config::is_log_w) {
                 if (num == 0) [[unlikely]] {
-                    log::d("wait_cq_entry() gets 0 cqe.\n");
+                    log::w("wait_cq_entry() gets 0 cqe.\n");
                 }
             }
         }

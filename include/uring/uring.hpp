@@ -188,6 +188,8 @@ class [[nodiscard]] uring final {
 
     int unregister_ring_fd();
 
+    [[nodiscard]] bool is_cq_ring_need_enter() const noexcept;
+
   public:
     /**
      * @brief Init the io_uring.
@@ -223,8 +225,6 @@ class [[nodiscard]] uring final {
         const noexcept;
 
     [[nodiscard]] bool is_cq_ring_need_flush() const noexcept;
-
-    [[nodiscard]] bool is_cq_ring_need_enter() const noexcept;
 
     void buf_ring_cq_advance(buf_ring &br, unsigned count) noexcept;
 

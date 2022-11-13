@@ -55,6 +55,8 @@ struct worker_meta final {
 
     void submit_non_sqe(uintptr_t typed_task) noexcept;
 
+    [[nodiscard]] bool is_ring_need_enter() const noexcept;
+
     void wait_uring() noexcept;
 
     [[nodiscard]] cur_t number_to_schedule() const noexcept {
@@ -151,6 +153,15 @@ inline uint32_t worker_meta::poll_completion() noexcept {
     });
 
     return num;
+}
+
+inline bool worker_meta::is_ring_need_enter() const noexcept {
+    return ring.is_cq_ring_need_enter();
+}
+
+inline void worker_meta::wait_uring() noexcept {
+    [[maybe_unused]] const liburingcxx::cq_entry *_;
+    ring.wait_cq_entry(_);
 }
 
 } // namespace co_context::detail

@@ -145,9 +145,9 @@ namespace config {
     // inline constexpr level log_level = level::verbose;
     // inline constexpr level log_level = level::debug;
     // inline constexpr level log_level = level::info;
-    // inline constexpr level log_level = level::warning;
+    inline constexpr level log_level = level::warning;
     // inline constexpr level log_level = level::error;
-    inline constexpr level log_level = level::no_log;
+    // inline constexpr level log_level = level::no_log;
 
     inline constexpr bool is_log_v = log_level <= level::verbose;
     inline constexpr bool is_log_d = log_level <= level::debug;
