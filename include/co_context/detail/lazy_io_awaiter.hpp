@@ -30,6 +30,16 @@ class lazy_awaiter {
         submit();
     }
 
+    lazy_awaiter &set_async() &noexcept {
+        sqe->set_async();
+        return *this;
+    }
+
+    lazy_awaiter &&set_async() &&noexcept {
+        sqe->set_async();
+        return std::move(*this);
+    }
+
     /*NOLINT*/ int32_t await_resume() const noexcept { return io_info.result; }
 
   protected:
