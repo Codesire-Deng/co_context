@@ -65,9 +65,6 @@ namespace config {
     // ========================================================================
 
     // ======================= io_context configuration =======================
-    // Enabling this would significantly increase latency in multi-thread model.
-    inline constexpr bool is_using_wait_and_notify = true;
-
     using cur_t = uint16_t;
     // inline constexpr cur_t swap_capacity = 4;
     // inline constexpr cur_t swap_capacity = 8;
