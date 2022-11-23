@@ -2,12 +2,14 @@
 
 # co_context
 
-**co_context** 是一个**协程**异步多线程并发框架，以提供可靠的性能为使命，同时致力于减轻用户的心智负担，让 C++ 初学者也能轻松写出高并发程序。
-co_context 基于 Linux io_uring，其性能通常优于 epoll。
+co_context 是一个**协程**并发框架，提供可靠的性能，同时致力于减轻用户的心智负担，让 C++ 初学者也能轻松写出高并发程序。
+co_context 基于 Linux [io_uring](https://github.com/axboe/liburing)，其性能通常优于 epoll。
+
+> 出于性能原因，我们重写了 [liburing](https://github.com/axboe/liburing)，取名为 [liburingcxx](https://github.com/Codesire-Deng/liburingcxx)。
 
 ## 已有功能
 
-1. 支持 `read` `write` `timeout` 等 io_uring 提供的所有系统调用，总计 74 个功能。
+1. 支持 `read` `write` `accept` `timeout` 等 io_uring 提供的所有系统调用，总计 74 个功能。
 2. 并发支持: `mutex`, `semaphore`, `condition_variable`, `channel`。
 3. 调度提示: `yield`
 
@@ -19,13 +21,15 @@ co_context 基于 Linux io_uring，其性能通常优于 epoll。
 2. [可选] [mimalloc](https://github.com/microsoft/mimalloc)  从包管理器或源代码安装。
 3. Linux 内核版本 >= 5.6，建议 >= 5.11，越新越好。
     - 运行 `uname -r` 即可查看你的内核版本。
-    - 由于开发环境是 Linux 6.0，在其他版本下可能出现兼容性错误。如遇问题，请将报错发到[issue](https://github.com/Codesire-Deng/co_context/issues)或B站私信[@等疾风](https://space.bilibili.com/35186937)，非常感谢！
+    - 由于开发环境是 Linux 6.0，在其他版本下可能出现兼容性错误。如遇问题，请将报错发到[issue](https://github.com/Codesire-Deng/co_context/issues)，非常感谢！
     - **docker 将继承宿主机的 Linux 内核版本**。 因此，docker 无法解决 Linux 内核版本过低的问题。
 
 ### 编译命令
 
-1. 根目录下执行：`cmake -B build && cmake --build build -j`
-2. 运行代码示例：`build/example/timer`
+```bash
+cmake -B build && cmake --build build -j
+build/example/timer # 跑一个小示例
+```
 
 ## 代码示例
 
@@ -38,7 +42,7 @@ co_context 基于 Linux io_uring，其性能通常优于 epoll。
     io_context context;
 ```
 
-使用`task`定义一个 socket 监听协程：
+使用 `task<>` 定义一个 socket 监听协程。`task<>` 就像一个普通的 `void` 函数，但可以在里面使用 `co_await`。
 
 ```cpp
 task<> server(uint16_t port) {
@@ -49,7 +53,7 @@ task<> server(uint16_t port) {
 }
 ```
 
-使用`task`描述业务逻辑：
+继续使用 `task` 描述业务逻辑，例如读取 socket 的内容并输出到 stdout：
 
 ```cpp
 task<> session(co_context::socket sock) {
@@ -64,7 +68,7 @@ task<> session(co_context::socket sock) {
 }
 ```
 
-`main()` 函数调用`io_context::run()`即可：
+如何写一个 `main()`：
 
 ```cpp
 int main(int argc, const char *argv[]) {
@@ -73,16 +77,17 @@ int main(int argc, const char *argv[]) {
         return 0;
     }
 
-    io_context context;
+    io_context context; // 1. 定义一个 io_context
 
     int port = atoi(argv[2]);
     if (strcmp(argv[1], "-l") == 0) {
-        context.co_spawn(server(port)); // 创建一个监听协程
+        context.co_spawn(server(port)); // 2. 至少创建一个 task<>
     } else {
-        context.co_spawn(client(argv[1], port)); // 直接连接
+        context.co_spawn(client(argv[1], port));
     }
 
-    context.run(); // 启动 io_context（可选单线程或多线程）
+    context.start(); // 3. 启动 io_context 线程
+    context.join();  // 4. 需要时等待 io_context 线程
 
     return 0;
 }
@@ -172,6 +177,10 @@ nr = co_await (
 
 [示例：channel.cpp](https://github.com/Codesire-Deng/co_context/blob/main/test/channel.cpp)
 
+<details>
+
+<summary>Draft</summary>
+
 ## 性能
 
 co_context 在开发过程中表现出惊人的性能。早期测试见[我的博客](https://codesire-deng.github.io/2022/06/25/co-context-2/#%E5%B0%8F%E7%BB%93)。下一个开发周期将进行更多测试。
@@ -197,10 +206,6 @@ co_context 在开发过程中表现出惊人的性能。早期测试见[我的�
 6. 协程自身的缓存不友好问题（主要由 `operator new` 引起），需要借助其他工具来解决，例如 [mimalloc](https://github.com/microsoft/mimalloc)。
 
 ---
-
-<details>
-
-<summary>Draft</summary>
 
 ## 协程存在的问题
 

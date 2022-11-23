@@ -84,7 +84,8 @@ int main(int argc, const char *argv[]) {
         context.co_spawn(client(argv[1], port));
     }
 
-    context.run(); // 3. finally run()
+    context.start(); // 3. start the io_context in a new thread.
+    context.join();  // 4. wait for that thread.
 
     return 0;
 }
@@ -155,7 +156,7 @@ int main() {
 
 #### Linked IO
 
-You can use `&&` to link I/Os。Linking I/Os will enhance performance.（But only the last result will be returned by default.）
+You can use `&&` to link I/Os. Linking I/Os will enhance performance.(But only the last result will be returned by default.)
 
 ```cpp
 nr = co_await (
@@ -166,7 +167,7 @@ nr = co_await (
 
 This example use link_io in an echo_server.
 
-#### channel（experimental）
+#### channel(experimental)
 
 An blocking queue inspired by Golang.
 
