@@ -66,7 +66,9 @@ void io_context::run() {
 #endif
     log::i("io_context[%u] runs on %d\n", this->id, this->tid);
 
-    worker.listen_on_co_spawn();
+    if (meta.create_count >= 2) {
+        worker.listen_on_co_spawn();
+    }
 
     while (!will_stop) [[likely]] {
         do_worker_part();
