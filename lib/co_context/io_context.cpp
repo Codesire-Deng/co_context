@@ -33,14 +33,21 @@ void io_context::start() {
 
         {
             std::unique_lock lock{meta.mtx};
-            log::d("io_context[%u] ready.\n", this->id);
+            log::d(
+                "&meta.create_count = %lx  value = %u\n", &meta.create_count,
+                meta.create_count
+            );
+            log::d(
+                "io_context[%u] ready. %u:%u\n", this->id,
+                io_context::meta.create_count, io_context::meta.ready_count
+            );
             ++meta.ready_count;
             if (!meta.cv.wait_for(lock, std::chrono::seconds{1}, [] {
-                    return io_context::meta.count
+                    return io_context::meta.create_count
                            == io_context::meta.ready_count;
                 })) {
                 log::e("io_context initialization timeout. There exists an "
-                       "io_context that has not started.");
+                       "io_context that has not started.\n");
                 std::exit(1);
             }
         }
@@ -58,6 +65,8 @@ void io_context::run() {
     detail::set_cpu_affinity(detail::this_thread.ctx_id);
 #endif
     log::i("io_context[%u] runs on %d\n", this->id, this->tid);
+
+    worker.listen_on_co_spawn();
 
     while (!will_stop) [[likely]] {
         do_worker_part();

@@ -6,21 +6,40 @@
 #include "co_context/detail/eager_io_state.hpp"
 #include "co_context/detail/sem_task_meta.hpp"
 #include "co_context/detail/thread_meta.hpp"
+#include "co_context/detail/user_data.hpp"
 #include "co_context/io_context.hpp"
 #include "co_context/log/log.hpp"
+#include "co_context/utility/as_buffer.hpp"
 #include "co_context/utility/set_cpu_affinity.hpp"
 #include "uring/cq_entry.hpp"
 #include "uring/uring_define.hpp"
 #include <atomic>
+#include <cerrno>
 #include <cstdint>
+#include <exception>
 #include <memory>
 #include <mutex>
 #include <thread>
 #include <unistd.h>
+#include <sys/eventfd.h>
 
 namespace co_context::detail {
 
 thread_local thread_meta this_thread;
+
+worker_meta::worker_meta() noexcept {
+    co_spawn_event_fd = ::eventfd(0, 0);
+    if (co_spawn_event_fd == -1) [[unlikely]] {
+        log::e("Errors on eventfd(). errno = %d\n", errno);
+        std::terminate();
+    }
+}
+
+worker_meta::~worker_meta() noexcept {
+    if (co_spawn_event_fd != -1) [[likely]] {
+        ::close(co_spawn_event_fd);
+    }
+}
 
 void worker_meta::init(unsigned io_uring_entries) {
     this->ctx_id = this_thread.ctx_id;
@@ -98,6 +117,13 @@ void worker_meta::submit_non_sqe(uintptr_t typed_task) noexcept {
     swap[tail].address = typed_task;
     log::v("worker[%u] submit_non_sqe at [%u]\n", this_thread.ctx_id, tail);
     cur.push(1);
+}
+
+void worker_meta::listen_on_co_spawn() noexcept {
+    auto *const sqe = get_free_sqe();
+    sqe->prep_read(co_spawn_event_fd, as_buf(&co_spawn_event_buf), 0);
+    sqe->set_data(static_cast<uint64_t>(reserved_user_data::co_spawn_event));
+    submit_sqe();
 }
 
 std::coroutine_handle<> worker_meta::schedule() noexcept {
@@ -312,6 +338,11 @@ void worker_meta::handle_cq_entry(const liburingcxx::cq_entry *const cqe
     ring.seen_cq_entry(cqe);
     assert(flags != detail::reap_info::co_spawn_flag);
 
+    if (user_data < uint64_t(detail::reserved_user_data::nop)) [[unlikely]] {
+        handle_reserved_user_data(user_data);
+        return;
+    }
+
     using task_type = task_info::task_type;
 
     if constexpr (config::enable_eager_io) {
@@ -339,6 +370,56 @@ void worker_meta::handle_cq_entry(const liburingcxx::cq_entry *const cqe
     task_info *const io_info = CO_CONTEXT_ASSUME_ALIGNED(alignof(task_info)
     )(detail::raw_task_info_ptr(user_data));
     reap(detail::reap_info{io_info, result, flags});
+}
+
+void worker_meta::handle_reserved_user_data(const uint64_t user_data) noexcept {
+    using type = detail::reserved_user_data;
+    switch (type(user_data)) {
+        case type::co_spawn_event:
+            handle_co_spawn_events();
+            break;
+        case type::nop:
+            break;
+    }
+}
+
+void worker_meta::handle_co_spawn_events() noexcept {
+    assert(co_spawn_local_queue.empty());
+
+    {
+        std::lock_guard lg{co_spawn_mtx};
+        co_spawn_local_queue.swap(co_spawn_queue);
+    }
+
+    const size_t overflow_level = reap_cur.available_number();
+    size_t num = co_spawn_local_queue.size();
+
+    if (overflow_level < num) [[unlikely]] {
+        log::e(
+            "Too many co_spawn() exhausted reap_swap "
+            "at worker[%u]: panding = %u, free_space = %u\n",
+            this->ctx_id, num, overflow_level
+        );
+        std::terminate();
+    }
+
+    if constexpr (config::is_log_w) {
+        const size_t warning_level = overflow_level / 4 * 3;
+        if (warning_level <= num) [[unlikely]] {
+            log::w(
+                "Too many co_spawn(). worker[%u] is running out of "
+                "reap_swap: panding = %u, free_space = %u\n",
+                this->ctx_id, num, overflow_level
+            );
+        }
+    }
+
+    while (num--) {
+        forward_task(co_spawn_local_queue.front());
+        co_spawn_local_queue.pop();
+    }
+
+    listen_on_co_spawn();
 }
 
 } // namespace co_context::detail

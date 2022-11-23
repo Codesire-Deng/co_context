@@ -41,8 +41,8 @@ namespace detail {
     struct io_context_meta {
         std::mutex mtx;
         std::condition_variable cv;
-        config::ctx_id_t count = 0;
-        config::ctx_id_t ready_count = 0;
+        config::ctx_id_t create_count; // Do not initialize this
+        config::ctx_id_t ready_count;  // Do not initialize this
     };
 } // namespace detail
 
@@ -115,7 +115,11 @@ class [[nodiscard]] io_context final {
   public:
     explicit io_context() noexcept {
         std::lock_guard lg{meta.mtx};
-        this->id = meta.count++;
+        this->id = meta.create_count++;
+        log::d(
+            "&meta.create_count = %lx  value = %u\n", &meta.create_count,
+            meta.create_count
+        );
     }
 
     void co_spawn(task<void> &&entrance) noexcept;
@@ -148,7 +152,7 @@ class [[nodiscard]] io_context final {
 
 // Must be called by corresponding thread.
 inline void io_context::init() {
-    this->tid = getpid();
+    this->tid = ::gettid();
     detail::this_thread.ctx = this;
     detail::this_thread.ctx_id = this->id;
 
@@ -168,11 +172,12 @@ inline void io_context::co_spawn_unsafe(task<void> &&entrance) noexcept {
 }
 
 inline void io_context::co_spawn(std::coroutine_handle<> handle) noexcept {
-    // MT-unsafe in some scenes
-    if (detail::this_thread.ctx == this || meta.ready_count == 0) [[likely]] {
+    // MT-unsafe in some scenes (for meta.ready_count == 0)
+    // before calling io_context::start(), this_thread.ctx is nullptr.
+    if (detail::this_thread.ctx == this || meta.ready_count == 0) [[unlikely]] {
         worker.co_spawn_unsafe(handle);
     } else {
-        assert(false && "todo");
+        worker.co_spawn_safe_eager(handle);
     }
 }
 
@@ -217,17 +222,6 @@ inline void io_context::do_completion_part() noexcept {
 }
 
 inline void co_spawn(task<void> &&entrance) noexcept {
-    assert(
-        detail::this_thread.ctx != nullptr
-        && "Can not co_spawn() on the thread "
-           "without a running io_context!"
-    );
-    auto handle = entrance.get_handle();
-    entrance.detach();
-    detail::this_thread.ctx->co_spawn(handle);
-}
-
-inline void co_spawn_unsafe(task<void> &&entrance) noexcept {
     assert(
         detail::this_thread.ctx != nullptr
         && "Can not co_spawn() on the thread "
