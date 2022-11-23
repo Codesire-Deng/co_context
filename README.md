@@ -53,7 +53,7 @@ task<> server(uint16_t port) {
 }
 ```
 
-继续使用 `task` 描述业务逻辑，例如读取 socket 的内容并输出到 stdout：
+继续使用 `task<T>` 描述业务逻辑，例如读取 socket 的内容并输出到 stdout：
 
 ```cpp
 task<> session(co_context::socket sock) {
@@ -65,6 +65,18 @@ task<> session(co_context::socket sock) {
         co_await lazy::write(STDOUT_FILENO, {buf, (size_t)nr});
         nr = co_await sock.recv(buf);
     }
+}
+```
+
+`task<T>` 和普通 `T` 函数一样可以任意嵌套：
+
+```cpp
+task<int> the_answer() {
+    co_return 42;
+}
+task<> universe() {
+    printf("The answer is %d\n", co_await the_answer());
+    co_return;
 }
 ```
 
@@ -136,6 +148,12 @@ void log_error(int err) {
 }
 ```
 
+#### 负载均衡
+
+每个 `io_context` 代表一个线程。要负载均衡，只需将 `task<>` 分配到合理的 `io_context`。
+
+[示例：echo_server_MT.cpp](./example/echo_server_MT.cpp)
+
 #### Generator
 
 炫到没朋友的生成器，可配合`std::range`。 *需要 g++*
@@ -175,7 +193,7 @@ nr = co_await (
 
 借鉴自 Go 语言的阻塞队列。
 
-[示例：channel.cpp](https://github.com/Codesire-Deng/co_context/blob/main/test/channel.cpp)
+[示例：channel.cpp](./test/channel.cpp)
 
 <details>
 

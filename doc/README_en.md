@@ -66,6 +66,18 @@ task<> session(co_context::socket sock) {
 }
 ```
 
+`task<T> f()` is just like `T f()` which can be nested arbitrarily.
+
+```cpp
+task<int> the_answer() {
+    co_return 42;
+}
+task<> universe() {
+    printf("The answer is %d\n", co_await the_answer());
+    co_return;
+}
+```
+
 How to write `main()`:
 
 ```cpp
@@ -132,6 +144,12 @@ void log_error(int err) {
 }
 ```
 
+#### Load balancing
+
+An `io_context` is an OS-thread. For load balancing, just dispatch those `task<>` to appropriate `io_context`.
+
+[example: echo_server_MT.cpp](../example/echo_server_MT.cpp)
+
 #### Generator
 
 An awesome sequence generator which can play with `std::range`. *Requires g++*
@@ -171,7 +189,7 @@ This example use link_io in an echo_server.
 
 An blocking queue inspired by Golang.
 
-[example: channel.cpp](https://github.com/Codesire-Deng/co_context/blob/main/test/channel.cpp)
+[example: channel.cpp](../test/channel.cpp)
 
 
 <details>
