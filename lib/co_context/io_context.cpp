@@ -33,21 +33,17 @@ void io_context::start() {
 
         {
             std::unique_lock lock{meta.mtx};
+            ++meta.ready_count;
             log::d(
-                "&meta.create_count = %lx  value = %u\n", &meta.create_count,
-                meta.create_count
-            );
-            log::d(
-                "io_context[%u] ready. %u:%u\n", this->id,
+                "io_context[%u] ready. (%u/%u)\n", this->id,
                 io_context::meta.create_count, io_context::meta.ready_count
             );
-            ++meta.ready_count;
             if (!meta.cv.wait_for(lock, std::chrono::seconds{1}, [] {
                     return io_context::meta.create_count
                            == io_context::meta.ready_count;
                 })) {
                 log::e("io_context initialization timeout. There exists an "
-                       "io_context that has not started.\n");
+                       "io_context that has not been started.\n");
                 std::exit(1);
             }
         }
