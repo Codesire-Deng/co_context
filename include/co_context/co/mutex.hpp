@@ -14,7 +14,6 @@ namespace detail {
 
 class mutex final {
   public:
-    using task_info = detail::task_info;
 
     class [[nodiscard("Did you forget to co_await?")]] lock_awaiter {
       public:

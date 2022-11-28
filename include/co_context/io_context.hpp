@@ -20,7 +20,6 @@
 
 #include "uring/uring.hpp"
 #include "co_context/config.hpp"
-#include "co_context/detail/reap_info.hpp"
 #include "co_context/detail/submit_info.hpp"
 #include "co_context/detail/task_info.hpp"
 #include "co_context/detail/thread_meta.hpp"
@@ -102,9 +101,9 @@ class [[nodiscard]] io_context final {
 
     friend void co_spawn_unsafe(task<void> &&entrance) noexcept;
 
-    void co_spawn(std::coroutine_handle<> entrance) noexcept;
+    void co_spawn(std::coroutine_handle<> handle) noexcept;
 
-    void co_spawn_unsafe(std::coroutine_handle<> entrance) noexcept;
+    void co_spawn_unsafe(std::coroutine_handle<> handle) noexcept;
 
     void do_submission_part() noexcept;
 
@@ -177,7 +176,11 @@ inline void io_context::co_spawn(std::coroutine_handle<> handle) noexcept {
     if (detail::this_thread.ctx == this || meta.ready_count == 0) [[unlikely]] {
         worker.co_spawn_unsafe(handle);
     } else {
-        worker.co_spawn_safe_eager(handle);
+#if CO_CONTEXT_IS_USING_MSG_RING
+        worker.co_spawn_safe_msg_ring(handle);
+#else
+        worker.co_spawn_safe_eventfd(handle);
+#endif
     }
 }
 
@@ -201,7 +204,11 @@ inline void io_context::do_submission_part() noexcept {
 inline void io_context::do_completion_part() noexcept {
     // NOTE in the future: if an IO generates multiple requests_to_reap，
     // it must be counted carefully
-    if (worker.requests_to_reap > 0) [[likely]] {
+
+    bool need_check_ring =
+        (meta.ready_count > 1) | (worker.requests_to_reap > 0);
+
+    if (need_check_ring) [[likely]] {
         auto num = worker.poll_completion();
 
         // io_context will block itself here

@@ -22,7 +22,7 @@ struct submit_info {
     };
 };
 
-enum submit_type : uint8_t { co_spawn, sem_rel, cv_notify };
+enum submit_type : uint8_t { sem_rel, cv_notify };
 
 /*
 - submit:

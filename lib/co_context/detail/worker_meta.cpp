@@ -3,8 +3,8 @@
 #include "co_context/co/semaphore.hpp"
 #include "co_context/compat.hpp"
 #include "co_context/detail/cv_task_meta.hpp"
-#include "co_context/detail/eager_io_state.hpp"
 #include "co_context/detail/sem_task_meta.hpp"
+#include "co_context/detail/task_info.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/detail/user_data.hpp"
 #include "co_context/io_context.hpp"
@@ -15,18 +15,23 @@
 #include "uring/uring_define.hpp"
 #include <atomic>
 #include <cerrno>
+#include <coroutine>
 #include <cstdint>
 #include <exception>
 #include <memory>
 #include <mutex>
 #include <thread>
 #include <unistd.h>
+
+#if CO_CONTEXT_IS_USING_EVENTFD
 #include <sys/eventfd.h>
+#endif
 
 namespace co_context::detail {
 
 thread_local thread_meta this_thread;
 
+#if CO_CONTEXT_IS_USING_EVENTFD
 worker_meta::worker_meta() noexcept {
     co_spawn_event_fd = ::eventfd(0, 0);
     if (co_spawn_event_fd == -1) [[unlikely]] {
@@ -40,6 +45,7 @@ worker_meta::~worker_meta() noexcept {
         ::close(co_spawn_event_fd);
     }
 }
+#endif
 
 void worker_meta::init(unsigned io_uring_entries) {
     this->ctx_id = this_thread.ctx_id;
@@ -47,8 +53,12 @@ void worker_meta::init(unsigned io_uring_entries) {
 
     ring.init(io_uring_entries);
 
+#if CO_CONTEXT_IS_USING_MSG_RING
+    this->ring_fd = ring.fd();
+#endif
+
     if (!check_init(io_uring_entries)) {
-        std::exit(1);
+        std::terminate();
     }
 
 #ifdef CO_CONTEXT_USE_CPU_AFFINITY
@@ -119,12 +129,14 @@ void worker_meta::submit_non_sqe(uintptr_t typed_task) noexcept {
     cur.push(1);
 }
 
+#if CO_CONTEXT_IS_USING_EVENTFD
 void worker_meta::listen_on_co_spawn() noexcept {
     auto *const sqe = get_free_sqe();
     sqe->prep_read(co_spawn_event_fd, as_buf(&co_spawn_event_buf), 0);
     sqe->set_data(static_cast<uint64_t>(reserved_user_data::co_spawn_event));
     submit_sqe();
 }
+#endif
 
 std::coroutine_handle<> worker_meta::schedule() noexcept {
     auto &cur = this->reap_cur;
@@ -132,39 +144,18 @@ std::coroutine_handle<> worker_meta::schedule() noexcept {
     log::v("worker[%u] try scheduling\n", this->ctx_id);
     assert(!cur.is_empty());
 
-    const cur_t head = cur.head();
-    const reap_info info = reap_swap[head];
+    std::coroutine_handle<> chosen_coro = reap_swap[cur.head()];
     cur.pop();
-    if (!info.is_co_spawn()) [[likely]] {
-        info.io_info->result = info.result;
-        // info.io_info->flags = info.flags;
-        if constexpr (config::enable_link_io_result) {
-            if (info.io_info->type == task_info::task_type::lazy_link_sqe) {
-                log::v("worker[%u] found link_io, skip\n", ctx_id, head);
-                return nullptr;
-            }
-        }
-        log::v(
-            "worker[%u] found io(%lx) to resume at reap_swap[%u]\n", ctx_id,
-            info.io_info->handle, head
-        );
-        return info.io_info->handle;
-    } else {
-        log::v(
-            "worker[%u] found co_spawn(%lx) to resume at reap_swap[%u]\n",
-            ctx_id, info.handle, head
-        );
-        return info.handle;
-    }
+    assert(bool(chosen_coro));
+    return chosen_coro;
 }
 
 void worker_meta::work_once() {
     log::v("worker[%u] work_once...\n", this->ctx_id);
 
     const auto coro = this->schedule();
-    if (bool(coro)) [[likely]] {
-        coro.resume();
-    }
+    coro.resume();
+
     log::v("worker[%u] work_once finished\n", this->ctx_id);
 }
 
@@ -212,9 +203,6 @@ void worker_meta::submit(submit_info &info) noexcept {
 
     // PERF May call cur.pop() to make worker start sooner.
     switch (uint32_t(info.address) & 0b111) {
-        case submit_type::co_spawn:
-            forward_task(std::coroutine_handle<>::from_address(info.ptr));
-            return;
         case submit_type::sem_rel:
             handle_semaphore_release(io_info);
             return;
@@ -237,7 +225,7 @@ void worker_meta::forward_task(std::coroutine_handle<> handle) noexcept {
         cur.tail()
     );
 
-    reap_swap[cur.tail()] = reap_info{handle};
+    reap_swap[cur.tail()] = handle;
     cur.push();
 }
 
@@ -299,31 +287,12 @@ void worker_meta::handle_condition_variable_notify(task_info *cv_notify
     }
 }
 
-inline void worker_meta::reap(detail::reap_info info) noexcept {
-    auto &cur = reap_cur;
-    log::v("worker[%u] reap at [%u]\n", ctx_id, cur.tail());
-    reap_swap[cur.tail()] = info;
-    cur.push();
-}
-
-static bool eager_io_need_awake(detail::task_info *io_info) noexcept {
-    using io_state_t = eager::io_state_t;
-    const io_state_t old_state =
-        as_atomic(io_info->eager_io_state)
-            // .fetch_or(eager::io_ready, std::memory_order_seq_cst);
-            .fetch_or(eager::io_ready, std::memory_order_release);
-    if (old_state & eager::io_detached) {
-        delete io_info;
-    }
-    return old_state & eager::io_wait;
-}
-
 void worker_meta::handle_cq_entry(const liburingcxx::cq_entry *const cqe
 ) noexcept {
     --requests_to_reap;
     log::v("ctx poll_completion found, remaining=%d\n", requests_to_reap);
 
-    const uint64_t user_data = cqe->user_data;
+    uint64_t user_data = cqe->user_data;
     const int32_t result = cqe->res;
     [[maybe_unused]] const uint32_t flags = cqe->flags;
 
@@ -336,53 +305,65 @@ void worker_meta::handle_cq_entry(const liburingcxx::cq_entry *const cqe
     }
 
     ring.seen_cq_entry(cqe);
-    assert(flags != detail::reap_info::co_spawn_flag);
 
-    if (user_data < uint64_t(detail::reserved_user_data::nop)) [[unlikely]] {
-        handle_reserved_user_data(user_data);
-        return;
+    if constexpr (uint64_t(detail::reserved_user_data::none) > 0) {
+        if (user_data < uint64_t(detail::reserved_user_data::none))
+            [[unlikely]] {
+            handle_reserved_user_data(user_data);
+            return;
+        }
     }
 
-    using task_type = task_info::task_type;
+    using mux = user_data_type;
+    mux selector = mux(uint8_t(user_data & 0b111));
+    assert(uint8_t(selector) < uint8_t(mux::none));
 
-    if constexpr (config::enable_eager_io) {
-        if ((user_data & 0b111) == uint8_t(task_type::eager_sqe)) [[unlikely]] {
-            auto *const eager_io_info = CO_CONTEXT_ASSUME_ALIGNED(8
-            )(reinterpret_cast /*NOLINT*/<task_info *>(
-                user_data ^ uint64_t(task_type::eager_sqe)
+    user_data &= raw_task_info_mask;
+    task_info *__restrict__ const io_info =
+        CO_CONTEXT_ASSUME_ALIGNED(alignof(task_info)
+        )(reinterpret_cast /*NOLINT*/<task_info *>(user_data));
+
+    switch (selector) {
+        [[likely]] case mux::task_info_ptr:
+            io_info->result = result;
+            // io_info->flags = flags;
+            forward_task(io_info->handle);
+            break;
+        case mux::coroutine_handle:
+            forward_task(std::coroutine_handle<>::from_address(
+                reinterpret_cast<void *>(user_data) /*NOLINT*/
             ));
-            eager_io_info->result = result;
-            if (eager_io_need_awake(eager_io_info)) [[likely]] {
-                reap(detail::reap_info{eager_io_info->handle});
+            break;
+        case mux::task_info_ptr__link_sqe:
+            if constexpr (config::enable_link_io_result) {
+                io_info->result = result;
             }
-            return;
-        }
-        // must be lazy_sqe or lazy_link_sqe here
+            // if link_io_result is not enabled, we can skip the
+            // lazy_link_sqe.
+            break;
+        case mux::none:
+            assert(false && "handle_cq_entry(): unknown case");
     }
-
-    if constexpr (!config::enable_link_io_result) {
-        // if link_io_result is not enabled, we can skip the lazy_link_sqe.
-        if ((user_data & 0b111) == uint8_t(task_type::lazy_link_sqe)) {
-            return;
-        }
-    }
-
-    task_info *const io_info = CO_CONTEXT_ASSUME_ALIGNED(alignof(task_info)
-    )(detail::raw_task_info_ptr(user_data));
-    reap(detail::reap_info{io_info, result, flags});
 }
 
 void worker_meta::handle_reserved_user_data(const uint64_t user_data) noexcept {
-    using type = detail::reserved_user_data;
-    switch (type(user_data)) {
-        case type::co_spawn_event:
+    using mux = detail::reserved_user_data;
+    switch (mux(user_data)) {
+        [[likely]]
+#if CO_CONTEXT_IS_USING_EVENTFD
+        case mux::co_spawn_event:
             handle_co_spawn_events();
             break;
-        case type::nop:
+#endif
+        case mux::nop:
+            ++requests_to_reap; // compensate this number. see handle_cqe()
+            [[fallthrough]];
+        case mux::none:
             break;
     }
 }
 
+#if CO_CONTEXT_IS_USING_EVENTFD
 void worker_meta::handle_co_spawn_events() noexcept {
     assert(co_spawn_local_queue.empty());
 
@@ -421,5 +402,6 @@ void worker_meta::handle_co_spawn_events() noexcept {
 
     listen_on_co_spawn();
 }
+#endif
 
 } // namespace co_context::detail

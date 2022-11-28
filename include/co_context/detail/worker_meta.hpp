@@ -1,13 +1,14 @@
 #pragma once
 
 #include "co_context/config.hpp"
-#include "co_context/detail/reap_info.hpp"
 #include "co_context/detail/submit_info.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/detail/uring_type.hpp"
+#include "co_context/detail/user_data.hpp"
 #include "co_context/lockfree/spsc_cursor.hpp"
 #include "co_context/log/log.hpp"
 #include "co_context/task.hpp"
+#include <coroutine>
 #include <cstdint>
 #include <mutex>
 #include <queue>
@@ -33,7 +34,9 @@ struct worker_meta final {
     // An instant of io_uring
     alignas(cache_line_size) uring ring;
 
+#if CO_CONTEXT_IS_USING_EVENTFD
     uint64_t co_spawn_event_buf = 0;
+#endif
 
     /**
      * ---------------------------------------------------
@@ -41,7 +44,12 @@ struct worker_meta final {
      * ---------------------------------------------------
      */
 
-    alignas(cache_line_size) int co_spawn_event_fd = -1;
+    alignas(cache_line_size)
+#if CO_CONTEXT_IS_USING_EVENTFD
+        int co_spawn_event_fd = -1;
+#else
+        int ring_fd;
+#endif
 
     config::ctx_id_t ctx_id;
 
@@ -51,9 +59,11 @@ struct worker_meta final {
      * ---------------------------------------------------
      */
 
+#if CO_CONTEXT_IS_USING_EVENTFD
     alignas(cache_line_size) std::mutex co_spawn_mtx;
     // TODO replace this with spsc fixed-sized queue.
     std::queue<std::coroutine_handle<>> co_spawn_queue;
+#endif
 
     /**
      * ---------------------------------------------------
@@ -64,7 +74,7 @@ struct worker_meta final {
     alignas(cache_line_size
     ) std::array<detail::submit_info, config::swap_capacity> submit_swap;
 
-    std::array<detail::reap_info, config::swap_capacity> reap_swap;
+    std::array<std::coroutine_handle<>, config::swap_capacity> reap_swap;
 
     using cur_t = config::cur_t;
 
@@ -72,8 +82,10 @@ struct worker_meta final {
 
     spsc_cursor<cur_t, config::swap_capacity, false> reap_cur;
 
+#if CO_CONTEXT_IS_USING_EVENTFD
     // TODO replace this with fixed-sized queue.
     std::queue<std::coroutine_handle<>> co_spawn_local_queue;
+#endif
 
     // number of I/O tasks running inside io_uring
     int32_t requests_to_reap = 0;
@@ -94,7 +106,9 @@ struct worker_meta final {
 
     [[nodiscard]] bool is_ring_need_enter() const noexcept;
 
+#if CO_CONTEXT_IS_USING_EVENTFD
     void listen_on_co_spawn() noexcept;
+#endif
 
     void wait_uring() noexcept;
 
@@ -112,7 +126,12 @@ struct worker_meta final {
 
     void co_spawn_safe_lazy(std::coroutine_handle<> entrance) noexcept;
 
-    void co_spawn_safe_eager(std::coroutine_handle<> entrance) noexcept;
+#if CO_CONTEXT_IS_USING_MSG_RING
+    void co_spawn_safe_msg_ring(std::coroutine_handle<> entrance
+    ) const noexcept;
+#else
+    void co_spawn_safe_eventfd(std::coroutine_handle<> entrance) noexcept;
+#endif
 
     void work_once();
 
@@ -150,22 +169,20 @@ struct worker_meta final {
     void submit(detail::submit_info &info) noexcept;
 
     /**
-     * @brief forward the completion from the io_uring to a worker. If failed
-     * (because workers are full), do nothing.
-     */
-    void reap(detail::reap_info info) noexcept;
-
-    /**
      * @brief handle an non-null cq_entry from the cq of io_uring
      */
     void handle_cq_entry(const liburingcxx::cq_entry *) noexcept;
 
     void handle_reserved_user_data(uint64_t user_data) noexcept;
 
+#if CO_CONTEXT_IS_USING_EVENTFD
     void handle_co_spawn_events() noexcept;
-
     explicit worker_meta() noexcept;
     ~worker_meta() noexcept;
+#else
+    explicit worker_meta() noexcept = default;
+    ~worker_meta() noexcept = default;
+#endif
 
   private:
     [[nodiscard]] bool check_init(unsigned expect_sqring_size) const noexcept;
@@ -184,11 +201,12 @@ inline void worker_meta::co_spawn_safe_lazy(std::coroutine_handle<> entrance
     assert(false && "todo");
 }
 
-inline void worker_meta::co_spawn_safe_eager(std::coroutine_handle<> entrance
+#if CO_CONTEXT_IS_USING_EVENTFD
+inline void worker_meta::co_spawn_safe_eventfd(std::coroutine_handle<> entrance
 ) noexcept {
     log::v(
-        "coro(%lx) is pushing to worker[%u] by co_spawn_safe_eager() \n",
-        ctx_id, entrance.address()
+        "coro(%lx) is pushing to worker[%u] by co_spawn_safe_eventfd() \n",
+        entrance.address(), ctx_id
     );
     {
         std::lock_guard lg{co_spawn_mtx};
@@ -196,6 +214,29 @@ inline void worker_meta::co_spawn_safe_eager(std::coroutine_handle<> entrance
     }
     ::eventfd_write(co_spawn_event_fd, 1);
 }
+#endif
+
+#if CO_CONTEXT_IS_USING_MSG_RING
+inline void worker_meta::co_spawn_safe_msg_ring(std::coroutine_handle<> entrance
+) const noexcept {
+    worker_meta &from = *this_thread.worker;
+    log::v(
+        "coro(%lx) is pushing to worker[%u] from worker[%u] "
+        "by co_spawn_safe_msg_ring() \n",
+        entrance.address(), ctx_id, from.ctx_id
+    );
+    auto *const sqe = from.get_free_sqe();
+    auto user_data = reinterpret_cast<uint64_t>(entrance.address())
+                     | uint8_t(user_data_type::coroutine_handle);
+    sqe->prep_msg_ring(ring_fd, 0, user_data, 0);
+    sqe->set_data(uint64_t(reserved_user_data::nop));
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 17)
+    sqe->set_cqe_skip();
+    --from.requests_to_reap;
+#endif
+    from.submit_sqe();
+}
+#endif
 
 inline uint32_t worker_meta::poll_completion() noexcept {
     using cq_entry = liburingcxx::cq_entry;
