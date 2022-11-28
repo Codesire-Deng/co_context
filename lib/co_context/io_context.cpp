@@ -6,7 +6,6 @@
 #include "co_context/co/condition_variable.hpp"
 #include "co_context/co/semaphore.hpp"
 #include "co_context/compat.hpp"
-#include "co_context/detail/eager_io_state.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/io_context.hpp"
 #include "co_context/log/log.hpp"
@@ -62,9 +61,11 @@ void io_context::run() {
 #endif
     log::i("io_context[%u] runs on %d\n", this->id, this->tid);
 
+#if CO_CONTEXT_IS_USING_EVENTFD
     if (meta.create_count >= 2) {
         worker.listen_on_co_spawn();
     }
+#endif
 
     while (!will_stop) [[likely]] {
         do_worker_part();

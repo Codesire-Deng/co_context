@@ -73,12 +73,14 @@ class sq_entry final : private io_uring_sqe {
         return *this;
     }
 
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 17)
     // see `man io_uring_enter`
     // available since Linux 5.17
     inline sq_entry &set_cqe_skip() noexcept {
         this->flags |= IOSQE_CQE_SKIP_SUCCESS;
         return *this;
     }
+#endif
 
   private:
     inline sq_entry &set_target_fixed_file(uint32_t file_index) noexcept {

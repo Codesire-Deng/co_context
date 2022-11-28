@@ -31,21 +31,15 @@ struct [[nodiscard]] task_info {
         // condition_variable *cv;
     };
 
-    union {
-        config::ctx_id_t ctx_id_hint;
-        config::eager_io_state_t eager_io_state; // for eager_io
-    };
-
     enum class task_type : uint8_t {
         co_spawn,
-        eager_sqe,
         lazy_sqe,
         lazy_link_sqe,
         // lazy_detached_sqe,
         // result,
         semaphore_release,
         condition_variable_notify,
-        nop
+        none
     };
 
     task_type type;
@@ -58,18 +52,13 @@ struct [[nodiscard]] task_info {
         return static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
     }
 
-    [[nodiscard]] uint64_t as_eager_user_data() const noexcept {
-        return static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this))
-               | uint64_t(task_type::eager_sqe);
-    }
-
     [[deprecated, nodiscard]] uint64_t as_linked_user_data() const noexcept {
         return static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this))
                | uint64_t(task_type::lazy_link_sqe);
     }
 };
 
-static_assert(uint8_t(task_info::task_type::nop) < alignof(task_info));
+static_assert(uint8_t(task_info::task_type::none) < alignof(task_info));
 
 inline constexpr uintptr_t raw_task_info_mask =
     ~uintptr_t(alignof(task_info) - 1);

@@ -115,6 +115,8 @@ class [[nodiscard]] uring final {
     unsigned pad2;
 
   public:
+    int fd() const noexcept { return ring_fd; }
+
     int submit() noexcept;
 
     int submit_and_wait(unsigned wait_num) noexcept;

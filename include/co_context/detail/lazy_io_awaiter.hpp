@@ -68,7 +68,6 @@ class lazy_awaiter {
     friend void set_link_awaiter(lazy_awaiter &awaiter) noexcept;
 
     lazy_awaiter() noexcept : io_info(task_info::task_type::lazy_sqe) {
-        io_info.ctx_id_hint = detail::this_thread.ctx_id;
         sqe = this_thread.worker->get_free_sqe();
         sqe->set_data(io_info.as_user_data());
     }

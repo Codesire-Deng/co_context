@@ -1,7 +1,6 @@
 #pragma once
 
 #include "co_context/lazy_io.hpp"
-#include "co_context/eager_io.hpp"
 #include "co_context/net/inet_address.hpp"
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -57,27 +56,13 @@ class socket {
         return lazy::connect(sockfd, addr.get_sockaddr(), addr.length());
     }
 
-    [[nodiscard]] auto eager_connect(const inet_address &addr) const noexcept {
-        return eager::connect(sockfd, addr.get_sockaddr(), addr.length());
-    }
-
     [[nodiscard]] auto recv(std::span<char> buf, int flags = 0) const noexcept {
         return lazy::recv(sockfd, buf, flags);
     }
 
     [[nodiscard]] auto
-    eager_recv(std::span<char> buf, int flags = 0) const noexcept {
-        return eager::recv(sockfd, buf, flags);
-    }
-
-    [[nodiscard]] auto
     send(std::span<const char> buf, int flags = 0) const noexcept {
         return lazy::send(sockfd, buf, flags);
-    }
-
-    [[nodiscard]] auto
-    eager_send(std::span<const char> buf, int flags = 0) const noexcept {
-        return eager::send(sockfd, buf, flags);
     }
 
     [[nodiscard]] auto close() noexcept {
@@ -86,18 +71,8 @@ class socket {
         return lazy::close(tmp);
     }
 
-    [[nodiscard]] auto eager_close() noexcept {
-        const int tmp = sockfd;
-        sockfd = -1;
-        return eager::close(tmp);
-    }
-
     [[nodiscard]] auto shutdown_write() const noexcept {
         return lazy::shutdown(sockfd, SHUT_WR);
-    }
-
-    [[nodiscard]] auto eager_shutdown_write() const noexcept {
-        return eager::shutdown(sockfd, SHUT_WR);
     }
 
     // factory methods

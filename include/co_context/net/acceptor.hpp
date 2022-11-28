@@ -19,10 +19,6 @@ class acceptor {
         return lazy::accept(listen_socket.fd(), nullptr, nullptr, flags);
     }
 
-    [[nodiscard]] auto eager_accept(int flags = 0) noexcept {
-        return eager::accept(listen_socket.fd(), nullptr, nullptr, flags);
-    }
-
     [[nodiscard]] int listen_fd() const noexcept { return listen_socket.fd(); }
 
     // socket acceptSocketOrDie();

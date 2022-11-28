@@ -2,6 +2,7 @@
 
 #include "uring/io_uring.h"
 #include "uring/uring_define.hpp"
+#include "uring/utility/kernel_version.hpp"
 #include <bit>
 #include <cstddef>
 #include <cstdint>
@@ -55,6 +56,15 @@ namespace config {
     inline constexpr bool is_using_hyper_threading = true;
 
     /**
+     * @brief Use msg_ring to co_spawn betweens io_contexts, instead of
+     * eventfd, std::mutex and std::queue.
+     */
+#define CO_CONTEXT_IS_USING_MSG_RING LIBURINGCXX_IS_KERNEL_REACH(5, 18)
+#define CO_CONTEXT_IS_USING_EVENTFD !CO_CONTEXT_IS_USING_MSG_RING
+    inline constexpr bool is_using_msg_ring =
+        LIBURINGCXX_IS_KERNEL_REACH(5, 18);
+
+    /**
      * @brief This tells if a standalone thread will run in kernel space.
      *
      * @note Do not modify this, check `io_uring_setup_flags` instead.
@@ -102,11 +112,6 @@ namespace config {
 
     // ======================== lazy_io configuration =========================
     inline constexpr bool enable_link_io_result = false;
-    // ========================================================================
-
-    // ======================== eager_io configuration ========================
-    using eager_io_state_t = uint8_t;
-    inline constexpr bool enable_eager_io = false;
     // ========================================================================
 
 } // namespace config
