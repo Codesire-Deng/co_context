@@ -32,7 +32,6 @@
 #include <queue>
 #include <sys/types.h>
 #include <thread>
-#include <vector>
 
 namespace co_context {
 
@@ -149,15 +148,6 @@ class [[nodiscard]] io_context final {
     io_context &operator=(io_context &&) = delete;
 }; // class io_context
 
-// Must be called by corresponding thread.
-inline void io_context::init() {
-    this->tid = ::gettid();
-    detail::this_thread.ctx = this;
-    detail::this_thread.ctx_id = this->id;
-
-    this->worker.init(config::default_io_uring_entries);
-}
-
 inline void io_context::co_spawn(task<void> &&entrance) noexcept {
     auto handle = entrance.get_handle();
     entrance.detach();
@@ -187,45 +177,6 @@ inline void io_context::co_spawn(std::coroutine_handle<> handle) noexcept {
 inline void io_context::co_spawn_unsafe(std::coroutine_handle<> handle
 ) noexcept {
     worker.co_spawn_unsafe(handle);
-}
-
-inline void io_context::do_worker_part() {
-    auto num = worker.number_to_schedule();
-    log::v("worker[%u] will run %u times...\n", id, num);
-    while (num-- > 0) {
-        worker.work_once();
-    }
-}
-
-inline void io_context::do_submission_part() noexcept {
-    worker.poll_submission();
-}
-
-inline void io_context::do_completion_part() noexcept {
-    // NOTE in the future: if an IO generates multiple requests_to_reap，
-    // it must be counted carefully
-
-    bool need_check_ring =
-        (meta.ready_count > 1) | (worker.requests_to_reap > 0);
-
-    if (need_check_ring) [[likely]] {
-        auto num = worker.poll_completion();
-
-        // io_context will block itself here
-        uint32_t will_not_wait =
-            num | worker.has_task_ready() | worker.need_ring_submit;
-        if (will_not_wait == 0) [[unlikely]] {
-            worker.wait_uring();
-            num = worker.poll_completion();
-            if constexpr (config::is_log_w) {
-                if (num == 0) [[unlikely]] {
-                    log::w("wait_cq_entry() gets 0 cqe.\n");
-                }
-            }
-        }
-    } else if (!worker.has_task_ready()) [[unlikely]] {
-        will_stop = true;
-    }
 }
 
 inline void co_spawn(task<void> &&entrance) noexcept {

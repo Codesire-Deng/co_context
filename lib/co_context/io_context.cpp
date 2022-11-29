@@ -1,4 +1,4 @@
-#include <cassert>
+
 #ifdef USE_MIMALLOC
 #include <mimalloc-new-delete.h>
 #endif
@@ -12,7 +12,9 @@
 #include "co_context/utility/set_cpu_affinity.hpp"
 #include "uring/uring_define.hpp"
 #include <atomic>
+#include <cassert>
 #include <cstdint>
+#include <exception>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -24,6 +26,15 @@
 namespace co_context {
 
 detail::io_context_meta io_context::meta;
+
+// Must be called by corresponding thread.
+void io_context::init() {
+    this->tid = ::gettid();
+    detail::this_thread.ctx = this;
+    detail::this_thread.ctx_id = this->id;
+
+    this->worker.init(config::default_io_uring_entries);
+}
 
 void io_context::start() {
     host_thread = std::thread{[this] {
@@ -43,7 +54,7 @@ void io_context::start() {
                 })) {
                 log::e("io_context initialization timeout. There exists an "
                        "io_context that has not been started.\n");
-                std::exit(1);
+                std::terminate();
             }
         }
         meta.cv.notify_all();
@@ -52,6 +63,45 @@ void io_context::start() {
 
         this->run();
     }};
+}
+
+void io_context::do_worker_part() {
+    auto num = worker.number_to_schedule();
+    log::v("worker[%u] will run %u times...\n", id, num);
+    while (num-- > 0) {
+        worker.work_once();
+    }
+}
+
+void io_context::do_submission_part() noexcept {
+    worker.poll_submission();
+}
+
+void io_context::do_completion_part() noexcept {
+    // NOTE in the future: if an IO generates multiple requests_to_reap，
+    // it must be counted carefully
+
+    bool need_check_ring =
+        (meta.ready_count > 1) | (worker.requests_to_reap > 0);
+
+    if (need_check_ring) [[likely]] {
+        auto num = worker.poll_completion();
+
+        // io_context will block itself here
+        uint32_t will_not_wait =
+            num | worker.has_task_ready() | worker.need_ring_submit;
+        if (will_not_wait == 0) [[unlikely]] {
+            worker.wait_uring();
+            num = worker.poll_completion();
+            if constexpr (config::is_log_w) {
+                if (num == 0) [[unlikely]] {
+                    log::w("wait_cq_entry() gets 0 cqe.\n");
+                }
+            }
+        }
+    } else if (!worker.has_task_ready()) [[unlikely]] {
+        will_stop = true;
+    }
 }
 
 void io_context::run() {
