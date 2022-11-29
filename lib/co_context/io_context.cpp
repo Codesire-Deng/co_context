@@ -38,7 +38,6 @@ void io_context::init() {
 
 void io_context::start() {
     host_thread = std::thread{[this] {
-        this->tid = gettid();
         this->init();
 
         {

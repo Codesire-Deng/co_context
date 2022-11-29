@@ -1,6 +1,6 @@
 #pragma once
 
-#include "co_context/co/spinlock.hpp"
+#include "co_context/detail/spinlock.hpp"
 #include "co_context/detail/task_info.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/utility/as_atomic.hpp"
