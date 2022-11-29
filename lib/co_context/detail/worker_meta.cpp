@@ -3,7 +3,6 @@
 #include "co_context/co/semaphore.hpp"
 #include "co_context/compat.hpp"
 #include "co_context/detail/cv_task_meta.hpp"
-#include "co_context/detail/sem_task_meta.hpp"
 #include "co_context/detail/task_info.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/detail/user_data.hpp"
@@ -203,9 +202,6 @@ void worker_meta::submit(submit_info &info) noexcept {
 
     // PERF May call cur.pop() to make worker start sooner.
     switch (uint32_t(info.address) & 0b111) {
-        case submit_type::sem_rel:
-            handle_semaphore_release(io_info);
-            return;
         case submit_type::cv_notify:
             handle_condition_variable_notify(io_info);
             return;
@@ -227,28 +223,6 @@ void worker_meta::forward_task(std::coroutine_handle<> handle) noexcept {
 
     reap_swap[cur.tail()] = handle;
     cur.push();
-}
-
-void worker_meta::handle_semaphore_release(task_info *sem_release) noexcept {
-    counting_semaphore &sem = *as_counting_semaphore(sem_release);
-    const counting_semaphore::T update =
-        as_atomic(sem_release->update).exchange(0, std::memory_order_relaxed);
-    if (update == 0) [[unlikely]] {
-        return;
-    }
-
-    counting_semaphore::T done = 0;
-    std::coroutine_handle<> handle;
-    while (done < update && bool(handle = sem.try_release())) {
-        log::v(
-            "ctx handle_semaphore_release: forwarding %lx\n", handle.address()
-        );
-        forward_task(handle);
-        ++done;
-    }
-
-    // TODO determine this memory order
-    sem.counter.fetch_add(update, std::memory_order_acq_rel);
 }
 
 void worker_meta::handle_condition_variable_notify(task_info *cv_notify

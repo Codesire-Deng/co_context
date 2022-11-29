@@ -1,5 +1,6 @@
 #pragma once
 
+#include "co_context/co/spinlock.hpp"
 #include "co_context/detail/task_info.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/utility/as_atomic.hpp"
@@ -20,7 +21,7 @@ class counting_semaphore final {
 
         bool await_ready() noexcept {
             const T old_counter =
-                sem.counter.fetch_sub(1, std::memory_order_acquire); // seq_cst?
+                sem.counter.fetch_sub(1, std::memory_order_acquire);
             return old_counter > 0;
         }
 
@@ -39,12 +40,7 @@ class counting_semaphore final {
   public:
     explicit counting_semaphore(T desired) noexcept
         : awaiting(nullptr)
-
-        , counter(desired)
-        , awaken_task(task_info::task_type::semaphore_release) {
-        // awaken_task.sem = this; // deprecated
-        as_atomic(awaken_task.update).store(0, std::memory_order_relaxed);
-    }
+        , counter(desired) {}
 
     counting_semaphore(const counting_semaphore &) = delete;
 
@@ -67,13 +63,7 @@ class counting_semaphore final {
     std::atomic<acquire_awaiter *> awaiting;
     acquire_awaiter *to_resume = nullptr;
     std::atomic<T> counter;
-
-    task_info awaken_task;
-
-  public:
-    static consteval auto __task_offset() /*NOLINT*/ noexcept {
-        return offsetof(counting_semaphore, awaken_task);
-    }
+    spinlock notifier_mtx;
 };
 
 } // namespace co_context
