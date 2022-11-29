@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.20.0)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(FORCE_TO_USE_MIMALLOC "Force the use of mimalloc version 2.0 or above" OFF)
+option(FORCE_TO_USE_LIBCXX "Force the use of LLVM libc++. Requires clang." OFF)
 option(BUILD_TESTS "Build the tests" OFF)
 
 if (NOT CMAKE_BUILD_TYPE)
@@ -12,7 +13,7 @@ endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-project(co_context VERSION 0.6.1 LANGUAGES CXX)
+project(co_context VERSION 0.6.2 LANGUAGES CXX)
 
 if (NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
     message(WARNING "co_context only supports Linux currently, but the target OS is ${CMAKE_SYSTEM_NAME}.")
@@ -53,6 +54,11 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "14.0.0")
         message(FATAL_ERROR "Insufficient clang version, requires clang 14.0 or above")
+    endif()
+
+    if (FORCE_TO_USE_LIBCXX)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -stdlib=libc++ -lc++abi")    
     endif()
 
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsized-deallocation -std=c++20")

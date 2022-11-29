@@ -7,7 +7,7 @@
 #pragma once
 #if !defined(__GNUG__) || defined(__clang__)
 #error Up to now this header can only be compiled by g++.
-#error PS: Clang 14 is known to be not happy with this header.
+#error PS: Clang 14/16 is known to be not happy with this header.
 #endif
 #pragma GCC system_header
 #include <algorithm>
