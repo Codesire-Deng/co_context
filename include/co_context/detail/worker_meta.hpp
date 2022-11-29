@@ -1,11 +1,11 @@
 #pragma once
 
 #include "co_context/config.hpp"
+#include "co_context/detail/spsc_cursor.hpp"
 #include "co_context/detail/submit_info.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/detail/uring_type.hpp"
 #include "co_context/detail/user_data.hpp"
-#include "co_context/lockfree/spsc_cursor.hpp"
 #include "co_context/log/log.hpp"
 #include "co_context/task.hpp"
 #include <coroutine>
@@ -152,11 +152,6 @@ struct worker_meta final {
      * are full), forward to the overflow buffer.
      */
     void forward_task(std::coroutine_handle<> handle) noexcept;
-
-    /**
-     * @brief handler where io_context finds a semaphore::release task
-     */
-    void handle_semaphore_release(task_info *sem_release) noexcept;
 
     /**
      * @brief handler where io_context finds a condition_variable::notify_* task
