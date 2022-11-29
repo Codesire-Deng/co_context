@@ -1,20 +1,20 @@
 #if defined(__GNUG__) && !defined(__clang__)
 
-#include <co_context/generator.hpp>
+#include "co_context/generator.hpp"
 #include <iostream>
-#include <cassert>
 #include <ranges>
 
-co_context::generator<int> gen_iota(int x) {
+co_context::generator<int> iota(int x) {
     while (true) {
-        co_yield x++;
+        co_yield x;
+        ++x;
     }
 }
 
 int main() {
-    using namespace std::views;
+    using std::views::drop, std::views::take;
 
-    for (auto &&x : gen_iota(1) | drop(5) | take(3)) {
+    for (auto &&x : iota(1) | drop(5) | take(3)) {
         std::cout << x << " ";
     }
 
