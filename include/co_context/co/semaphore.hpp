@@ -53,7 +53,10 @@ class counting_semaphore final {
         return acquire_awaiter{*this};
     }
 
-    void release(T update = 1) noexcept;
+    // release one. faster than release(1).
+    void release() noexcept;
+
+    void release(T update) noexcept;
 
   private:
     friend struct detail::worker_meta;
