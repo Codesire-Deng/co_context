@@ -1,11 +1,13 @@
 #pragma once
 
 #include "co_context/co/mutex.hpp"
+#include "co_context/detail/spinlock.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/detail/worker_meta.hpp"
 #include "co_context/task.hpp"
 #include "co_context/utility/as_atomic.hpp"
 #include "co_context/utility/bit.hpp"
+#include <atomic>
 
 namespace co_context {
 
@@ -60,13 +62,8 @@ class condition_variable final {
     inline static constexpr T notify_all_flag = bit_top<T>;
 
   public:
-    condition_variable() noexcept
-        : awaiting(nullptr)
-        , notify_task(task_info::task_type::condition_variable_notify) {
-        // notify_task.cv = this; // deprecated
-        as_atomic(notify_task.notify_counter)
-            .store(0, std::memory_order_relaxed);
-    }
+    explicit condition_variable() noexcept = default;
+    ~condition_variable() noexcept = default;
 
     cv_wait_awaiter wait(mutex &mtx) noexcept {
         return cv_wait_awaiter{*this, mtx};
@@ -80,48 +77,113 @@ class condition_variable final {
     }
 
     void notify_one() noexcept {
-        as_atomic(notify_task.notify_counter)
-            .fetch_add(1, std::memory_order_relaxed);
-        send_task();
+        auto *const worker = detail::this_thread.worker;
+        assert(
+            worker != nullptr
+            && "condition_variable::notify_one() "
+               "must run inside an io_context"
+        );
+
+        auto try_notify_one = [worker](cv_wait_awaiter *head) {
+            auto &trylock_awaiter = head->lock_awaken_handle;
+            if (!trylock_awaiter.register_awaiting()) [[unlikely]] {
+                // lock succ, wakeup
+                // TODO send to another io_context
+                worker->co_spawn_unsafe(trylock_awaiter.awaken_coro);
+            } else {
+                // lock failed, just wait for another mutex.unlock()
+            }
+        };
+
+        cv_wait_awaiter *head;
+
+        notifier_mtx.lock();
+        head = this->to_resume_head;
+        if (this->to_resume_head != nullptr) {
+            this->to_resume_head = this->to_resume_head->next;
+            notifier_mtx.unlock();
+            try_notify_one(head);
+            return;
+        }
+        this->to_resume_tail = nullptr;
+        notifier_mtx.unlock();
+
+        head = awaiting.exchange(nullptr, std::memory_order_acquire);
+        if (head == nullptr) [[unlikely]] {
+            return;
+        }
+
+        cv_wait_awaiter *const tail = head;
+        cv_wait_awaiter *succ = nullptr;
+        cv_wait_awaiter *pred = head->next;
+        while (pred != nullptr) {
+            head->next = succ;
+            succ = head;
+            head = pred;
+            pred = pred->next;
+        }
+
+        notifier_mtx.lock();
+        if (this->to_resume_head == nullptr) [[likely]] {
+            this->to_resume_head = succ;
+            this->to_resume_tail = tail;
+            notifier_mtx.unlock();
+            try_notify_one(head);
+            return;
+        }
+        this->to_resume_tail->next = head;
+        cv_wait_awaiter *const to_notify = this->to_resume_head;
+        this->to_resume_head = this->to_resume_head->next;
+        notifier_mtx.unlock();
+        try_notify_one(to_notify);
     }
 
     void notify_all() noexcept {
-        as_atomic(notify_task.notify_counter)
-            .store(notify_all_flag, std::memory_order_relaxed);
-        send_task();
+        auto *const worker = detail::this_thread.worker;
+        assert(
+            worker != nullptr
+            && "condition_variable::notify_all() "
+               "must run inside an io_context"
+        );
+
+        auto try_notify_all = [worker](cv_wait_awaiter *head) {
+            while (head != nullptr) {
+                auto &trylock_awaiter = head->lock_awaken_handle;
+                if (!trylock_awaiter.register_awaiting()) [[unlikely]] {
+                    // lock succ, wakeup
+                    // TODO send to another io_context
+                    worker->co_spawn_unsafe(trylock_awaiter.awaken_coro);
+                } else {
+                    // lock failed, just wait for another mutex.unlock()
+                }
+                head = head->next;
+            }
+        };
+
+        cv_wait_awaiter *resume_head =
+            awaiting.exchange(nullptr, std::memory_order_acquire);
+
+        try_notify_all(resume_head);
+
+        notifier_mtx.lock();
+        resume_head = this->to_resume_head;
+        this->to_resume_head = nullptr;
+        // this->to_resume_tail = nullptr;
+        notifier_mtx.unlock();
+
+        try_notify_all(resume_head);
     }
 
   private:
     friend class detail::cv_wait_awaiter;
     friend struct detail::worker_meta;
 
-    std::atomic<cv_wait_awaiter *> awaiting;
+    std::atomic<cv_wait_awaiter *> awaiting{nullptr};
     cv_wait_awaiter *to_resume_head = nullptr;
     cv_wait_awaiter *to_resume_tail = nullptr;
+    spinlock notifier_mtx;
 
-    task_info notify_task;
-
-    void send_task() noexcept;
     void to_resume_fetch_all() noexcept;
-
-  public:
-    static consteval auto __task_offset() /*NOLINT*/ noexcept {
-        return offsetof(condition_variable, notify_task);
-    }
 };
-
-inline void condition_variable::send_task() noexcept {
-    // register condition_variable-notify event, to io_context(worker)
-    using namespace ::co_context::detail;
-    auto *worker = this_thread.worker;
-    assert(
-        worker != nullptr
-        && "condition_variable::send_task() must run inside an io_context"
-    );
-    log::d("condition_variable %lx notified\n", this);
-    worker->submit_non_sqe(
-        reinterpret_cast<uintptr_t>(&notify_task) | submit_type::cv_notify
-    );
-}
 
 } // namespace co_context

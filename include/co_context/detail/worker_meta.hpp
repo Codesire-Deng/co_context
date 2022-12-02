@@ -72,13 +72,9 @@ struct worker_meta final {
      */
 
     alignas(cache_line_size
-    ) std::array<detail::submit_info, config::swap_capacity> submit_swap;
-
-    std::array<std::coroutine_handle<>, config::swap_capacity> reap_swap;
+    ) std::array<std::coroutine_handle<>, config::swap_capacity> reap_swap;
 
     using cur_t = config::cur_t;
-
-    spsc_cursor<cur_t, config::swap_capacity, false> submit_cur;
 
     spsc_cursor<cur_t, config::swap_capacity, false> reap_cur;
 
