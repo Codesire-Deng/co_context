@@ -22,6 +22,32 @@ bool counting_semaphore::try_acquire() noexcept {
            );
 }
 
+void counting_semaphore::release() noexcept {
+    constexpr T update = 1;
+    // register semaphore-update event, to io_context(worker)
+    const T old_counter = counter.fetch_add(update, std::memory_order_release);
+    if (old_counter >= 0) {
+        return;
+    }
+
+    auto *const worker = detail::this_thread.worker;
+    assert(
+        worker != nullptr
+        && "semaphore::release() must run inside an io_context"
+    );
+
+    if (old_counter >= 0) {
+        return;
+    }
+
+    notifier_mtx.lock();
+    std::coroutine_handle<> awaken_coro = try_release();
+    notifier_mtx.unlock();
+    assert(bool(awaken_coro));
+    // TODO forward to other io_context
+    worker->co_spawn_unsafe(awaken_coro);
+};
+
 void counting_semaphore::release(T update) noexcept {
     // register semaphore-update event, to io_context(worker)
     const T old_counter = counter.fetch_add(update, std::memory_order_release);
