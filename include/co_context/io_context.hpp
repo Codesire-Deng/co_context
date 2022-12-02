@@ -35,6 +35,10 @@
 
 namespace co_context {
 
+class mutex;
+class condition_variable;
+class counting_semaphore;
+
 namespace detail {
     struct io_context_meta {
         std::mutex mtx;
@@ -146,6 +150,11 @@ class [[nodiscard]] io_context final {
     io_context(io_context &&) = delete;
     io_context &operator=(const io_context &) = delete;
     io_context &operator=(io_context &&) = delete;
+
+  private:
+    friend class co_context::mutex;
+    friend class co_context::condition_variable;
+    friend class co_context::counting_semaphore;
 }; // class io_context
 
 inline void io_context::co_spawn(task<void> &&entrance) noexcept {

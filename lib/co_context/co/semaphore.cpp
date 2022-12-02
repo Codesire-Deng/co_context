@@ -37,11 +37,10 @@ void counting_semaphore::release() noexcept {
     );
 
     notifier_mtx.lock();
-    std::coroutine_handle<> awaken_coro = try_release();
+    acquire_awaiter *awaken_awaiter = try_release();
     notifier_mtx.unlock();
-    assert(bool(awaken_coro));
-    // TODO forward to other io_context
-    worker->co_spawn_unsafe(awaken_coro);
+
+    awaken_awaiter->resume_ctx->co_spawn(awaken_awaiter->handle);
 };
 
 void counting_semaphore::release(T update) noexcept {
@@ -61,16 +60,15 @@ void counting_semaphore::release(T update) noexcept {
     {
         notifier_mtx.lock();
         do {
-            std::coroutine_handle<> awaken_coro = try_release();
-            assert(bool(awaken_coro));
-            // TODO forward to other io_context
-            worker->co_spawn_unsafe(awaken_coro);
+            acquire_awaiter *awaken_awaiter = try_release();
+            awaken_awaiter->resume_ctx->co_spawn(awaken_awaiter->handle);
         } while (++update < 0);
         notifier_mtx.unlock();
     }
 };
 
-std::coroutine_handle<> counting_semaphore::try_release() noexcept {
+counting_semaphore::acquire_awaiter *
+counting_semaphore::try_release() noexcept {
     acquire_awaiter *resume_head = to_resume;
     if (resume_head == nullptr) [[unlikely]] {
         auto *node = awaiting.exchange(nullptr, std::memory_order_acquire);
@@ -89,7 +87,7 @@ std::coroutine_handle<> counting_semaphore::try_release() noexcept {
     assert(resume_head != nullptr);
 
     to_resume = resume_head->next;
-    return resume_head->handle;
+    return resume_head;
 }
 
 void counting_semaphore::acquire_awaiter::await_suspend(
