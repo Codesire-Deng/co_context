@@ -8,6 +8,8 @@
 
 namespace co_context {
 
+class io_context;
+
 class counting_semaphore final {
   private:
     using task_info = detail::task_info;
@@ -16,7 +18,9 @@ class counting_semaphore final {
 
     class [[nodiscard("Did you forget to co_await?")]] acquire_awaiter final {
       public:
-        explicit acquire_awaiter(counting_semaphore & sem) noexcept : sem(sem) {
+        explicit acquire_awaiter(counting_semaphore & sem) noexcept
+            : sem(sem)
+            , resume_ctx(detail::this_thread.ctx) {
         }
 
         bool await_ready() noexcept {
@@ -31,8 +35,9 @@ class counting_semaphore final {
 
       private:
         counting_semaphore &sem;
-        acquire_awaiter *next;
+        acquire_awaiter *next = nullptr;
         std::coroutine_handle<> handle;
+        co_context::io_context *resume_ctx;
         friend class counting_semaphore;
         friend struct detail::worker_meta;
     };
@@ -60,7 +65,7 @@ class counting_semaphore final {
 
   private:
     friend struct detail::worker_meta;
-    std::coroutine_handle<> try_release() noexcept;
+    acquire_awaiter *try_release() noexcept;
 
   private:
     std::atomic<acquire_awaiter *> awaiting;

@@ -8,16 +8,19 @@
 
 namespace co_context {
 
+class io_context;
+
 namespace detail {
     class cv_wait_awaiter;
 } // namespace detail
 
 class mutex final {
   public:
-
     class [[nodiscard("Did you forget to co_await?")]] lock_awaiter {
       public:
-        explicit lock_awaiter(mutex & mtx) noexcept : mtx(mtx) {
+        explicit lock_awaiter(mutex & mtx) noexcept
+            : mtx(mtx)
+            , resume_ctx(detail::this_thread.ctx) {
         }
 
         static constexpr bool await_ready() noexcept {
@@ -54,8 +57,9 @@ class mutex final {
 
       protected:
         mutex &mtx;
-        lock_awaiter *next;
+        lock_awaiter *next = nullptr;
         std::coroutine_handle<> awaken_coro;
+        co_context::io_context *resume_ctx;
         friend class co_context::mutex;
         friend class detail::cv_wait_awaiter;
         friend class co_context::condition_variable;
