@@ -36,10 +36,6 @@ void counting_semaphore::release() noexcept {
         && "semaphore::release() must run inside an io_context"
     );
 
-    if (old_counter >= 0) {
-        return;
-    }
-
     notifier_mtx.lock();
     std::coroutine_handle<> awaken_coro = try_release();
     notifier_mtx.unlock();
