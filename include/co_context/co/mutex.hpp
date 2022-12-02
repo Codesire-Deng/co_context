@@ -47,6 +47,7 @@ class mutex final {
          */
         bool register_awaiting() noexcept;
 
+        // reserved for condition_variable
         void unlock_ahead() noexcept {
             mtx.unlock();
         }
@@ -55,9 +56,9 @@ class mutex final {
         mutex &mtx;
         lock_awaiter *next;
         std::coroutine_handle<> awaken_coro;
-        friend class mutex;
-        friend class locked_mutex;
+        friend class co_context::mutex;
         friend class detail::cv_wait_awaiter;
+        friend class co_context::condition_variable;
         friend struct detail::worker_meta;
     };
 

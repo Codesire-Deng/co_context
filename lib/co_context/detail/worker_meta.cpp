@@ -2,7 +2,6 @@
 #include "co_context/co/condition_variable.hpp"
 #include "co_context/co/semaphore.hpp"
 #include "co_context/compat.hpp"
-#include "co_context/detail/cv_task_meta.hpp"
 #include "co_context/detail/task_info.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/detail/user_data.hpp"
@@ -116,18 +115,6 @@ void worker_meta::submit_sqe() const noexcept {
     log::v("worker[%u] submit_sqe(s)\n", this_thread.ctx_id);
 }
 
-void worker_meta::submit_non_sqe(uintptr_t typed_task) noexcept {
-    auto &swap = this->submit_swap;
-    auto &cur = this->submit_cur;
-
-    assert(cur.is_available());
-    const auto tail = cur.tail();
-
-    swap[tail].address = typed_task;
-    log::v("worker[%u] submit_non_sqe at [%u]\n", this_thread.ctx_id, tail);
-    cur.push(1);
-}
-
 #if CO_CONTEXT_IS_USING_EVENTFD
 void worker_meta::listen_on_co_spawn() noexcept {
     auto *const sqe = get_free_sqe();
@@ -159,56 +146,12 @@ void worker_meta::work_once() {
 }
 
 void worker_meta::poll_submission() noexcept {
-    auto &cur = submit_cur;
-    auto &swap = submit_swap;
-
     // submit sqes
     if (need_ring_submit) [[likely]] {
-        uint8_t will_wait =
-            uint8_t(!has_task_ready()) & uint8_t(cur.is_empty());
+        bool will_wait = !has_task_ready();
         [[maybe_unused]] int res = ring.submit_and_wait(will_wait);
         assert(res >= 0 && "exception at uring::submit");
         need_ring_submit = false;
-    }
-
-    if (cur.is_empty()) {
-        log::v("worker[%u] found NO non-sqe submission\n", ctx_id);
-        return;
-    }
-
-    log::v(
-        "worker[%u] found non-sqe submissions [%u,%u] (%u in total)\n", ctx_id,
-        cur.head(), cur.tail() - 1, cur.size()
-    );
-
-    auto head{cur.raw_head()};
-    auto tail{cur.raw_tail()};
-
-    for (; head != tail; ++head) {
-        const auto i{head & cur.mask};
-        log::v("worker[%u] submit(swap[%d])\n", ctx_id, i);
-        submit(swap[i]); // always success (currently).
-    }
-
-    cur.m_head = tail; // consume submit_cur
-}
-
-void worker_meta::submit(submit_info &info) noexcept {
-    assert(info.address != 0); // sqe is impossible.
-
-    using submit_type = detail::submit_type;
-    task_info *const io_info = CO_CONTEXT_ASSUME_ALIGNED(alignof(task_info)
-    )(detail::raw_task_info_ptr(info.address));
-
-    // PERF May call cur.pop() to make worker start sooner.
-    switch (uint32_t(info.address) & 0b111) {
-        case submit_type::cv_notify:
-            handle_condition_variable_notify(io_info);
-            return;
-        default:
-            log::e("submit_info.address==%lx\n", info.address);
-            assert(false && "submit(): unknown task_type");
-            return;
     }
 }
 
@@ -223,42 +166,6 @@ void worker_meta::forward_task(std::coroutine_handle<> handle) noexcept {
 
     reap_swap[cur.tail()] = handle;
     cur.push();
-}
-
-void worker_meta::handle_condition_variable_notify(task_info *cv_notify
-) noexcept {
-    condition_variable &cv = *detail::as_condition_variable(cv_notify);
-    const condition_variable::T notify_counter =
-        as_atomic(cv_notify->notify_counter)
-            .exchange(0, std::memory_order_relaxed);
-
-    if (notify_counter == 0) [[unlikely]] {
-        return;
-    }
-
-    if (cv.awaiting.load(std::memory_order_relaxed) != nullptr) {
-        cv.to_resume_fetch_all();
-    }
-
-    condition_variable::T done = 0;
-    const bool is_nofity_all = notify_counter & cv.notify_all_flag;
-    while ((is_nofity_all || done < notify_counter)
-           && cv.to_resume_head != nullptr) {
-        mutex::lock_awaiter &to_awake = cv.to_resume_head->lock_awaken_handle;
-        // let the coroutine get the lock
-        if (!to_awake.register_awaiting()) {
-            // lock succ, wakeup
-            forward_task(to_awake.get_coroutine());
-        }
-        // lock failed, just wait for another mutex.unlock()
-
-        cv.to_resume_head = cv.to_resume_head->next;
-        ++done;
-    }
-
-    if (cv.to_resume_head == nullptr) {
-        cv.to_resume_tail = nullptr;
-    }
 }
 
 void worker_meta::handle_cq_entry(const liburingcxx::cq_entry *const cqe

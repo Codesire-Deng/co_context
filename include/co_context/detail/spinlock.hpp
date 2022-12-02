@@ -16,7 +16,7 @@ class spinlock final {
 
     void unlock() noexcept;
 
-    spinlock() noexcept = default;
+    explicit spinlock() noexcept = default;
     ~spinlock() noexcept = default;
 
     spinlock(const spinlock &) = delete;
