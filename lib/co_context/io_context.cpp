@@ -6,6 +6,7 @@
 #include "co_context/co/condition_variable.hpp"
 #include "co_context/co/semaphore.hpp"
 #include "co_context/compat.hpp"
+#include "co_context/detail/io_context_meta.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/io_context.hpp"
 #include "co_context/log/log.hpp"
@@ -25,8 +26,6 @@
 
 namespace co_context {
 
-detail::io_context_meta io_context::meta;
-
 // Must be called by corresponding thread.
 void io_context::init() {
     this->tid = ::gettid();
@@ -39,17 +38,16 @@ void io_context::init() {
 void io_context::start() {
     host_thread = std::thread{[this] {
         this->init();
-
+        auto &meta = detail::io_context_meta;
         {
             std::unique_lock lock{meta.mtx};
             ++meta.ready_count;
             log::d(
-                "io_context[%u] ready. (%u/%u)\n", this->id,
-                io_context::meta.create_count, io_context::meta.ready_count
+                "io_context[%u] ready. (%u/%u)\n", this->id, meta.create_count,
+                meta.ready_count
             );
             if (!meta.cv.wait_for(lock, std::chrono::seconds{1}, [] {
-                    return io_context::meta.create_count
-                           == io_context::meta.ready_count;
+                    return meta.create_count == meta.ready_count;
                 })) {
                 log::e("io_context initialization timeout. There exists an "
                        "io_context that has not been started.\n");
@@ -79,6 +77,8 @@ void io_context::do_submission_part() noexcept {
 void io_context::do_completion_part() noexcept {
     // NOTE in the future: if an IO generates multiple requests_to_reap，
     // it must be counted carefully
+
+    auto &meta = detail::io_context_meta;
 
     bool need_check_ring =
         (meta.ready_count > 1) | (worker.requests_to_reap > 0);
@@ -111,6 +111,7 @@ void io_context::run() {
     log::i("io_context[%u] runs on %d\n", this->id, this->tid);
 
 #if CO_CONTEXT_IS_USING_EVENTFD
+    auto &meta = detail::io_context_meta;
     if (meta.create_count >= 2) {
         worker.listen_on_co_spawn();
     }

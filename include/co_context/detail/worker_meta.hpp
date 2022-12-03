@@ -1,6 +1,7 @@
 #pragma once
 
 #include "co_context/config.hpp"
+#include "co_context/detail/io_context_meta.hpp"
 #include "co_context/detail/spsc_cursor.hpp"
 #include "co_context/detail/submit_info.hpp"
 #include "co_context/detail/thread_meta.hpp"
@@ -121,14 +122,15 @@ struct worker_meta final {
 
     void init(unsigned io_uring_entries);
 
-    void co_spawn_unsafe(std::coroutine_handle<> entrance) noexcept;
+    void co_spawn_unsafe(std::coroutine_handle<> handle) noexcept;
 
 #if CO_CONTEXT_IS_USING_MSG_RING
-    void co_spawn_safe_msg_ring(std::coroutine_handle<> entrance
-    ) const noexcept;
+    void co_spawn_safe_msg_ring(std::coroutine_handle<> handle) const noexcept;
 #else
-    void co_spawn_safe_eventfd(std::coroutine_handle<> entrance) noexcept;
+    void co_spawn_safe_eventfd(std::coroutine_handle<> handle) noexcept;
 #endif
+
+    void co_spawn_auto(std::coroutine_handle<> handle) noexcept;
 
     void work_once();
 
@@ -180,40 +182,38 @@ struct worker_meta final {
     [[nodiscard]] bool check_init(unsigned expect_sqring_size) const noexcept;
 };
 
-inline void worker_meta::co_spawn_unsafe(std::coroutine_handle<> entrance
+inline void worker_meta::co_spawn_unsafe(std::coroutine_handle<> handle
 ) noexcept {
-    log::v(
-        "worker[%u] co_spawn_unsafe coro(%lx)\n", ctx_id, entrance.address()
-    );
-    forward_task(entrance);
+    log::v("worker[%u] co_spawn_unsafe coro(%lx)\n", ctx_id, handle.address());
+    forward_task(handle);
 }
 
 #if CO_CONTEXT_IS_USING_EVENTFD
-inline void worker_meta::co_spawn_safe_eventfd(std::coroutine_handle<> entrance
+inline void worker_meta::co_spawn_safe_eventfd(std::coroutine_handle<> handle
 ) noexcept {
     log::v(
         "coro(%lx) is pushing to worker[%u] by co_spawn_safe_eventfd() \n",
-        entrance.address(), ctx_id
+        handle.address(), ctx_id
     );
     {
         std::lock_guard lg{co_spawn_mtx};
-        co_spawn_queue.push(entrance);
+        co_spawn_queue.push(handle);
     }
     ::eventfd_write(co_spawn_event_fd, 1);
 }
 #endif
 
 #if CO_CONTEXT_IS_USING_MSG_RING
-inline void worker_meta::co_spawn_safe_msg_ring(std::coroutine_handle<> entrance
+inline void worker_meta::co_spawn_safe_msg_ring(std::coroutine_handle<> handle
 ) const noexcept {
     worker_meta &from = *this_thread.worker;
     log::v(
         "coro(%lx) is pushing to worker[%u] from worker[%u] "
         "by co_spawn_safe_msg_ring() \n",
-        entrance.address(), ctx_id, from.ctx_id
+        handle.address(), ctx_id, from.ctx_id
     );
     auto *const sqe = from.get_free_sqe();
-    auto user_data = reinterpret_cast<uint64_t>(entrance.address())
+    auto user_data = reinterpret_cast<uint64_t>(handle.address())
                      | uint8_t(user_data_type::coroutine_handle);
     sqe->prep_msg_ring(ring_fd, 0, user_data, 0);
     sqe->set_data(uint64_t(reserved_user_data::nop));
@@ -224,6 +224,22 @@ inline void worker_meta::co_spawn_safe_msg_ring(std::coroutine_handle<> entrance
     from.submit_sqe();
 }
 #endif
+
+inline void worker_meta::co_spawn_auto(std::coroutine_handle<> handle
+) noexcept {
+    // MT-unsafe in some scenes (for meta.ready_count == 0)
+    // before calling io_context::start(), this_thread.ctx is nullptr.
+    if (detail::this_thread.worker == this
+        || io_context_meta.ready_count == 0) {
+        this->co_spawn_unsafe(handle);
+    } else {
+#if CO_CONTEXT_IS_USING_MSG_RING
+        this->co_spawn_safe_msg_ring(handle);
+#else
+        this->co_spawn_safe_eventfd(handle);
+#endif
+    }
+}
 
 inline uint32_t worker_meta::poll_completion() noexcept {
     using cq_entry = liburingcxx::cq_entry;

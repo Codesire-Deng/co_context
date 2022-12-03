@@ -40,7 +40,7 @@ void counting_semaphore::release() noexcept {
     acquire_awaiter *awaken_awaiter = try_release();
     notifier_mtx.unlock();
 
-    awaken_awaiter->resume_ctx->co_spawn(awaken_awaiter->handle);
+    awaken_awaiter->co_spawn();
 };
 
 void counting_semaphore::release(T update) noexcept {
@@ -61,7 +61,7 @@ void counting_semaphore::release(T update) noexcept {
         notifier_mtx.lock();
         do {
             acquire_awaiter *awaken_awaiter = try_release();
-            awaken_awaiter->resume_ctx->co_spawn(awaken_awaiter->handle);
+            awaken_awaiter->co_spawn();
         } while (++update < 0);
         notifier_mtx.unlock();
     }
@@ -101,6 +101,10 @@ void counting_semaphore::acquire_awaiter::await_suspend(
     } while (!sem.awaiting.compare_exchange_weak(
         old_head, this, std::memory_order_release, std::memory_order_relaxed
     ));
+}
+
+void counting_semaphore::acquire_awaiter::co_spawn() const noexcept {
+    this->resume_ctx->worker.co_spawn_auto(this->handle);
 }
 
 } // namespace co_context

@@ -34,6 +34,8 @@ class counting_semaphore final {
         }
 
       private:
+        void co_spawn() const noexcept;
+
         counting_semaphore &sem;
         acquire_awaiter *next = nullptr;
         std::coroutine_handle<> handle;
