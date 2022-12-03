@@ -11,7 +11,7 @@ co_context 基于 Linux [io_uring](https://github.com/axboe/liburing)，其性�
 
 1. 支持 `read` `write` `accept` `timeout` 等 io_uring 提供的所有系统调用，总计 74 个功能。
 2. 并发支持: `mutex`, `semaphore`, `condition_variable`, `channel`。
-3. 调度提示: `yield`
+3. 调度提示: `yield`, `resume_on`
 
 ## 编译和运行
 
