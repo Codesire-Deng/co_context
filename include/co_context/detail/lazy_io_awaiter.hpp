@@ -1,9 +1,6 @@
 #pragma once
 
-#include "uring/uring.hpp"
-#include "co_context/detail/task_info.hpp"
-#include "co_context/detail/thread_meta.hpp"
-#include "co_context/detail/worker_meta.hpp"
+#include "co_context/io_context.hpp"
 #include <cassert>
 #include <chrono>
 #include <cstdint>
@@ -752,6 +749,23 @@ struct lazy_yield {
     constexpr void await_resume() const noexcept {}
 
     constexpr lazy_yield() noexcept = default;
+};
+
+class lazy_resume_on {
+  public:
+    static constexpr bool await_ready() noexcept { return false; }
+
+    void await_suspend(std::coroutine_handle<> current) noexcept {
+        resume_ctx.worker.co_spawn_auto(current);
+    }
+
+    constexpr void await_resume() const noexcept {}
+
+    explicit lazy_resume_on(co_context::io_context &resume_context) noexcept
+        : resume_ctx(resume_context) {}
+
+  private:
+    co_context::io_context &resume_ctx;
 };
 
 /****************************

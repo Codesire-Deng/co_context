@@ -55,6 +55,8 @@ class mutex final {
             mtx.unlock();
         }
 
+        void co_spawn() const noexcept;
+
       protected:
         mutex &mtx;
         lock_awaiter *next = nullptr;

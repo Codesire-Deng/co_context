@@ -42,8 +42,6 @@ class [[nodiscard("Did you forget to co_await?")]] cv_wait_awaiter final {
   private:
     mutex::lock_awaiter lock_awaken_handle;
     condition_variable &cv;
-    // mutex &mtx;
-    // std::coroutine_handle<> handle;
 
     cv_wait_awaiter *next = nullptr;
     friend class ::co_context::condition_variable;

@@ -25,7 +25,7 @@ void condition_variable::notify_one() noexcept {
         auto &awaken_awaiter = head->lock_awaken_handle;
         if (!awaken_awaiter.register_awaiting()) [[unlikely]] {
             // lock succ, wakeup
-            awaken_awaiter.resume_ctx->co_spawn(awaken_awaiter.awaken_coro);
+            awaken_awaiter.co_spawn();
         } else {
             // lock failed, just wait for another mutex.unlock()
         }
@@ -87,7 +87,7 @@ void condition_variable::notify_all() noexcept {
             auto &awaken_awaiter = head->lock_awaken_handle;
             if (!awaken_awaiter.register_awaiting()) [[unlikely]] {
                 // lock succ, wakeup
-                awaken_awaiter.resume_ctx->co_spawn(awaken_awaiter.awaken_coro);
+                awaken_awaiter.co_spawn();
             } else {
                 // lock failed, just wait for another mutex.unlock()
             }

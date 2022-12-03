@@ -49,7 +49,7 @@ void mutex::unlock() noexcept {
     assert(resume_head != nullptr);
 
     to_resume = resume_head->next;
-    resume_head->resume_ctx->co_spawn(resume_head->awaken_coro);
+    resume_head->co_spawn();
 }
 
 bool mutex::lock_awaiter::register_awaiting() noexcept {
@@ -74,6 +74,10 @@ bool mutex::lock_awaiter::register_awaiting() noexcept {
             }
         }
     }
+}
+
+void mutex::lock_awaiter::co_spawn() const noexcept {
+    this->resume_ctx->worker.co_spawn_auto(this->awaken_coro);
 }
 
 } // namespace co_context
