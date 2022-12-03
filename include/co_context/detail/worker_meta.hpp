@@ -120,8 +120,6 @@ struct worker_meta final {
 
     void co_spawn_unsafe(std::coroutine_handle<> entrance) noexcept;
 
-    void co_spawn_safe_lazy(std::coroutine_handle<> entrance) noexcept;
-
 #if CO_CONTEXT_IS_USING_MSG_RING
     void co_spawn_safe_msg_ring(std::coroutine_handle<> entrance
     ) const noexcept;
@@ -185,11 +183,6 @@ inline void worker_meta::co_spawn_unsafe(std::coroutine_handle<> entrance
         "worker[%u] co_spawn_unsafe coro(%lx)\n", ctx_id, entrance.address()
     );
     forward_task(entrance);
-}
-
-inline void worker_meta::co_spawn_safe_lazy(std::coroutine_handle<> entrance
-) noexcept {
-    assert(false && "todo");
 }
 
 #if CO_CONTEXT_IS_USING_EVENTFD
