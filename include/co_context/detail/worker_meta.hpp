@@ -12,8 +12,11 @@
 #include <cstdint>
 #include <mutex>
 #include <queue>
-#include <sys/eventfd.h>
 #include <thread>
+
+#if CO_CONTEXT_IS_USING_EVENTFD
+#include <sys/eventfd.h>
+#endif
 
 namespace co_context {
 
