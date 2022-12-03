@@ -60,7 +60,7 @@ namespace config {
      * eventfd, std::mutex and std::queue.
      */
 #define CO_CONTEXT_IS_USING_MSG_RING LIBURINGCXX_IS_KERNEL_REACH(5, 18)
-#define CO_CONTEXT_IS_USING_EVENTFD !CO_CONTEXT_IS_USING_MSG_RING
+#define CO_CONTEXT_IS_USING_EVENTFD  !CO_CONTEXT_IS_USING_MSG_RING
     inline constexpr bool is_using_msg_ring =
         LIBURINGCXX_IS_KERNEL_REACH(5, 18);
 
