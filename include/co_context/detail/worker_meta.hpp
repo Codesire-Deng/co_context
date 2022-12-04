@@ -99,10 +99,6 @@ struct worker_meta final {
 
     liburingcxx::sq_entry *get_free_sqe() noexcept;
 
-    void submit_sqe() const noexcept;
-
-    void submit_non_sqe(uintptr_t typed_task) noexcept;
-
     [[nodiscard]] bool is_ring_need_enter() const noexcept;
 
 #if CO_CONTEXT_IS_USING_EVENTFD
@@ -210,7 +206,6 @@ inline void worker_meta::co_spawn_safe_msg_ring(std::coroutine_handle<> handle
     sqe->set_cqe_skip();
     --from.requests_to_reap;
 #endif
-    from.submit_sqe();
 }
 #endif
 

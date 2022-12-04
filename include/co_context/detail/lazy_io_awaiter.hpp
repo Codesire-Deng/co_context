@@ -24,7 +24,6 @@ class lazy_awaiter {
 
     void await_suspend(std::coroutine_handle<> current) noexcept {
         io_info.handle = current;
-        submit();
     }
 
     lazy_awaiter &set_async() &noexcept {
@@ -44,11 +43,6 @@ class lazy_awaiter {
     friend struct lazy_link_timeout;
     liburingcxx::sq_entry *sqe;
     task_info io_info;
-
-    static inline void submit() noexcept {
-        worker_meta *const worker = detail::this_thread.worker;
-        worker->submit_sqe();
-    }
 
     friend lazy_link_io
     operator&&(lazy_awaiter &&lhs, lazy_awaiter &&rhs) noexcept;
@@ -115,8 +109,6 @@ operator&&(lazy_link_io &&lhs, lazy_link_io &&rhs) noexcept {
 inline void lazy_link_io::await_suspend(std::coroutine_handle<> current
 ) const noexcept {
     this->last_io->io_info.handle = current;
-    worker_meta *const worker = detail::this_thread.worker;
-    worker->submit_sqe();
 }
 
 inline int32_t lazy_link_io::await_resume() const noexcept {
