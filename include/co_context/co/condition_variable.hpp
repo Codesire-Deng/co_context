@@ -3,8 +3,8 @@
 #include "co_context/co/mutex.hpp"
 #include "co_context/detail/spinlock.hpp"
 #include "co_context/detail/thread_meta.hpp"
+#include "co_context/detail/trival_task.hpp"
 #include "co_context/detail/worker_meta.hpp"
-#include "co_context/task.hpp"
 #include "co_context/utility/as_atomic.hpp"
 #include "co_context/utility/bit.hpp"
 #include <atomic>
@@ -67,7 +67,7 @@ class condition_variable final {
     }
 
     template<std::predicate Pred>
-    task<void> wait(mutex &mtx, Pred stop_waiting) {
+    detail::trival_task wait(mutex &mtx, Pred stop_waiting) {
         while (!stop_waiting()) {
             co_await this->wait(mtx);
         }
