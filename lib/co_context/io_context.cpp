@@ -5,7 +5,7 @@
 #include "co_context/config.hpp"
 #include "co_context/co/condition_variable.hpp"
 #include "co_context/co/semaphore.hpp"
-#include "co_context/compat.hpp"
+#include "co_context/detail/compat.hpp"
 #include "co_context/detail/io_context_meta.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/io_context.hpp"
