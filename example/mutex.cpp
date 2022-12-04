@@ -15,10 +15,14 @@ task<> add() {
 }
 
 int main() {
-    io_context ctx;
+    io_context ctx[10];
     for (int i = 0; i < 1000; ++i) {
-        ctx.co_spawn(add());
+        ctx[i % 10].co_spawn(add());
     }
-    ctx.start();
-    ctx.join();
+    for (auto &c : ctx) {
+        c.start();
+    }
+    
+    ctx[0].join(); // never stop
+    return 0;
 }
