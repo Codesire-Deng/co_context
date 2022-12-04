@@ -55,7 +55,6 @@ namespace co_context {
 class condition_variable final {
   private:
     using cv_wait_awaiter = detail::cv_wait_awaiter;
-    using task_info = detail::task_info;
     using T = config::condition_variable_counting_t;
     inline static constexpr T notify_all_flag = bit_top<T>;
 
@@ -85,7 +84,7 @@ class condition_variable final {
     std::atomic<cv_wait_awaiter *> awaiting{nullptr};
     cv_wait_awaiter *to_resume_head = nullptr;
     cv_wait_awaiter *to_resume_tail = nullptr;
-    spinlock notifier_mtx;
+    detail::spinlock notifier_mtx;
 };
 
 } // namespace co_context

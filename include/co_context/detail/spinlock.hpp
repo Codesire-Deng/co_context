@@ -3,7 +3,7 @@
 #include "co_context/config.hpp"
 #include <atomic>
 
-namespace co_context {
+namespace co_context::detail {
 
 class spinlock final {
   private:
@@ -47,4 +47,4 @@ inline void spinlock::unlock() noexcept {
     occupied.store(false, std::memory_order_release);
 }
 
-} // namespace co_context
+} // namespace co_context::detail

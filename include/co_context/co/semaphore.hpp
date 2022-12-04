@@ -1,9 +1,10 @@
 #pragma once
 
 #include "co_context/detail/spinlock.hpp"
-#include "co_context/detail/task_info.hpp"
 #include "co_context/detail/thread_meta.hpp"
+#include "co_context/log/log.hpp"
 #include "co_context/utility/as_atomic.hpp"
+#include <coroutine>
 #include <type_traits>
 
 namespace co_context {
@@ -12,7 +13,6 @@ class io_context;
 
 class counting_semaphore final {
   private:
-    using task_info = detail::task_info;
     using T = config::semaphore_counting_t;
     static_assert(std::is_integral_v<T>);
 
@@ -73,7 +73,7 @@ class counting_semaphore final {
     std::atomic<acquire_awaiter *> awaiting;
     acquire_awaiter *to_resume = nullptr;
     std::atomic<T> counter;
-    spinlock notifier_mtx;
+    detail::spinlock notifier_mtx;
 };
 
 } // namespace co_context
