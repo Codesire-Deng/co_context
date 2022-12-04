@@ -1,6 +1,7 @@
 #pragma once
 
 #include "co_context/detail/io_context_meta.hpp"
+#include "co_context/detail/lock_guard.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include <atomic>
 #include <cassert>
@@ -73,42 +74,12 @@ class mutex final {
       private:
         friend class mutex;
 
-        class [[nodiscard("Remember to hold the lock_guard."
-        )]] lock_guard final {
-          public:
-            explicit lock_guard(mutex & mtx) noexcept : mtx(mtx) {
-            }
-            ~lock_guard() noexcept {
-                mtx.unlock();
-            }
-
-            lock_guard(const lock_guard &) = delete;
-#ifdef __INTELLISENSE__
-            // clang-format off
-            [[deprecated(
-                "This function is for cheating intellisense, "
-                "who doesn't sense RVO. "
-                "You should NEVER use this explicitly or implicitly.")]]
-            // clang-format on
-            lock_guard(lock_guard && other) noexcept
-                : mtx(other.mtx) {
-                assert(false && "Mandatory copy elision failed!");
-            };
-#else
-            lock_guard(lock_guard && other) = delete;
-#endif
-
-            lock_guard &operator=(const lock_guard &) = delete;
-            lock_guard &operator=(lock_guard &&) = delete;
-
-          private:
-            mutex &mtx;
-        };
+        using lock_guard = detail::lock_guard<mutex>;
 
       public:
         using lock_awaiter::lock_awaiter;
 
-        lock_guard await_resume() const noexcept {
+        [[nodiscard]] lock_guard await_resume() const noexcept {
             return lock_guard{mtx};
         }
     };

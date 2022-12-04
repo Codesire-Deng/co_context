@@ -7,7 +7,7 @@ namespace co_context::detail {
 
 class spinlock final {
   private:
-    std::atomic_bool occupied = false;
+    std::atomic_bool occupied{false};
 
   public:
     void lock() noexcept;
