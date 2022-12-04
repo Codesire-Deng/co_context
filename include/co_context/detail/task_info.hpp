@@ -18,29 +18,11 @@ namespace co_context::detail {
 // using liburingcxx::cq_entry;
 
 struct [[nodiscard]] task_info {
-    union {
-        std::coroutine_handle<> handle;
-        config::semaphore_counting_t update;
-        config::condition_variable_counting_t notify_counter;
-    };
+    std::coroutine_handle<> handle;
 
-    union {
-        // const cq_entry *cqe;
-        int32_t result;
-        // counting_semaphore *sem;
-        // condition_variable *cv;
-    };
+    int32_t result;
 
-    enum class task_type : uint8_t {
-        co_spawn,
-        lazy_sqe,
-        lazy_link_sqe,
-        // lazy_detached_sqe,
-        // result,
-        semaphore_release,
-        condition_variable_notify,
-        none
-    };
+    enum class task_type : uint8_t { lazy_sqe, lazy_link_sqe, none };
 
     task_type type;
 
@@ -50,11 +32,6 @@ struct [[nodiscard]] task_info {
 
     [[nodiscard]] uint64_t as_user_data() const noexcept {
         return static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
-    }
-
-    [[deprecated, nodiscard]] uint64_t as_linked_user_data() const noexcept {
-        return static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this))
-               | uint64_t(task_type::lazy_link_sqe);
     }
 };
 
