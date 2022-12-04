@@ -30,12 +30,6 @@ void counting_semaphore::release() noexcept {
         return;
     }
 
-    auto *const worker = detail::this_thread.worker;
-    assert(
-        worker != nullptr
-        && "semaphore::release() must run inside an io_context"
-    );
-
     notifier_mtx.lock();
     acquire_awaiter *awaken_awaiter = try_release();
     notifier_mtx.unlock();
@@ -49,12 +43,6 @@ void counting_semaphore::release(T update) noexcept {
     if (old_counter >= 0) {
         return;
     }
-
-    auto *const worker = detail::this_thread.worker;
-    assert(
-        worker != nullptr
-        && "semaphore::release() must run inside an io_context"
-    );
 
     update = std::max(old_counter, -update);
     {
