@@ -116,7 +116,7 @@ struct worker_meta final {
         return cur.size();
     }
 
-    // Get a coroutine to run. May return nullptr.
+    // Get a coroutine to run. Guarantee to be non-null.
     [[nodiscard]] std::coroutine_handle<> schedule() noexcept;
 
     void init(unsigned io_uring_entries);
