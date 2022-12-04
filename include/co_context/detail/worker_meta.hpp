@@ -3,7 +3,6 @@
 #include "co_context/config.hpp"
 #include "co_context/detail/io_context_meta.hpp"
 #include "co_context/detail/spsc_cursor.hpp"
-#include "co_context/detail/submit_info.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/detail/uring_type.hpp"
 #include "co_context/detail/user_data.hpp"
@@ -151,16 +150,6 @@ struct worker_meta final {
      * are full), forward to the overflow buffer.
      */
     void forward_task(std::coroutine_handle<> handle) noexcept;
-
-    /**
-     * @brief handler where io_context finds a condition_variable::notify_* task
-     */
-    void handle_condition_variable_notify(task_info *cv_notify) noexcept;
-
-    /**
-     * @brief handle the submission from the worker.
-     */
-    void submit(detail::submit_info &info) noexcept;
 
     /**
      * @brief handle an non-null cq_entry from the cq of io_uring
