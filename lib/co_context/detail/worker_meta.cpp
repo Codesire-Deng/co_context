@@ -111,16 +111,11 @@ liburingcxx::sq_entry *worker_meta::get_free_sqe() noexcept {
     return sqe;
 }
 
-void worker_meta::submit_sqe() const noexcept {
-    log::v("worker[%u] submit_sqe(s)\n", this_thread.ctx_id);
-}
-
 #if CO_CONTEXT_IS_USING_EVENTFD
 void worker_meta::listen_on_co_spawn() noexcept {
     auto *const sqe = get_free_sqe();
     sqe->prep_read(co_spawn_event_fd, as_buf(&co_spawn_event_buf), 0);
     sqe->set_data(static_cast<uint64_t>(reserved_user_data::co_spawn_event));
-    submit_sqe();
 }
 #endif
 
