@@ -1,10 +1,12 @@
 #pragma once
 
+#include "co_context/utility/type_extraction.hpp"
 #include <cassert>
 #include <concepts>
 #include <coroutine>
 #include <exception>
 #include <memory>
+#include <tuple>
 #include <type_traits>
 
 namespace co_context {
@@ -28,7 +30,9 @@ namespace detail {
      */
     template<typename T>
     struct task_final_awaiter {
-        constexpr bool await_ready() const noexcept { return false; }
+        [[nodiscard]] consteval bool await_ready() const noexcept {
+            return false;
+        }
 
         template<std::derived_from<task_promise_base<T>> Promise>
         std::coroutine_handle<>
@@ -37,7 +41,7 @@ namespace detail {
         }
 
         // Won't be resumed anyway
-        constexpr void await_resume() const noexcept {}
+        consteval void await_resume() const noexcept {}
     };
 
     /**
@@ -45,7 +49,7 @@ namespace detail {
      */
     template<>
     struct task_final_awaiter<void> {
-        static constexpr bool await_ready() noexcept { return false; }
+        static consteval bool await_ready() noexcept { return false; }
 
         template<std::derived_from<task_promise_base<void>> Promise>
         std::coroutine_handle<>
@@ -62,7 +66,7 @@ namespace detail {
         }
 
         // Won't be resumed anyway
-        constexpr void await_resume() const noexcept {}
+        consteval void await_resume() const noexcept {}
     };
 
     /**
@@ -77,11 +81,11 @@ namespace detail {
       public:
         task_promise_base() noexcept = default;
 
-        inline constexpr std::suspend_always initial_suspend() noexcept {
+        inline consteval std::suspend_always initial_suspend() noexcept {
             return {};
         }
 
-        inline constexpr task_final_awaiter<T> final_suspend() noexcept {
+        inline consteval task_final_awaiter<T> final_suspend() noexcept {
             return {};
         }
 
@@ -175,7 +179,7 @@ namespace detail {
 
         task<void> get_return_object() noexcept;
 
-        constexpr void return_void() noexcept {}
+        consteval void return_void() noexcept {}
 
         void unhandled_exception() {
             if (is_detached_flag == is_detached) {
@@ -330,6 +334,41 @@ class [[nodiscard("Did you forget to co_await?")]] task {
         return awaiter{handle};
     }
 
+    [[nodiscard]] auto as_tuple() const &noexcept {
+        struct awaiter : awaiter_base {
+            using awaiter_base::awaiter_base;
+
+            decltype(auto) await_resume() {
+                assert(this->handle && "broken_promise");
+                if constexpr (std::is_void_v<T>) {
+                    return std::tuple<>{};
+                } else {
+                    return std::tuple<T>{this->handle.promise().result()};
+                }
+            }
+        };
+
+        return awaiter{handle};
+    }
+
+    [[nodiscard]] auto as_tuple() const &&noexcept {
+        struct awaiter : awaiter_base {
+            using awaiter_base::awaiter_base;
+
+            decltype(auto) await_resume() {
+                assert(this->handle && "broken_promise");
+                if constexpr (std::is_void_v<T>) {
+                    return std::tuple<>{};
+                } else {
+                    return std::tuple<T>{
+                        std::move(this->handle.promise()).result()};
+                }
+            }
+        };
+
+        return awaiter{handle};
+    }
+
     /**
      * @brief wait for the task<> to complete, but do not get the result
      */
@@ -337,7 +376,7 @@ class [[nodiscard("Did you forget to co_await?")]] task {
         struct awaiter : awaiter_base {
             using awaiter_base::awaiter_base;
 
-            constexpr void await_resume() const noexcept {}
+            consteval void await_resume() const noexcept {}
         };
 
         return awaiter{handle};
@@ -398,6 +437,22 @@ template<typename Awaiter>
 auto make_task(Awaiter awaiter) -> task<
     detail::remove_rvalue_reference_t<detail::get_awaiter_result_t<Awaiter>>> {
     co_return co_await static_cast<Awaiter &&>(awaiter);
+}
+
+template<typename... Ts>
+using tuple_or_void = std::conditional_t<
+    std::is_same_v<std::tuple<>, mpl::remove_t<void, Ts...>>,
+    void,
+    mpl::remove_t<void, Ts...>>;
+
+template<typename... Ts>
+task<tuple_or_void<Ts...>> all(task<Ts> &&...node) {
+    // TODO Make this concurrent.
+    if constexpr (std::is_void_v<tuple_or_void<Ts...>>) {
+        (..., co_await node);
+    } else {
+        co_return std::tuple_cat((co_await node.as_tuple())...);
+    }
 }
 
 } // namespace co_context
