@@ -26,7 +26,7 @@ class trival_task {
         }
 
         // Won't be resumed anyway
-        static consteval void await_resume() noexcept {}
+        static constexpr void await_resume() noexcept {}
     };
 
     struct promise_type {
