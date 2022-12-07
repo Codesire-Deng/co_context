@@ -41,7 +41,7 @@ namespace detail {
         }
 
         // Won't be resumed anyway
-        consteval void await_resume() const noexcept {}
+        constexpr void await_resume() const noexcept {}
     };
 
     /**
@@ -66,7 +66,7 @@ namespace detail {
         }
 
         // Won't be resumed anyway
-        consteval void await_resume() const noexcept {}
+        constexpr void await_resume() const noexcept {}
     };
 
     /**
@@ -376,7 +376,7 @@ class [[nodiscard("Did you forget to co_await?")]] task {
         struct awaiter : awaiter_base {
             using awaiter_base::awaiter_base;
 
-            consteval void await_resume() const noexcept {}
+            constexpr void await_resume() const noexcept {}
         };
 
         return awaiter{handle};
