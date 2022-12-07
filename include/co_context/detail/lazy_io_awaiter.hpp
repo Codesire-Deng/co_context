@@ -58,9 +58,11 @@ class lazy_awaiter {
 
     friend void set_link_awaiter(lazy_awaiter &awaiter) noexcept;
 
-    lazy_awaiter() noexcept : io_info(task_info::task_type::lazy_sqe) {
+    lazy_awaiter() noexcept {
         sqe = this_thread.worker->get_free_sqe();
-        sqe->set_data(io_info.as_user_data());
+        sqe->set_data(
+            io_info.as_user_data() | uint64_t(user_data_type::task_info_ptr)
+        );
     }
 
 #ifndef __INTELLISENSE__
@@ -75,12 +77,11 @@ class lazy_awaiter {
 
 inline void set_link_sqe(liburingcxx::sq_entry *sqe) noexcept {
     sqe->set_link();
-    sqe->fetch_data() |= __u64(task_info::task_type::lazy_link_sqe);
+    sqe->fetch_data() |= uint64_t(user_data_type::task_info_ptr__link_sqe);
 }
 
 inline void set_link_awaiter(lazy_awaiter &awaiter) noexcept {
     set_link_sqe(awaiter.sqe);
-    awaiter.io_info.type = task_info::task_type::lazy_link_sqe;
 }
 
 inline void set_link_link_io(lazy_link_io &link_io) noexcept {
@@ -390,7 +391,8 @@ struct lazy_link_timeout : lazy_link_io {
         // Mark timer as lazy_link_sqe task type, but without sqe link.
         // The purpose is to make io_context to handle the timed_io and ignore
         // the timer.
-        timer.io_info.type = task_info::task_type::lazy_link_sqe;
+        // [[deprecated]]
+        
         // Send the result to timed_io.
         this->last_io = &timed_io;
     }

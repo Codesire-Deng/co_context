@@ -22,20 +22,10 @@ struct [[nodiscard]] task_info {
 
     int32_t result;
 
-    enum class task_type : uint8_t { lazy_sqe, lazy_link_sqe, none };
-
-    task_type type;
-
-    explicit task_info(task_type type) noexcept : type(type) {
-        log::v("task_info generated at %lx\n", this);
-    }
-
     [[nodiscard]] uint64_t as_user_data() const noexcept {
         return static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
     }
 };
-
-static_assert(uint8_t(task_info::task_type::none) < alignof(task_info));
 
 inline constexpr uintptr_t raw_task_info_mask =
     ~uintptr_t(alignof(task_info) - 1);
