@@ -90,7 +90,7 @@ struct worker_meta final {
     int32_t requests_to_reap = 0;
 
     // if there is at least one entry to submit to io_uring
-    bool need_ring_submit = false;
+    uint32_t requests_to_submit = 0;
 
     // if there is at least one task newly spawned or forwarded
     [[nodiscard]] bool has_task_ready() const noexcept {
@@ -128,6 +128,8 @@ struct worker_meta final {
     void co_spawn_auto(std::coroutine_handle<> handle) noexcept;
 
     void work_once();
+
+    void check_submission_threshold() noexcept;
 
     /**
      * @brief poll the submission swap zone
