@@ -104,7 +104,7 @@ bool worker_meta::check_init(unsigned expect_sqring_size) const noexcept {
 liburingcxx::sq_entry *worker_meta::get_free_sqe() noexcept {
     log::v("worker[%u] get_free_sqe\n", this_thread.ctx_id);
     ++requests_to_reap; // NOTE may required no reap or required multi-reap.
-    need_ring_submit = true;
+    ++requests_to_submit;
 
     auto *sqe = this->ring.get_sq_entry();
     assert(sqe != nullptr);
@@ -140,13 +140,23 @@ void worker_meta::work_once() {
     log::v("worker[%u] work_once finished\n", this->ctx_id);
 }
 
+void worker_meta::check_submission_threshold() noexcept {
+    if constexpr (config::submission_threshold != -1) {
+        if (requests_to_submit >= config::submission_threshold) {
+            [[maybe_unused]] int res = ring.submit();
+            assert(res >= 0 && "exception at uring::submit");
+            requests_to_submit = 0;
+        }
+    }
+}
+
 void worker_meta::poll_submission() noexcept {
     // submit sqes
-    if (need_ring_submit) [[likely]] {
+    if (requests_to_submit) [[likely]] {
         bool will_wait = !has_task_ready();
         [[maybe_unused]] int res = ring.submit_and_wait(will_wait);
-        assert(res >= 0 && "exception at uring::submit");
-        need_ring_submit = false;
+        assert(res >= 0 && "exception at uring::submit_and_wait");
+        requests_to_submit = 0;
     }
 }
 

@@ -95,9 +95,15 @@ namespace config {
     inline constexpr uint32_t default_io_uring_entries =
         std::bit_ceil<uint32_t>(swap_capacity * 2ULL);
 
-    [[deprecated]] inline constexpr uint8_t submit_poll_rounds = 1;
-
-    [[deprecated]] inline constexpr uint8_t reap_poll_rounds = 1;
+    /**
+     * @brief Maximal batch size of submissions. -1 means the batch size is
+     * unlimited.
+     * @note Once the threshold is reached, it is not mandatary to submit to
+     * io_uring immediately. As a result, the actual batch size might be equal
+     * to or slightly grater than the threshold.
+     */
+    inline constexpr uint32_t submission_threshold = 32;
+    // inline constexpr uint32_t submission_threshold = -1;
     // ========================================================================
 
     // ========================== net configuration ===========================

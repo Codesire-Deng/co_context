@@ -65,8 +65,11 @@ void io_context::start() {
 void io_context::do_worker_part() {
     auto num = worker.number_to_schedule();
     log::v("worker[%u] will run %u times...\n", id, num);
-    while (num-- > 0) {
+    for (; num > 0; --num) {
         worker.work_once();
+        if constexpr (config::submission_threshold != -1) {
+            worker.check_submission_threshold();
+        }
     }
 }
 
@@ -84,11 +87,11 @@ void io_context::do_completion_part() noexcept {
         (meta.ready_count > 1) | (worker.requests_to_reap > 0);
 
     if (need_check_ring) [[likely]] {
-        auto num = worker.poll_completion();
+        uint32_t num = worker.poll_completion();
 
         // io_context will block itself here
         uint32_t will_not_wait =
-            num | worker.has_task_ready() | worker.need_ring_submit;
+            num | worker.has_task_ready() | worker.requests_to_submit;
         if (will_not_wait == 0) [[unlikely]] {
             worker.wait_uring();
             num = worker.poll_completion();
