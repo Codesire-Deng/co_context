@@ -6,7 +6,7 @@ using namespace co_context;
 
 using uring = liburingcxx::uring<0>;
 
-uring ring{8};
+uring ring;
 
 int res;
 
@@ -84,6 +84,7 @@ int main(int argc, const char *argv[]) {
         return 0;
     }
 
+    ring.init(8);
     const int port = atoi(argv[2]);
     if (strcmp(argv[1], "-l") == 0) {
         server(port);
