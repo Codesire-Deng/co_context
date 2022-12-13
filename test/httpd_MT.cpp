@@ -1,3 +1,4 @@
+// Multi-threaded http GET server
 #include "co_context/all.hpp"
 #include <algorithm>
 #include <cctype>
@@ -19,6 +20,8 @@ static_assert(liburingcxx::is_kernel_reach(5, 5));
 constexpr std::string_view SERVER_STRING = "Server: zerohttpd/1.0\r\n";
 constexpr uint16_t DEFAULT_SERVER_PORT = 8000;
 constexpr size_t READ_SZ = 4096;
+constexpr uint32_t worker_num = 4;
+io_context ctx[worker_num];
 
 constexpr std::string_view unimplemented_content =
     "HTTP/1.0 400 Bad Request\r\n"
@@ -256,9 +259,8 @@ task<> session(const int sockfd) {
     co_await (sock.send({header_buf, n_header}) && sock.send(content_buf));
 }
 
-task<> server(const uint16_t port) {
-    acceptor ac{inet_address{port}};
-    printf("ZeroHTTPd listening on port: %d\n", DEFAULT_SERVER_PORT);
+task<> server(acceptor &ac, int id) {
+    log::i("ZeroHTTPd listening on port: %d\n", DEFAULT_SERVER_PORT);
 
     for (int sockfd; (sockfd = co_await ac.accept()) >= 0;) {
         co_spawn(session(sockfd));
@@ -273,10 +275,16 @@ void sigint_handler([[maybe_unused]] int signo) {
 int main() {
     check_for_index_file();
 
-    io_context ctx;
-    ctx.co_spawn(server(DEFAULT_SERVER_PORT));
-    ctx.start();
-    ctx.join(); // never stop
+    acceptor ac{inet_address{DEFAULT_SERVER_PORT}};
+
+    for (int i = 0; i < int(worker_num); ++i) {
+        ctx[i].co_spawn(server(ac, i));
+    }
+
+    for (auto &c : ctx) {
+        c.start();
+    }
+    ctx[0].join(); // never stop
 
     return 0;
 }

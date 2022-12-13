@@ -34,7 +34,7 @@ inline namespace lazy {
         int fd_out,
         int64_t off_out,
         unsigned int nbytes,
-        unsigned int splice_flags
+        unsigned int splice_flags = 0
     ) noexcept {
         return detail::lazy_splice{fd_in,   off_in, fd_out,
                                    off_out, nbytes, splice_flags};
