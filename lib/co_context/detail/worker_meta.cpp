@@ -206,8 +206,9 @@ void worker_meta::handle_cq_entry(const liburingcxx::cq_entry *const cqe
 
     user_data &= raw_task_info_mask;
     task_info *__restrict__ const io_info =
-        CO_CONTEXT_ASSUME_ALIGNED(alignof(task_info)
-        )(reinterpret_cast /*NOLINT*/<task_info *>(user_data));
+        CO_CONTEXT_ASSUME_ALIGNED(alignof(task_info))(
+            reinterpret_cast /*NOLINT*/<task_info *>(user_data)
+        );
 
     switch (selector) {
         [[likely]] case mux::task_info_ptr:
