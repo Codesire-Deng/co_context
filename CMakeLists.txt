@@ -30,6 +30,15 @@ message("kernel_version_patchlevel = ${kernel_version_patchlevel}")
 add_compile_definitions(LIBURINGCXX_KERNEL_VERSION_MAJOR=${kernel_version_major})
 add_compile_definitions(LIBURINGCXX_KERNEL_VERSION_PATCHLEVEL=${kernel_version_patchlevel})
 
+# Optional IPO/LTO.
+include(CheckIPOSupported)
+check_ipo_supported(RESULT is_support_IPO OUTPUT output_support_IPO)
+if(is_support_IPO)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+else()
+    message(WARNING "IPO is not supported: ${output_support_IPO}")
+endif()
+
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "11.3.0")
         message(FATAL_ERROR "Insufficient gcc version, requires gcc 11.3 or above")
@@ -46,7 +55,7 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     endif()
 
     if (${CMAKE_BUILD_TYPE} MATCHES Release)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -flto")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
     endif()
 
     message("CMAKE_CXX_FLAGS = ${CMAKE_CXX_FLAGS}")
@@ -74,7 +83,7 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     endif()
 
     if (${CMAKE_BUILD_TYPE} MATCHES Release)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -flto")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
     endif()
 
     message("CMAKE_CXX_FLAGS = ${CMAKE_CXX_FLAGS}")
