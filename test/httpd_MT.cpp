@@ -256,7 +256,9 @@ task<> session(const int sockfd) {
     log::i("200 %s %ld bytes\n", path.data(), path_stat.st_size);
 
     // send them to the client
-    co_await (sock.send({header_buf, n_header}) && sock.send(content_buf));
+    co_await (
+        sock.send({header_buf, n_header}, MSG_MORE) && sock.send(content_buf)
+    );
 }
 
 task<> server(acceptor &ac, int id) {
