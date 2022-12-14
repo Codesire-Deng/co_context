@@ -36,8 +36,9 @@ void mutex::unlock() noexcept {
 
         assert(top != not_locked && top != locked_no_awaiting);
 
-        auto *node = CO_CONTEXT_ASSUME_ALIGNED(alignof(lock_awaiter)
-        )(reinterpret_cast /*NOLINT*/<lock_awaiter *>(top));
+        auto *node = CO_CONTEXT_ASSUME_ALIGNED(alignof(lock_awaiter))(
+            reinterpret_cast /*NOLINT*/<lock_awaiter *>(top)
+        );
         do {
             lock_awaiter *tmp = node->next;
             node->next = resume_head;
@@ -64,8 +65,9 @@ bool mutex::lock_awaiter::register_awaiting() noexcept {
             }
         } else {
             // try to push myself onto `awaiting` stack.
-            this->next = CO_CONTEXT_ASSUME_ALIGNED(alignof(lock_awaiter)
-            )(reinterpret_cast /*NOLINT*/<lock_awaiter *>(old_state));
+            this->next = CO_CONTEXT_ASSUME_ALIGNED(alignof(lock_awaiter))(
+                reinterpret_cast /*NOLINT*/<lock_awaiter *>(old_state)
+            );
             if (mtx.awaiting.compare_exchange_weak(
                     old_state, reinterpret_cast<uintptr_t>(this),
                     std::memory_order_release, std::memory_order_relaxed

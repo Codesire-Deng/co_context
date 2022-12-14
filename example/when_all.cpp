@@ -20,7 +20,7 @@ task<void> f3() {
 task<> run() {
     auto a = co_await f1();
     std::cout << "a = " << a << std::endl;
-    
+
     auto [b] = co_await all(f2(), f3());
     std::cout << "b = " << b << std::endl;
 }

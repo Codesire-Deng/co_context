@@ -392,7 +392,7 @@ struct lazy_link_timeout : lazy_link_io {
         // The purpose is to make io_context to handle the timed_io and ignore
         // the timer.
         // [[deprecated]]
-        
+
         // Send the result to timed_io.
         this->last_io = &timed_io;
     }
