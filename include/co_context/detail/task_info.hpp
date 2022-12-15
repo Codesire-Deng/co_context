@@ -5,17 +5,7 @@
 #include <coroutine>
 #include <memory>
 
-namespace co_context {
-
-class counting_semaphore;
-class condition_variable;
-
-} // namespace co_context
-
 namespace co_context::detail {
-
-// using liburingcxx::sq_entry;
-// using liburingcxx::cq_entry;
 
 struct [[nodiscard]] task_info {
     std::coroutine_handle<> handle;

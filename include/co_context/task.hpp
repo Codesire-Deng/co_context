@@ -26,7 +26,7 @@ namespace detail {
     class task_promise_base;
 
     /**
-     * @brief current task<> is finished therefore resume the parent
+     * @brief When current task<> finishes, resume its parent.
      */
     template<typename T>
     struct task_final_awaiter {
@@ -45,7 +45,7 @@ namespace detail {
     };
 
     /**
-     * @brief current task<> is finished therefore resume the parent
+     * @brief When current task<> finishes, resume its parent.
      */
     template<>
     struct task_final_awaiter<void> {
@@ -453,6 +453,11 @@ task<tuple_or_void<Ts...>> all(task<Ts> &&...node) {
     } else {
         co_return std::tuple_cat((co_await node.as_tuple())...);
     }
+}
+
+template<typename T>
+class all_awaiter : final {
+    
 }
 
 } // namespace co_context

@@ -155,6 +155,17 @@ inline void co_spawn(task<void> &&entrance) noexcept {
     detail::this_thread.worker->co_spawn_unsafe(handle);
 }
 
+namespace detail {
+    inline void co_spawn(std::coroutine_handle<> handle) noexcept {
+        assert(
+            detail::this_thread.ctx != nullptr
+            && "Can not co_spawn() on the thread "
+               "without a running io_context!"
+        );
+        detail::this_thread.worker->co_spawn_unsafe(handle);
+    }
+} // namespace detail
+
 inline void io_context_stop() noexcept {
     detail::this_thread.ctx->can_stop();
 }
