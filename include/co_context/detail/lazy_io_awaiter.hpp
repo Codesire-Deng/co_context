@@ -3,6 +3,7 @@
 #include "co_context/io_context.hpp"
 #include <cassert>
 #include <chrono>
+#include <coroutine>
 #include <cstdint>
 #include <span>
 
@@ -744,6 +745,25 @@ struct lazy_yield {
 
     constexpr lazy_yield() noexcept = default;
 };
+
+struct lazy_who_am_i {
+    static constexpr bool await_ready() noexcept { return false; }
+
+    constexpr bool await_suspend(std::coroutine_handle<> current) noexcept {
+        handle = current;
+        return false;
+    }
+
+    [[nodiscard]] std::coroutine_handle<> await_resume() const noexcept {
+        return handle;
+    }
+
+    constexpr lazy_who_am_i() noexcept = default;
+
+    std::coroutine_handle<> handle;
+};
+
+using lazy_forget = std::suspend_always;
 
 class lazy_resume_on {
   public:

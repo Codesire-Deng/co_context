@@ -533,6 +533,16 @@ inline namespace lazy {
         return {};
     }
 
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_who_am_i
+    who_am_i() noexcept {
+        return {};
+    }
+
+    [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_forget
+    forget() noexcept {
+        return {};
+    }
+
     [[nodiscard("Did you forget to co_await?")]] inline detail::lazy_resume_on
     resume_on(co_context::io_context &resume_context) noexcept {
         return detail::lazy_resume_on{resume_context};
