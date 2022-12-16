@@ -9,7 +9,7 @@ namespace co_context {
 template<
     std::unsigned_integral T,
     T capacity,
-    bool is_thread_safe = true,
+    safety is_thread_safe = safety::safe,
     bool is_blocking = is_thread_safe>
 struct spsc_cursor {
     static_assert(std::has_single_bit(capacity));

@@ -141,4 +141,6 @@ namespace config {
     inline constexpr bool is_log_e = log_level <= level::error;
 } // namespace config
 
+enum safety : bool { unsafe = false, safe = true };
+
 } // namespace co_context

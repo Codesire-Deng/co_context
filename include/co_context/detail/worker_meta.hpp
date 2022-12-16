@@ -78,7 +78,7 @@ struct worker_meta final {
 
     using cur_t = config::cur_t;
 
-    spsc_cursor<cur_t, config::swap_capacity, false> reap_cur;
+    spsc_cursor<cur_t, config::swap_capacity, unsafe> reap_cur;
 
 #if CO_CONTEXT_IS_USING_EVENTFD
     // TODO replace this with fixed-sized queue.

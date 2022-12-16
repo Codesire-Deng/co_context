@@ -1,10 +1,11 @@
 #pragma once
 
+#include "co_context/config.hpp"
 #include "co_context/io_context.hpp"
 #include "co_context/lazy_io.hpp"
 #include "co_context/task.hpp"
+#include "co_context/utility/as_atomic.hpp"
 #include "co_context/utility/mpl.hpp"
-#include <atomic>
 #include <coroutine>
 #include <cstddef>
 #include <memory>
@@ -66,7 +67,7 @@ using clear_void_t = mpl::filter<mpl::type_list<Ts...>, is_not_void_v>::type;
 template<typename... Ts>
 using to_all_meta_t = clear_void_t<Ts...>::template to<all_meta>;
 
-template<size_t idx, typename... Ts>
+template<safety is_thread_safe, size_t idx, typename... Ts>
 task<void> evaluate_to(
     to_all_meta_t<Ts...> &meta, task<mpl::select_t<idx, Ts...>> &&node
 ) {
@@ -85,9 +86,15 @@ task<void> evaluate_to(
         );
     }
 
-    // NOTE NOT thread-safe!  If `resume_on` is used, race condition may
-    // happen!
-    if (--meta.count_down == 0) {
+    bool wakeup;
+    if constexpr (is_thread_safe) {
+        wakeup =
+            (as_atomic(meta.count_down).fetch_sub(1, std::memory_order_relaxed)
+             == 1);
+    } else {
+        wakeup = (--meta.count_down == 0);
+    }
+    if (wakeup) {
         detail::co_spawn_handle(meta.await_handle);
     }
 }
@@ -96,7 +103,7 @@ task<void> evaluate_to(
 
 namespace co_context {
 
-template<typename... Ts>
+template<safety is_thread_safe = safety::safe, typename... Ts>
 task<detail::tuple_or_void<Ts...>> all(task<Ts> &&...node) {
     constexpr size_t n = sizeof...(Ts);
     static_assert(n >= 2, "too few tasks for `all(...)`");
@@ -105,12 +112,22 @@ task<detail::tuple_or_void<Ts...>> all(task<Ts> &&...node) {
     meta_type meta{co_await lazy::who_am_i(), n};
 
     auto spawn_all = [&]<size_t... idx>(std::index_sequence<idx...>) {
-        (..., co_spawn(evaluate_to<idx, Ts...>(meta, std::move(node))));
+        (...,
+         co_spawn(evaluate_to<is_thread_safe, idx, Ts...>(meta, std::move(node))
+         ));
     };
+
+    if constexpr (is_thread_safe) {
+        std::atomic_thread_fence(std::memory_order_release);
+    }
 
     spawn_all(std::index_sequence_for<Ts...>{});
 
     co_await lazy::forget();
+
+    if constexpr (is_thread_safe) {
+        std::atomic_thread_fence(std::memory_order_acquire);
+    }
 
     if constexpr (std::is_void_v<detail::tuple_or_void<Ts...>>) {
         co_return;
