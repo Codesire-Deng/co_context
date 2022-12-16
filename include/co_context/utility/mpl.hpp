@@ -74,6 +74,9 @@ template<
 struct fold<type_list<H, Ts...>, acc, op>
     : fold<type_list<Ts...>, typename op<acc, H>::type, op> {};
 
+template<TL in, typename init, template<typename, typename> class op>
+using fold_t = fold<in, init, op>::type;
+
 template<TL... in>
 struct concat;
 
@@ -101,6 +104,22 @@ struct contain : std::false_type {};
 template<typename E, typename... Ts>
 struct contain<type_list<Ts...>, E>
     : std::bool_constant<(false || ... || std::is_same_v<E, Ts>)> {};
+
+template<TL in, typename E>
+constexpr bool contain_v = contain<in, E>::value;
+
+template<TL in>
+class unique {
+    template<TL acc, typename E>
+    using add = std::
+        conditional_t<contain_v<acc, E>, acc, typename acc::template append<E>>;
+
+  public:
+    using type = fold_t<in, type_list<>, add>;
+};
+
+template<TL in>
+using unique_t = unique<in>::type;
 
 template<TL in, typename E>
 struct count {};
