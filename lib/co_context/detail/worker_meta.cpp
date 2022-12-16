@@ -132,9 +132,8 @@ std::coroutine_handle<> worker_meta::schedule() noexcept {
 }
 
 void worker_meta::work_once() {
-    log::v("worker[%u] work_once...\n", this->ctx_id);
-
     const auto coro = this->schedule();
+    log::v("worker[%u] resume %lx\n", this->ctx_id, coro.address());
     coro.resume();
 
     log::v("worker[%u] work_once finished\n", this->ctx_id);

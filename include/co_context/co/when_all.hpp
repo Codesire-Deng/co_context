@@ -58,12 +58,6 @@ struct all_meta<> {
         , count_down(n) {}
 };
 
-template<typename T>
-using is_not_void_v = std::bool_constant<!std::is_void_v<T>>;
-
-template<typename... Ts>
-using clear_void_t = mpl::filter<mpl::type_list<Ts...>, is_not_void_v>::type;
-
 template<typename... Ts>
 using to_all_meta_t = clear_void_t<Ts...>::template to<all_meta>;
 
