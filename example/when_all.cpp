@@ -27,10 +27,12 @@ task<> run() {
     std::cout << "a = " << a << std::endl;
 
     // co_spawn f2 & f3, and wait for them
-    auto [b] = co_await all(f2(), f3());
+    // concurrency at thread-unsafe mode
+    auto [b] = co_await all<unsafe>(f2(), f3());
     std::cout << "b = " << b << std::endl;
 
     // co_spawn 3 timers, and wait for them (never stop)
+    // thread-safe Guaranteed
     co_await all(cycle(1, "1 sec"), cycle(3, "\t3 sec"), cycle(5, "\t\t5 sec"));
 }
 
