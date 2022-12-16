@@ -22,7 +22,7 @@ class trival_task {
         static std::coroutine_handle<>
         await_suspend(std::coroutine_handle<promise_type> current) noexcept {
             auto continuation = current.promise().parent_coro;
-            log::d("trival_task %lx destroy\n", current.address());
+            log::v("trival_task %lx destroy\n", current.address());
             current.destroy();
             return continuation;
         }
