@@ -7,44 +7,190 @@
 
 namespace co_context::mpl {
 
-template<typename T, typename... Ts>
-constexpr size_t count = (0 + ... + unsigned(std::is_same_v<T, Ts>));
+template<typename... Ts>
+struct type_list {
+    struct is_type_list {};
 
-template<typename... Tuples>
-using tuple_cat_t = decltype(std::tuple_cat(std::declval<Tuples>()...));
+    using type = type_list;
+
+    static constexpr size_t size = sizeof...(Ts);
+
+    template<typename... Us>
+    using append = type_list<Ts..., Us...>;
+    template<typename... Us>
+    using prepend = type_list<Us..., Ts...>;
+
+    template<template<typename...> typename T>
+    using to = T<Ts...>;
+};
+
+template<typename... Ts>
+struct type_list_from {};
+
+template<typename... Ts>
+struct type_list_from<std::tuple<Ts...>> : type_list<Ts...> {};
+
+template<typename Type_list>
+concept TL = requires {
+    typename Type_list::is_type_list;
+    typename Type_list::type;
+};
+
+static_assert(TL<type_list<>>);
+
+template<TL in, template<typename> class F>
+struct map;
+
+template<template<typename> class F, typename... Ts>
+struct map<type_list<Ts...>, F> : type_list<typename F<Ts>::type...> {};
+
+template<TL in, template<typename> class F>
+using map_t = typename map<in, F>::type;
+
+template<TL in, template<typename> class P, TL out = type_list<>>
+struct filter : out {};
+
+template<template<typename> class P, TL out, typename H, typename... Ts>
+struct filter<type_list<H, Ts...>, P, out>
+    : std::conditional_t<
+          P<H>::value,
+          filter<type_list<Ts...>, P, typename out::template append<H>>,
+          filter<type_list<Ts...>, P, out>> {};
+
+template<typename T>
+struct id {
+    using type = T;
+};
+
+template<TL in, typename init, template<typename, typename> class op>
+struct fold : id<init> {};
+
+template<
+    typename acc,
+    template<typename, typename>
+    class op,
+    typename H,
+    typename... Ts>
+struct fold<type_list<H, Ts...>, acc, op>
+    : fold<type_list<Ts...>, typename op<acc, H>::type, op> {};
+
+template<TL... in>
+struct concat;
+
+template<>
+struct concat<> : type_list<> {};
+
+template<TL in>
+struct concat<in> : in {};
+
+template<TL... in>
+using concat_t = typename concat<in...>::type;
+
+template<TL in1, TL in2, TL... Rest>
+struct concat<in1, in2, Rest...> : concat_t<concat_t<in1, in2>, Rest...> {};
+
+template<typename... Ts1, typename... Ts2>
+struct concat<type_list<Ts1...>, type_list<Ts2...>>
+    : type_list<Ts1..., Ts2...> {};
+
+static_assert(std::is_same_v<concat_t<type_list<>>, type_list<>>);
+
+template<TL in, typename E>
+struct contain : std::false_type {};
+
+template<typename E, typename... Ts>
+struct contain<type_list<Ts...>, E>
+    : std::bool_constant<(false || ... || std::is_same_v<E, Ts>)> {};
+
+template<TL in, typename E>
+struct count {};
+
+template<TL in, typename E>
+constexpr auto count_v = count<in, E>::value;
+
+template<typename E, typename T>
+struct count<type_list<T>, E>
+    : std::integral_constant<size_t, (unsigned(std::is_same_v<E, T>))> {};
+
+template<typename E, typename... Ts>
+struct count<type_list<Ts...>, E>
+    : std::integral_constant<
+          size_t,
+          (0 + ... + unsigned(std::is_same_v<E, Ts>))> {};
+
+// template<TL in, size_t idx>
+//     requires(idx < in::size)
+// struct select {
+//     using type = typename in::template to<std::tuple>;
+// };
+
+template<TL in, size_t idx>
+    requires(idx < in::size)
+struct select;
+
+// template<TL in, size_t idx>
+// using select_t = select<in, idx>::type;
 
 template<size_t idx, typename... Ts>
-using select = std::tuple_element_t<idx, std::tuple<Ts...>>;
+using select_t = select<type_list<Ts...>, idx>::type;
+
+template<typename H, typename... Ts>
+struct select<type_list<H, Ts...>, 0> : id<H> {};
+
+template<size_t idx, typename H, typename... Ts>
+struct select<type_list<H, Ts...>, idx> : select<type_list<Ts...>, idx - 1> {};
+
+template<TL in, size_t N, class = std::make_index_sequence<in::size>>
+struct first_N;
+
+template<std::size_t N, class... Ts, std::size_t... Is>
+struct first_N<type_list<Ts...>, N, std::index_sequence<Is...>>
+    : concat_t<std::conditional_t<(Is < N), type_list<Ts>, type_list<>>...> {};
+
+template<TL in, size_t N>
+using first_N_t = first_N<in, N>::type;
+
+static_assert(std::is_same_v<first_N_t<type_list<int>, 1>, type_list<int>>);
+
+} // namespace co_context::mpl
+
+namespace co_context::mpl {
+
+template<typename T>
+struct is_tuple : std::false_type {};
+
+template<>
+struct is_tuple<std::tuple<>> : std::true_type {};
+
+template<typename... Ts>
+struct is_tuple<std::tuple<Ts...>> : std::true_type {};
+
+template<typename T>
+using is_tuple_v = is_tuple<T>::value;
+
+template<typename T>
+concept tuple = is_tuple<T>::value;
+
+template<tuple... Tuples>
+using tuple_cat_t = decltype(std::tuple_cat(std::declval<Tuples>()...));
 
 namespace detail {
 
-    template<typename Tuple, size_t... idx>
-    auto select_tuple_f(
-        [[maybe_unused]] Tuple t, [[maybe_unused]] std::index_sequence<idx...> i
-    ) {
-        using type = tuple_cat_t<std::tuple_element_t<idx, Tuple>...>;
-        return std::declval<type>();
+    template<typename T>
+    union uninitialized_buffer {
+        T value;
     };
 
-    template<typename T, typename... Ts>
-    consteval size_t count_tuple_f([[maybe_unused]] std::tuple<Ts...> t) {
-        return count<T, Ts...>;
-    };
-
-    template<size_t N, typename... Ts>
-    using first_N_tuple_t = decltype(select_tuple_f(
-        std::declval<std::tuple<Ts...>>(),
-        std::declval<std::make_index_sequence<N>>()
-    ));
+    template<>
+    union uninitialized_buffer<void> {};
 
 } // namespace detail
 
-template<typename Tuple, size_t... idx>
+template<tuple Tuple, size_t... idx>
 using select_tuple_t = tuple_cat_t<std::tuple_element_t<idx, Tuple>...>;
 
 template<size_t N, typename T, typename... Ts>
-constexpr size_t count_first_N =
-    detail::count_tuple_f<T, detail::first_N_tuple_t<N, Ts...>>();
+constexpr size_t count_first_N = count<first_N<type_list<Ts...>, N>, T>::value;
 
 template<typename T, typename... From>
 using remove_t = tuple_cat_t<std::conditional_t<
@@ -53,13 +199,7 @@ using remove_t = tuple_cat_t<std::conditional_t<
     std::tuple<From>>...>;
 
 template<typename T>
-    requires(!std::is_void_v<T>)
-union uninitialized_buffer {
-    T value;
-};
-
-template<typename T>
-using uninitialized =
-    std::conditional_t<std::is_void_v<T>, void, uninitialized_buffer<T>>;
+using uninitialized = std::
+    conditional_t<std::is_void_v<T>, void, detail::uninitialized_buffer<T>>;
 
 } // namespace co_context::mpl
