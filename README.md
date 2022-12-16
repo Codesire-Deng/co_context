@@ -2,7 +2,7 @@
 
 # co_context
 
-co_context 是一个**协程**并发框架，提供可靠的性能，同时致力于减轻用户的心智负担，让 C++ 初学者也能轻松写出高并发程序。
+co_context 是一个**协程**并发框架，提供可靠的**性能**和强**易用性**，让 C++ 初学者也能轻松写出高并发程序。
 co_context 基于 Linux [io_uring](https://github.com/axboe/liburing)，其性能通常优于 epoll。
 
 > 出于性能原因，我们重写了 [liburing](https://github.com/axboe/liburing)，取名为 [liburingcxx](https://github.com/Codesire-Deng/liburingcxx)。
@@ -10,7 +10,7 @@ co_context 基于 Linux [io_uring](https://github.com/axboe/liburing)，其性�
 ## 已有功能
 
 1. 支持 `read` `write` `accept` `timeout` 等 io_uring 提供的所有系统调用，总计 74 个功能。
-2. 并发支持: `mutex`, `semaphore`, `condition_variable`, `channel`。
+2. 并发支持: `all`, `mutex`, `semaphore`, `condition_variable`, `channel`。
 3. 调度提示: `yield`, `resume_on`
 
 ## 编译和运行

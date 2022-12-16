@@ -9,7 +9,7 @@ A C++20 **coroutine** framework offering highly-concurrent I/O with a reasonable
 ## Features
 
 1. Syscalls like `read` `write` `accept` `timeout` which are provided by [io_uring](https://github.com/axboe/liburing), 74 in total.
-2. Concurrency support: `mutex`, `semaphore`, `condition_variable`, `channel`. Provides thread-safty between coroutines. 
+2. Concurrency support: `all`, `mutex`, `semaphore`, `condition_variable`, `channel`. Provides thread-safty between coroutines. 
 3. Dispatch hint: `yield`, `resume_on`
 
 ## Build
