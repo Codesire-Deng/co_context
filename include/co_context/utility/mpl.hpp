@@ -118,18 +118,9 @@ struct count<type_list<Ts...>, E>
           size_t,
           (0 + ... + unsigned(std::is_same_v<E, Ts>))> {};
 
-// template<TL in, size_t idx>
-//     requires(idx < in::size)
-// struct select {
-//     using type = typename in::template to<std::tuple>;
-// };
-
 template<TL in, size_t idx>
     requires(idx < in::size)
 struct select;
-
-// template<TL in, size_t idx>
-// using select_t = select<in, idx>::type;
 
 template<size_t idx, typename... Ts>
 using select_t = select<type_list<Ts...>, idx>::type;
