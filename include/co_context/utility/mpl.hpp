@@ -213,3 +213,13 @@ using uninitialized = std::
     conditional_t<std::is_void_v<T>, void, detail::uninitialized_buffer<T>>;
 
 } // namespace co_context::mpl
+
+namespace co_context::detail {
+
+template<typename T>
+using is_not_void_v = std::bool_constant<!std::is_void_v<T>>;
+
+template<typename... Ts>
+using clear_void_t = mpl::filter<mpl::type_list<Ts...>, is_not_void_v>::type;
+
+} // namespace co_context::detail
