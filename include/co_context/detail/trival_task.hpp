@@ -1,5 +1,6 @@
 #pragma once
 
+#include "co_context/log/log.hpp"
 #include <coroutine>
 
 namespace co_context::detail {
@@ -21,6 +22,7 @@ class trival_task {
         static std::coroutine_handle<>
         await_suspend(std::coroutine_handle<promise_type> current) noexcept {
             auto continuation = current.promise().parent_coro;
+            log::d("trival_task %lx destroy\n", current.address());
             current.destroy();
             return continuation;
         }
@@ -50,15 +52,14 @@ class trival_task {
 
     static constexpr bool await_ready() noexcept { return false; }
 
-    std::coroutine_handle<> await_suspend(std::coroutine_handle<> awaiting_coro
-    ) noexcept {
+    [[nodiscard]] std::coroutine_handle<>
+    await_suspend(std::coroutine_handle<> awaiting_coro) const noexcept {
         handle.promise().parent_coro = awaiting_coro;
         return handle;
     }
 
     static constexpr void await_resume() noexcept {}
 
-  private:
     std::coroutine_handle<promise_type> handle;
 };
 

@@ -156,7 +156,7 @@ inline void co_spawn(task<void> &&entrance) noexcept {
 }
 
 namespace detail {
-    inline void co_spawn(std::coroutine_handle<> handle) noexcept {
+    inline void co_spawn_handle(std::coroutine_handle<> handle) noexcept {
         assert(
             detail::this_thread.ctx != nullptr
             && "Can not co_spawn() on the thread "
