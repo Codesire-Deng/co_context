@@ -1,32 +1,33 @@
 #include "co_context/all.hpp"
 #include "co_context/lazy_io.hpp"
 #include "co_context/utility/polymorphism.hpp"
+#include <cstdint>
 #include <iostream>
 #include <variant>
 using namespace co_context;
 
-task<int> f1() {
-    printf("f1 start.\n");
+task<int> f0() {
+    printf("f0 start.\n");
     co_await timeout(std::chrono::seconds{1});
-    printf("f1 done.\n");
+    printf("f0 done.\n");
     co_return 1;
 }
 
-task<const char *> f2() {
-    printf("f2 done.\n");
-    co_return "f2 Great!";
+task<const char *> f1() {
+    printf("f1 done.\n");
+    co_return "f1 Great!";
 }
 
-task<void> f3() {
-    printf("f3 start.\n");
+task<void> f2() {
+    printf("f2 start.\n");
     co_await timeout(std::chrono::seconds{2});
-    printf("f3 done.\n");
+    printf("f2 done.\n");
     co_return;
 }
 
 task<> run() {
     // var : std::variant<std::monostate, int, const char *>;
-    auto [idx, var] = co_await any(f1(), f2(), f3());
+    auto [idx, var] = co_await any(f0(), f1(), f2());
     std::cout << idx << " finished!\n";
     std::visit(
         overloaded{
@@ -36,6 +37,13 @@ task<> run() {
         },
         var
     );
+
+    {
+        std::cout << "--------------\n";
+        std::cout << "3 * f2 start!\n";
+        uint32_t idx = co_await any<unsafe>(f2(), f2(), f2());
+        std::cout << idx << " finished!\n";
+    }
 }
 
 int main() {

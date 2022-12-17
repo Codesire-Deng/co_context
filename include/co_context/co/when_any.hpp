@@ -18,14 +18,29 @@
 namespace co_context::detail {
 
 template<typename... Ts>
+constexpr bool is_all_void_v =
+    (mpl::count_v<mpl::type_list<Ts...>, void> == sizeof...(Ts));
+
+template<typename... Ts>
 using variant_list = clear_void_t<Ts...>::template prepend<std::monostate>;
 
 template<typename... Ts>
 using to_any_variant_t = variant_list<Ts...>::template to<std::variant>;
 
 template<typename... Ts>
+using variant_or_uint =
+    std::conditional_t<is_all_void_v<Ts...>, uint32_t, to_any_variant_t<Ts...>>;
+
+template<typename... Ts>
+using any_tuple = std::tuple<uint32_t, to_any_variant_t<Ts...>>;
+
+template<typename... Ts>
+using any_return_type =
+    std::conditional_t<is_all_void_v<Ts...>, uint32_t, any_tuple<Ts...>>;
+
+template<typename Variant>
 struct any_meta {
-    using result_type = to_any_variant_t<Ts...>;
+    using result_type = Variant;
 
     result_type buffer;
     std::coroutine_handle<> await_handle;
@@ -42,9 +57,26 @@ struct any_meta {
     result_type &as_result() &noexcept { return buffer; }
 };
 
+template<>
+struct any_meta<uint32_t> {
+    std::coroutine_handle<> await_handle;
+
+    // NOTE NOT thread-safe!  If `resume_on` is used, race condition may
+    // happen!
+    uint32_t idx{-1U};
+    uint32_t count_down;
+
+    explicit any_meta(std::coroutine_handle<> await_handle, uint32_t n) noexcept
+        : await_handle(await_handle)
+        , count_down(n) {}
+};
+
+template<typename... Ts>
+using any_meta_type = any_meta<variant_or_uint<Ts...>>;
+
 template<safety is_thread_safe, size_t idx, typename... Ts>
 task<void> evaluate_to(
-    std::shared_ptr<any_meta<Ts...>> meta_ptr,
+    std::shared_ptr<any_meta_type<Ts...>> meta_ptr,
     task<mpl::select_t<idx, Ts...>> node
 ) {
     constexpr uint32_t n = sizeof...(Ts);
@@ -88,20 +120,17 @@ task<void> evaluate_to(
     }
 }
 
-template<typename... Ts>
-using any_tuple = std::tuple<uint32_t, to_any_variant_t<Ts...>>;
-
 } // namespace co_context::detail
 
 namespace co_context {
 
 template<safety is_thread_safe = safety::safe, typename... Ts>
-task<detail::any_tuple<Ts...>> any(task<Ts> &&...node) {
+task<detail::any_return_type<Ts...>> any(task<Ts> &&...node) {
     constexpr uint32_t n = sizeof...(Ts);
     static_assert(n >= 2, "too few tasks for `any(...)`");
 
-    auto meta_ptr =
-        std::make_shared<detail::any_meta<Ts...>>(co_await lazy::who_am_i(), n);
+    using mate_type = detail::any_meta_type<Ts...>;
+    auto meta_ptr = std::make_shared<mate_type>(co_await lazy::who_am_i(), n);
 
     auto spawn_all = [&]<size_t... idx>(std::index_sequence<idx...>) {
         (..., co_spawn(evaluate_to<is_thread_safe, idx, Ts...>(
@@ -121,8 +150,12 @@ task<detail::any_tuple<Ts...>> any(task<Ts> &&...node) {
         std::atomic_thread_fence(std::memory_order_acquire);
     }
 
-    co_return detail::any_tuple<Ts...>{
-        meta_ptr->idx, std::move(meta_ptr->buffer)};
+    if constexpr (detail::is_all_void_v<Ts...>) {
+        co_return meta_ptr->idx;
+    } else {
+        co_return detail::any_tuple<Ts...>{
+            meta_ptr->idx, std::move(meta_ptr->buffer)};
+    }
 }
 
 } // namespace co_context
