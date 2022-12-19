@@ -20,6 +20,9 @@ constexpr uint32_t total_switch = 2e9;
 
 uint32_t count = 0;
 
+#ifdef __clang__
+#warning Clang14 may crash on compiling this function.
+#endif
 task<> f(const swtch &to) {
     while (count++ < total_switch) {
         co_await to;
