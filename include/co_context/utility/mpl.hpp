@@ -75,7 +75,7 @@ struct fold<type_list<H, Ts...>, acc, op>
     : fold<type_list<Ts...>, typename op<acc, H>::type, op> {};
 
 template<TL in, typename init, template<typename, typename> class op>
-using fold_t = fold<in, init, op>::type;
+using fold_t = typename fold<in, init, op>::type;
 
 template<TL... in>
 struct concat;
@@ -119,7 +119,7 @@ class unique {
 };
 
 template<TL in>
-using unique_t = unique<in>::type;
+using unique_t = typename unique<in>::type;
 
 template<TL in, typename E>
 struct count {};
@@ -142,7 +142,7 @@ template<TL in, size_t idx>
 struct select;
 
 template<size_t idx, typename... Ts>
-using select_t = select<type_list<Ts...>, idx>::type;
+using select_t = typename select<type_list<Ts...>, idx>::type;
 
 template<typename H, typename... Ts>
 struct select<type_list<H, Ts...>, 0> : id<H> {};
@@ -158,7 +158,7 @@ struct first_N<type_list<Ts...>, N, std::index_sequence<Is...>>
     : concat_t<std::conditional_t<(Is < N), type_list<Ts>, type_list<>>...> {};
 
 template<TL in, size_t N>
-using first_N_t = first_N<in, N>::type;
+using first_N_t = typename first_N<in, N>::type;
 
 static_assert(std::is_same_v<first_N_t<type_list<int>, 1>, type_list<int>>);
 
@@ -176,7 +176,7 @@ template<typename... Ts>
 struct is_tuple<std::tuple<Ts...>> : std::true_type {};
 
 template<typename T>
-using is_tuple_v = is_tuple<T>::value;
+constexpr bool is_tuple_v = is_tuple<T>::value;
 
 template<typename T>
 concept tuple = is_tuple<T>::value;
@@ -217,9 +217,10 @@ using uninitialized = std::
 namespace co_context::detail {
 
 template<typename T>
-using is_not_void_v = std::bool_constant<!std::is_void_v<T>>;
+using is_not_void = std::bool_constant<!std::is_void_v<T>>;
 
 template<typename... Ts>
-using clear_void_t = mpl::filter<mpl::type_list<Ts...>, is_not_void_v>::type;
+using clear_void_t =
+    typename mpl::filter<mpl::type_list<Ts...>, is_not_void>::type;
 
 } // namespace co_context::detail

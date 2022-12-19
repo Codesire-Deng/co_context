@@ -59,7 +59,7 @@ struct all_meta<> {
 };
 
 template<typename... Ts>
-using to_all_meta_t = clear_void_t<Ts...>::template to<all_meta>;
+using to_all_meta_t = typename clear_void_t<Ts...>::template to<all_meta>;
 
 template<safety is_thread_safe, size_t idx, typename... Ts>
 task<void> evaluate_to(
