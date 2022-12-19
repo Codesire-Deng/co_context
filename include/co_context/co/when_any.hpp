@@ -22,10 +22,12 @@ constexpr bool is_all_void_v =
     (mpl::count_v<mpl::type_list<Ts...>, void> == sizeof...(Ts));
 
 template<typename... Ts>
-using variant_list = clear_void_t<Ts...>::template prepend<std::monostate>;
+using variant_list =
+    typename clear_void_t<Ts...>::template prepend<std::monostate>;
 
 template<typename... Ts>
-using to_any_variant_t = variant_list<Ts...>::template to<std::variant>;
+using to_any_variant_t =
+    typename variant_list<Ts...>::template to<std::variant>;
 
 template<typename... Ts>
 using variant_or_uint =
