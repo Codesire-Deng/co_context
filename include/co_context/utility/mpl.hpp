@@ -187,12 +187,17 @@ using tuple_cat_t = decltype(std::tuple_cat(std::declval<Tuples>()...));
 namespace detail {
 
     template<typename T>
-    union uninitialized_buffer {
-        T value;
+    struct real_sized {
+        T _;
+    };
+
+    template<typename T>
+    struct uninitialized_buffer {
+        alignas(alignof(real_sized<T>)) char data[sizeof(real_sized<T>)];
     };
 
     template<>
-    union uninitialized_buffer<void> {};
+    struct uninitialized_buffer<void> {};
 
 } // namespace detail
 

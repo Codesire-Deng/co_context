@@ -23,17 +23,11 @@ task<> cycle(int sec, const char *message) {
 }
 
 task<> run() {
-    auto a = co_await f1();
-    std::cout << "a = " << a << std::endl;
-
-    // co_spawn f2 & f3, and wait for them
+    // co_spawn f1 & f2 & f3, and wait for them
     // concurrency at thread-unsafe mode
-    auto [b] = co_await all<unsafe>(f2(), f3());
+    auto [a, b] = co_await all(f1(), f2(), f3());
+    std::cout << "a = " << a << std::endl;
     std::cout << "b = " << b << std::endl;
-
-    // co_spawn 3 timers, and wait for them (never stop)
-    // thread-safe Guaranteed
-    co_await all(cycle(1, "1 sec"), cycle(3, "\t3 sec"), cycle(5, "\t\t5 sec"));
 }
 
 int main() {
