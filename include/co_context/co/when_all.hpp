@@ -40,6 +40,10 @@ struct all_meta {
         : await_handle(await_handle)
         , count_down(n) {}
 
+    ~all_meta() noexcept(noexcept(std::destroy_at(&as_result()))) {
+        std::destroy_at(&as_result());
+    }
+
     result_type &as_result() &noexcept {
         return *reinterpret_cast<result_type *>(&buffer);
     }
@@ -74,10 +78,11 @@ task<void> evaluate_to(
 
         constexpr size_t pos = idx - mpl::count_v<list, void>;
 
-        std::construct_at(
-            std::addressof(std::get<pos>(meta.buffer).value),
-            std::move(co_await std::move(node))
-        );
+        auto *const location =
+            reinterpret_cast<node_return_type *>(std::get<pos>(meta.buffer).data
+            );
+
+        std::construct_at(location, std::move(co_await std::move(node)));
     }
 
     bool wakeup;

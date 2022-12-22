@@ -79,7 +79,7 @@ using any_meta_type = any_meta<variant_or_uint<Ts...>>;
 template<safety is_thread_safe, size_t idx, typename... Ts>
 task<void> evaluate_to(
     std::shared_ptr<any_meta_type<Ts...>> meta_ptr,
-    task<mpl::select_t<idx, Ts...>> node
+    task<mpl::select_t<idx, Ts...>> node // take the ownership
 ) {
     constexpr uint32_t n = sizeof...(Ts);
     using node_return_type = mpl::select_t<idx, Ts...>;
@@ -96,7 +96,7 @@ task<void> evaluate_to(
         co_return;
     }
 
-    auto preempt = [&]() -> bool {
+    auto preempt = [meta_ptr = meta_ptr.get()]() -> bool {
         if constexpr (is_thread_safe) {
             return as_atomic(meta_ptr->count_down)
                        .fetch_sub(1, std::memory_order_release)
