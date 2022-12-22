@@ -24,7 +24,6 @@ task<> cycle(int sec, const char *message) {
 
 task<> run() {
     // co_spawn f1 & f2 & f3, and wait for them
-    // concurrency at thread-unsafe mode
     auto [a, b] = co_await all(f1(), f2(), f3());
     std::cout << "a = " << a << std::endl;
     std::cout << "b = " << b << std::endl;
