@@ -95,9 +95,9 @@ void io_context::do_completion_part() noexcept {
         if (will_not_wait == 0) [[unlikely]] {
             worker.wait_uring();
             num = worker.poll_completion();
-            if constexpr (config::is_log_w) {
+            if constexpr (config::is_log_i) {
                 if (num == 0) [[unlikely]] {
-                    log::w("wait_cq_entry() gets 0 cqe.\n");
+                    log::i("wait_cq_entry() gets 0 cqe.\n");
                 }
             }
         }
