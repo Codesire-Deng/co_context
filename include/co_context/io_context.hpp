@@ -23,6 +23,7 @@
 #include "co_context/detail/io_context_meta.hpp"
 #include "co_context/detail/task_info.hpp"
 #include "co_context/detail/thread_meta.hpp"
+#include "co_context/detail/thread_safety.hpp"
 #include "co_context/detail/uring_type.hpp"
 #include "co_context/detail/worker_meta.hpp"
 #include "co_context/task.hpp"
@@ -100,7 +101,8 @@ class [[nodiscard]] io_context final {
 
     void co_spawn(task<void> &&entrance) noexcept;
 
-    void co_spawn_unsafe(task<void> &&entrance) noexcept;
+    template<safety is_thread_safe>
+    void co_spawn(task<void> &&entrance) noexcept;
 
     void can_stop() noexcept { will_stop = true; }
 
@@ -133,15 +135,18 @@ class [[nodiscard]] io_context final {
 }; // class io_context
 
 inline void io_context::co_spawn(task<void> &&entrance) noexcept {
-    auto handle = entrance.get_handle();
-    entrance.detach();
-    worker.co_spawn_auto(handle);
+    this->co_spawn<safety::safe>(std::move(entrance));
 }
 
-inline void io_context::co_spawn_unsafe(task<void> &&entrance) noexcept {
+template<safety is_thread_safe>
+inline void io_context::co_spawn(task<void> &&entrance) noexcept {
     auto handle = entrance.get_handle();
     entrance.detach();
-    worker.co_spawn_unsafe(handle);
+    if constexpr (is_thread_safe) {
+        worker.co_spawn_auto(handle);
+    } else {
+        worker.co_spawn_unsafe(handle);
+    }
 }
 
 inline void co_spawn(task<void> &&entrance) noexcept {
