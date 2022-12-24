@@ -1,8 +1,9 @@
 #pragma once
 
-#include <co_context/config.hpp>
-#include <co_context/utility/as_atomic.hpp>
-#include <co_context/utility/bit.hpp>
+#include "co_context/config.hpp"
+#include "co_context/detail/thread_safety.hpp"
+#include "co_context/utility/as_atomic.hpp"
+#include "co_context/utility/bit.hpp"
 
 namespace co_context {
 
