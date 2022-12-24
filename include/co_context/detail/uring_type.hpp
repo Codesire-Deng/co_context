@@ -20,6 +20,9 @@ using uring = liburingcxx::uring<
 #if LIBURINGCXX_IS_KERNEL_REACH(6, 0)
     | IORING_SETUP_SINGLE_ISSUER
 #endif
+#if LIBURINGCXX_IS_KERNEL_REACH(6, 1)
+    | IORING_SETUP_DEFER_TASKRUN
+#endif
     >;
 
 } // namespace co_context::detail
