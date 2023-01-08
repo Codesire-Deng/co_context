@@ -142,7 +142,7 @@ void worker_meta::work_once() {
 void worker_meta::check_submission_threshold() noexcept {
     if constexpr (config::submission_threshold != -1) {
         if (requests_to_submit >= config::submission_threshold) {
-            [[maybe_unused]] int res = ring.submit();
+            [[maybe_unused]] int res = ring.submit_and_get_events();
             assert(res >= 0 && "exception at uring::submit");
             requests_to_submit = 0;
         }

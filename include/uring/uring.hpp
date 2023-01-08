@@ -190,7 +190,7 @@ class [[nodiscard]] uring final {
 
     int unregister_ring_fd();
 
-    [[nodiscard]] bool is_cq_ring_need_enter() const noexcept;
+    [[nodiscard]] constexpr bool is_cq_ring_need_enter() const noexcept;
 
   public:
     /**
@@ -635,7 +635,7 @@ template<uint64_t uring_flags>
 int uring<uring_flags>::__submit(
     unsigned submitted, unsigned wait_num, bool getevents
 ) noexcept {
-    bool is_cq_need_enter = getevents || wait_num || is_cq_ring_need_enter();
+    bool is_cq_need_enter = (getevents | wait_num) || is_cq_ring_need_enter();
     unsigned flags = config::default_enter_flags_registered_ring;
 
     if (is_sq_ring_need_enter(submitted, flags) || is_cq_need_enter) {
@@ -755,7 +755,8 @@ inline bool uring<uring_flags>::is_cq_ring_need_flush() const noexcept {
 }
 
 template<uint64_t uring_flags>
-inline bool uring<uring_flags>::is_cq_ring_need_enter() const noexcept {
+inline constexpr bool
+uring<uring_flags>::is_cq_ring_need_enter() const noexcept {
     if constexpr (uring_flags & IORING_SETUP_IOPOLL) {
         return true;
     } else {
