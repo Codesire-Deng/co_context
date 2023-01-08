@@ -15,13 +15,6 @@ task<void> f3() {
     co_return;
 }
 
-task<> cycle(int sec, const char *message) {
-    while (true) {
-        co_await timeout(std::chrono::seconds{sec});
-        printf("%s\n", message);
-    }
-}
-
 task<> run() {
     // co_spawn f1 & f2 & f3, and wait for them
     auto [a, b] = co_await all(f1(), f2(), f3());
