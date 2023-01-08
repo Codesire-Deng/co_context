@@ -27,12 +27,12 @@ class lazy_awaiter {
         io_info.handle = current;
     }
 
-    lazy_awaiter &set_async() &noexcept {
+    lazy_awaiter &set_async() & noexcept {
         sqe->set_async();
         return *this;
     }
 
-    lazy_awaiter &&set_async() &&noexcept {
+    lazy_awaiter &&set_async() && noexcept {
         sqe->set_async();
         return std::move(*this);
     }

@@ -296,7 +296,7 @@ class [[nodiscard("Did you forget to co_await?")]] task {
     /**
      * @brief wait for the task<> to complete, and get the ref of the result
      */
-    auto operator co_await() const &noexcept {
+    auto operator co_await() const & noexcept {
         struct awaiter : awaiter_base {
             using awaiter_base::awaiter_base;
 
@@ -316,7 +316,7 @@ class [[nodiscard("Did you forget to co_await?")]] task {
      * @brief wait for the task<> to complete, and get the rvalue ref of the
      * result
      */
-    auto operator co_await() const &&noexcept {
+    auto operator co_await() const && noexcept {
         struct awaiter : awaiter_base {
             using awaiter_base::awaiter_base;
 

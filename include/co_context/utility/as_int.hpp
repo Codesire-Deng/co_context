@@ -10,7 +10,7 @@ namespace co_context {
 template<typename From, typename To>
 concept reinterpretable_to =
     sizeof(From) == sizeof(To) && std::is_fundamental_v<From>
-    && (!std::is_void_v<From>) && std::is_fundamental_v<To>
+    && (!std::is_void_v<From>)&&std::is_fundamental_v<To>
     && (!std::is_void_v<To>);
 
 template<reinterpretable_to<uintptr_t> T>

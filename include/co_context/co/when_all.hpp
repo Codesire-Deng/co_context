@@ -44,7 +44,7 @@ struct all_meta {
         std::destroy_at(&as_result());
     }
 
-    result_type &as_result() &noexcept {
+    result_type &as_result() & noexcept {
         return *reinterpret_cast<result_type *>(&buffer);
     }
 };
