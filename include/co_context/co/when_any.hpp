@@ -56,7 +56,7 @@ struct any_meta {
         : await_handle(await_handle)
         , count_down(n) {}
 
-    result_type &as_result() &noexcept { return buffer; }
+    result_type &as_result() & noexcept { return buffer; }
 };
 
 template<>
