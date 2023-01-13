@@ -1,0 +1,18 @@
+#include "co_context/all.hpp"
+#include "co_context/lazy_io.hpp"
+using namespace co_context;
+
+io_context ctx;
+
+task<> f() {
+    const int fd = ctx.ring().fd();
+    // co_await lazy::msg_ring(fd, 6666, 7777, 0);
+    co_await lazy::msg_ring_cqe_flags(fd, 6666, 7777, 0, 8888);
+}
+
+int main() {
+    ctx.co_spawn(f());
+    ctx.start();
+    ctx.join();
+    return 0;
+}
