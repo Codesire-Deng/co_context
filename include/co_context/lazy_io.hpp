@@ -433,6 +433,20 @@ inline namespace lazy {
     }
 #endif
 
+#if LIBURINGCXX_IS_KERNEL_REACH(6, 2)
+    CO_CONTEXT_AWAIT_HINT inline detail::lazy_msg_ring_cqe_flags
+    msg_ring_cqe_flags(
+        int fd,
+        uint32_t cqe_res,
+        uint64_t cqe_user_data,
+        uint32_t flags,
+        uint32_t cqe_flags
+    ) noexcept {
+        return detail::lazy_msg_ring_cqe_flags{
+            fd, cqe_res, cqe_user_data, flags, cqe_flags};
+    }
+#endif
+
     CO_CONTEXT_AWAIT_HINT inline detail::lazy_getxattr getxattr(
         const char *name, char *value, const char *path, size_t len
     ) noexcept {

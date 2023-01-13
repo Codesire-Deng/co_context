@@ -116,22 +116,24 @@ class sq_entry final : private io_uring_sqe {
      **************************************
      */
 
-    /**
-     * @pre Either fd_in or fd_out must be a pipe.
-     * @param off_in If fd_in refers to a pipe, off_in must be (int64_t) -1;
-     *               If fd_in does not refer to a pipe and off_in is (int64_t)
-     * -1, then bytes are read from fd_in starting from the file offset and it
-     * is adjust appropriately; If fd_in does not refer to a pipe and off_in is
-     * not (int64_t) -1, then the starting offset of fd_in will be off_in.
-     * @param off_out The description of off_in also applied to off_out.
-     * @param splice_flags see man splice(2) for description of flags.
+    /*
+     * io_uring_prep_splice() - Either @fd_in or @fd_out must be a pipe.
+     *
+     * - If @fd_in refers to a pipe, @off_in is ignored and must be set to -1.
+     *
+     * - If @fd_in does not refer to a pipe and @off_in is -1, then @nbytes are
+     * read from @fd_in starting from the file offset, which is incremented by
+     * the number of bytes read.
+     *
+     * - If @fd_in does not refer to a pipe and @off_in is not -1, then the
+     * starting offset of @fd_in will be @off_in.
      *
      * This splice operation can be used to implement sendfile by splicing to an
-     * intermediate pipe first, then splice to the final destination. In fact,
-     * the implementation of sendfile in kernel uses splice internally.
+     * intermediate pipe first, then splice to the final destination.
+     * In fact, the implementation of sendfile in kernel uses splice internally.
      *
      * NOTE that even if fd_in or fd_out refers to a pipe, the splice operation
-     * can still failed with EINVAL if one of the fd doesn't explicitly support
+     * can still fail with EINVAL if one of the fd doesn't explicitly support
      * splice operation, e.g. reading from terminal is unsupported from
      * kernel 5.7 to 5.11. Check issue #291 for more information.
      */
@@ -655,10 +657,25 @@ class sq_entry final : private io_uring_sqe {
      * available @since Linux 5.18
      */
     inline sq_entry &prep_msg_ring(
-        int fd, unsigned int cqe_res, uint64_t cqe_user_data, unsigned int flags
+        int fd, uint32_t cqe_res, uint64_t cqe_user_data, uint32_t flags
     ) noexcept {
         prep_rw(IORING_OP_MSG_RING, fd, nullptr, cqe_res, cqe_user_data);
-        this->rw_flags = static_cast<int>(flags);
+        this->msg_ring_flags = flags;
+        return *this;
+    }
+#endif
+
+#if LIBURINGCXX_IS_KERNEL_REACH(6, 2)
+    inline sq_entry &prep_msg_ring_cqe_flags(
+        int fd,
+        uint32_t cqe_res,
+        uint64_t cqe_user_data,
+        uint32_t flags,
+        uint32_t cqe_flags
+    ) noexcept {
+        prep_rw(IORING_OP_MSG_RING, fd, nullptr, cqe_res, cqe_user_data);
+        this->msg_ring_flags = IORING_MSG_RING_FLAGS_PASS | flags;
+        this->file_index = cqe_flags;
         return *this;
     }
 #endif

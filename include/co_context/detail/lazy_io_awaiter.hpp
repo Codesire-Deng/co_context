@@ -666,9 +666,25 @@ struct lazy_link : lazy_awaiter {
 #if LIBURINGCXX_IS_KERNEL_REACH(5, 18)
 struct lazy_msg_ring : lazy_awaiter {
     inline lazy_msg_ring(
-        int fd, unsigned int cqe_res, uint64_t cqe_user_data, unsigned int flags
+        int fd, uint32_t cqe_res, uint64_t cqe_user_data, uint32_t flags
     ) noexcept {
         sqe->prep_msg_ring(fd, cqe_res, cqe_user_data, flags);
+    }
+};
+#endif
+
+#if LIBURINGCXX_IS_KERNEL_REACH(6, 2)
+struct lazy_msg_ring_cqe_flags : lazy_awaiter {
+    inline lazy_msg_ring_cqe_flags(
+        int fd,
+        uint32_t cqe_res,
+        uint64_t cqe_user_data,
+        uint32_t flags,
+        uint32_t cqe_flags
+    ) noexcept {
+        sqe->prep_msg_ring_cqe_flags(
+            fd, cqe_res, cqe_user_data, flags, cqe_flags
+        );
     }
 };
 #endif
