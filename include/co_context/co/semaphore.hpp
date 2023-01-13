@@ -1,6 +1,7 @@
 #pragma once
 
 #include "co_context/detail/spinlock.hpp"
+#include "co_context/detail/hint.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/log/log.hpp"
 #include "co_context/utility/as_atomic.hpp"
@@ -16,7 +17,7 @@ class counting_semaphore final {
     using T = config::semaphore_counting_t;
     static_assert(std::is_integral_v<T>);
 
-    class [[nodiscard("Did you forget to co_await?")]] acquire_awaiter final {
+    class CO_CONTEXT_AWAIT_HINT acquire_awaiter final {
       public:
         explicit acquire_awaiter(counting_semaphore & sem) noexcept
             : sem(sem)

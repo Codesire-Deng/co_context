@@ -1,5 +1,6 @@
 #pragma once
 
+#include "co_context/detail/hint.hpp"
 #include <cassert>
 #include <concepts>
 #include <coroutine>
@@ -232,7 +233,7 @@ namespace detail {
 } // namespace detail
 
 template<typename T = void>
-class [[nodiscard("Did you forget to co_await?")]] task {
+class CO_CONTEXT_AWAIT_HINT task {
   public:
     using promise_type = detail::task_promise<T>;
     using value_type = T;
@@ -260,10 +261,9 @@ class [[nodiscard("Did you forget to co_await?")]] task {
     task() noexcept = default;
 
     explicit task(std::coroutine_handle<promise_type> current) noexcept
-        : handle(current) {
-    }
+        : handle(current) {}
 
-    task(task && other) noexcept : handle(other.handle) {
+    task(task &&other) noexcept : handle(other.handle) {
         other.handle = nullptr;
     }
 
@@ -345,9 +345,7 @@ class [[nodiscard("Did you forget to co_await?")]] task {
         return awaiter{handle};
     }
 
-    std::coroutine_handle<promise_type> get_handle() noexcept {
-        return handle;
-    }
+    std::coroutine_handle<promise_type> get_handle() noexcept { return handle; }
 
     void detach() noexcept {
         if constexpr (std::is_void_v<value_type>) {
