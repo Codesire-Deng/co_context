@@ -1,6 +1,7 @@
 #pragma once
 
 #include "co_context/detail/io_context_meta.hpp"
+#include "co_context/detail/hint.hpp"
 #include "co_context/detail/lock_guard.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include <atomic>
@@ -17,7 +18,7 @@ namespace detail {
 
 class mutex final {
   public:
-    class [[nodiscard("Did you forget to co_await?")]] lock_awaiter {
+    class CO_CONTEXT_AWAIT_HINT lock_awaiter {
       public:
         explicit lock_awaiter(mutex & mtx) noexcept
             : mtx(mtx)
@@ -69,7 +70,7 @@ class mutex final {
         friend struct detail::worker_meta;
     };
 
-    class [[nodiscard("Did you forget to co_await?")]] lock_guard_awaiter final
+    class CO_CONTEXT_AWAIT_HINT lock_guard_awaiter final
         : public lock_awaiter {
       private:
         friend class mutex;
