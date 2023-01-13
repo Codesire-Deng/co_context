@@ -20,31 +20,25 @@ class mutex final {
   public:
     class CO_CONTEXT_AWAIT_HINT lock_awaiter {
       public:
-        explicit lock_awaiter(mutex & mtx) noexcept
+        explicit lock_awaiter(mutex &mtx) noexcept
             : mtx(mtx)
-            , resume_ctx(detail::this_thread.ctx) {
-        }
+            , resume_ctx(detail::this_thread.ctx) {}
 
-        static constexpr bool await_ready() noexcept {
-            return false;
-        }
+        static constexpr bool await_ready() noexcept { return false; }
 
         bool await_suspend(std::coroutine_handle<> current) noexcept {
             register_coroutine(current);
             return register_awaiting();
         }
 
-        void await_resume() const noexcept {
-        }
+        void await_resume() const noexcept {}
 
       protected:
         void register_coroutine(std::coroutine_handle<> handle) noexcept {
             awaken_coro = handle;
         }
 
-        std::coroutine_handle<> get_coroutine() noexcept {
-            return awaken_coro;
-        }
+        std::coroutine_handle<> get_coroutine() noexcept { return awaken_coro; }
 
         /**
          * @brief lock, and when it needs, register handle to awaiting list
@@ -53,9 +47,7 @@ class mutex final {
         bool register_awaiting() noexcept;
 
         // reserved for condition_variable
-        void unlock_ahead() noexcept {
-            mtx.unlock();
-        }
+        void unlock_ahead() noexcept { mtx.unlock(); }
 
         void co_spawn() const noexcept;
 
@@ -70,8 +62,7 @@ class mutex final {
         friend struct detail::worker_meta;
     };
 
-    class CO_CONTEXT_AWAIT_HINT lock_guard_awaiter final
-        : public lock_awaiter {
+    class CO_CONTEXT_AWAIT_HINT lock_guard_awaiter final : public lock_awaiter {
       private:
         friend class mutex;
 

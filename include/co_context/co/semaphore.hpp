@@ -19,10 +19,9 @@ class counting_semaphore final {
 
     class CO_CONTEXT_AWAIT_HINT acquire_awaiter final {
       public:
-        explicit acquire_awaiter(counting_semaphore & sem) noexcept
+        explicit acquire_awaiter(counting_semaphore &sem) noexcept
             : sem(sem)
-            , resume_ctx(detail::this_thread.ctx) {
-        }
+            , resume_ctx(detail::this_thread.ctx) {}
 
         bool await_ready() noexcept {
             const T old_counter =
@@ -31,8 +30,8 @@ class counting_semaphore final {
         }
 
         void await_suspend(std::coroutine_handle<> current) noexcept;
-        void await_resume() const noexcept {
-        }
+
+        void await_resume() const noexcept {}
 
       private:
         void co_spawn() const noexcept;
