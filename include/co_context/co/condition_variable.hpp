@@ -22,14 +22,11 @@ class CO_CONTEXT_AWAIT_HINT cv_wait_awaiter final {
   public:
     using mutex = co_context::mutex;
 
-    explicit cv_wait_awaiter(condition_variable & cv, mutex & mtx) noexcept
+    explicit cv_wait_awaiter(condition_variable &cv, mutex &mtx) noexcept
         : lock_awaken_handle(mtx.lock())
-        , cv(cv) {
-    }
+        , cv(cv) {}
 
-    static constexpr bool await_ready() noexcept {
-        return false;
-    }
+    static constexpr bool await_ready() noexcept { return false; }
 
     void await_suspend(std::coroutine_handle<> current) noexcept;
 
@@ -37,8 +34,7 @@ class CO_CONTEXT_AWAIT_HINT cv_wait_awaiter final {
      * @detail the lock must be held, when io_context resume me.
      * @detail io_context will call mutex::lock_awaiter::register_awaiting
      **/
-    constexpr void await_resume() const noexcept {
-    }
+    constexpr void await_resume() const noexcept {}
 
   private:
     mutex::lock_awaiter lock_awaken_handle;
