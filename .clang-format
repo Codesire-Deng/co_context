@@ -47,6 +47,7 @@ IndentPPDirectives: None
 IndentRequires: true # clang-format 14
 IndentWrappedFunctionNames: false
 InsertBraces: true # clang-format 15
+InsertNewlineAtEOF: true # clang-format 16
 LambdaBodyIndentation: Signature
 KeepEmptyLinesAtTheStartOfBlocks: false
 MaxEmptyLinesToKeep: 1
