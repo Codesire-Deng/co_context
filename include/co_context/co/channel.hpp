@@ -1,8 +1,6 @@
 #pragma once
 
 #include "co_context/co/condition_variable.hpp"
-#include "co_context/co/semaphore.hpp"
-#include "co_context/detail/spsc_cursor.hpp"
 #include "co_context/task.hpp"
 #include "co_context/utility/mpl.hpp"
 #include <array>
@@ -178,6 +176,22 @@ class channel<T, 0UL> {
     [[nodiscard]] bool empty() const noexcept { return m_receiver == nullptr; }
 
     [[nodiscard]] bool full() const noexcept { return has_value(); }
+
+    task<> drop() {
+        std::optional<T> item{std::nullopt};
+        co_await m_acquire_mtx.lock();
+        co_await m_match_mtx.lock();
+        m_receiver = &item;
+        if (m_has_sender) {
+            m_match_cv.notify_one();
+        }
+        co_await m_match_cv.wait(m_match_mtx, [&item] {
+            return item.has_value();
+        });
+        m_has_sender = false;
+        m_match_mtx.unlock();
+        m_acquire_mtx.unlock();
+    }
 
     task<T> acquire() {
         std::optional<T> item{std::nullopt};
