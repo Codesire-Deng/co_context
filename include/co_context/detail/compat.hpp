@@ -15,3 +15,11 @@
 #else
 #define CO_CONTEXT_PAUSE __builtin_ia32_pause
 #endif
+
+#if (defined(__GNUC__) || defined(__GNUG__)) \
+    && __has_include(<sys/single_threaded.h>)
+#define CO_CONTEXT_IS_SINGLE_THREADED (__gnu_cxx::__is_single_threaded())
+#else
+// TODO find out ways to judge this
+#define CO_CONTEXT_IS_SINGLE_THREADED false
+#endif
