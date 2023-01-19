@@ -18,7 +18,7 @@ class condition_variable;
 
 namespace co_context::detail {
 
-class CO_CONTEXT_AWAIT_HINT cv_wait_awaiter final {
+class [[CO_CONTEXT_AWAIT_HINT]] cv_wait_awaiter final {
   public:
     using mutex = co_context::mutex;
 

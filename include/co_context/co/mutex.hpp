@@ -18,7 +18,7 @@ namespace detail {
 
 class mutex final {
   public:
-    class CO_CONTEXT_AWAIT_HINT lock_awaiter {
+    class [[CO_CONTEXT_AWAIT_HINT]] lock_awaiter {
       public:
         explicit lock_awaiter(mutex &mtx) noexcept
             : mtx(mtx)
@@ -62,7 +62,8 @@ class mutex final {
         friend struct detail::worker_meta;
     };
 
-    class CO_CONTEXT_AWAIT_HINT lock_guard_awaiter final : public lock_awaiter {
+    class [[CO_CONTEXT_AWAIT_HINT]] lock_guard_awaiter final
+        : public lock_awaiter {
       private:
         friend class mutex;
 
@@ -71,7 +72,8 @@ class mutex final {
       public:
         using lock_awaiter::lock_awaiter;
 
-        [[nodiscard]] lock_guard await_resume() const noexcept {
+        [[nodiscard]]
+        lock_guard await_resume() const noexcept {
             return lock_guard{mtx};
         }
     };

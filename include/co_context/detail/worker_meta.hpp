@@ -92,13 +92,15 @@ struct worker_meta final {
     uint32_t requests_to_submit = 0;
 
     // if there is at least one task newly spawned or forwarded
-    [[nodiscard]] bool has_task_ready() const noexcept {
+    [[nodiscard]]
+    bool has_task_ready() const noexcept {
         return !reap_cur.is_empty();
     }
 
     liburingcxx::sq_entry *get_free_sqe() noexcept;
 
-    [[nodiscard]] bool is_ring_need_enter() const noexcept;
+    [[nodiscard]]
+    bool is_ring_need_enter() const noexcept;
 
 #if CO_CONTEXT_IS_USING_EVENTFD
     void listen_on_co_spawn() noexcept;
@@ -106,13 +108,15 @@ struct worker_meta final {
 
     void wait_uring() noexcept;
 
-    [[nodiscard]] cur_t number_to_schedule() const noexcept {
+    [[nodiscard]]
+    cur_t number_to_schedule() const noexcept {
         const auto &cur = this->reap_cur;
         return cur.size();
     }
 
     // Get a coroutine to run. Guarantee to be non-null.
-    [[nodiscard]] std::coroutine_handle<> schedule() noexcept;
+    [[nodiscard]]
+    std::coroutine_handle<> schedule() noexcept;
 
     void init(unsigned io_uring_entries);
 
@@ -165,7 +169,8 @@ struct worker_meta final {
 #endif
 
   private:
-    [[nodiscard]] bool check_init(unsigned expect_sqring_size) const noexcept;
+    [[nodiscard]]
+    bool check_init(unsigned expect_sqring_size) const noexcept;
 };
 
 inline void worker_meta::co_spawn_unsafe(std::coroutine_handle<> handle

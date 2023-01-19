@@ -12,7 +12,8 @@ struct [[nodiscard]] task_info {
 
     int32_t result;
 
-    [[nodiscard]] uint64_t as_user_data() const noexcept {
+    [[nodiscard]]
+    uint64_t as_user_data() const noexcept {
         return static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
     }
 };

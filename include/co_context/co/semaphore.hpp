@@ -17,7 +17,7 @@ class counting_semaphore final {
     using T = config::semaphore_counting_t;
     static_assert(std::is_integral_v<T>);
 
-    class CO_CONTEXT_AWAIT_HINT acquire_awaiter final {
+    class [[CO_CONTEXT_AWAIT_HINT]] acquire_awaiter final {
       public:
         explicit acquire_awaiter(counting_semaphore &sem) noexcept
             : sem(sem)

@@ -16,13 +16,25 @@ class channel {
     static_assert(capacity != 0);
 
   public:
-    [[nodiscard]] size_t size() const noexcept { return m_size; }
+    [[nodiscard]]
+    size_t size() const noexcept {
+        return m_size;
+    }
 
-    [[nodiscard]] bool has_value() const noexcept { return !empty(); }
+    [[nodiscard]]
+    bool has_value() const noexcept {
+        return !empty();
+    }
 
-    [[nodiscard]] bool empty() const noexcept { return m_size == 0; }
+    [[nodiscard]]
+    bool empty() const noexcept {
+        return m_size == 0;
+    }
 
-    [[nodiscard]] bool full() const noexcept { return m_size == capacity; }
+    [[nodiscard]]
+    bool full() const noexcept {
+        return m_size == capacity;
+    }
 
     task<> drop() {
         co_await m_mtx.lock();
@@ -112,13 +124,25 @@ class channel {
 template<std::move_constructible T>
 class channel<T, 1UL> {
   public:
-    [[nodiscard]] size_t size() const noexcept { return m_buf.has_value(); }
+    [[nodiscard]]
+    size_t size() const noexcept {
+        return m_buf.has_value();
+    }
 
-    [[nodiscard]] bool has_value() const noexcept { return m_buf.has_value(); }
+    [[nodiscard]]
+    bool has_value() const noexcept {
+        return m_buf.has_value();
+    }
 
-    [[nodiscard]] bool empty() const noexcept { return !has_value(); }
+    [[nodiscard]]
+    bool empty() const noexcept {
+        return !has_value();
+    }
 
-    [[nodiscard]] bool full() const noexcept { return has_value(); }
+    [[nodiscard]]
+    bool full() const noexcept {
+        return has_value();
+    }
 
     task<> drop() {
         co_await m_mtx.lock();
@@ -169,13 +193,25 @@ class channel<T, 1UL> {
 template<std::move_constructible T>
 class channel<T, 0UL> {
   public:
-    [[nodiscard]] consteval size_t size() const noexcept { return 0; }
+    [[nodiscard]]
+    consteval size_t size() const noexcept {
+        return 0;
+    }
 
-    [[nodiscard]] bool has_value() const noexcept { return m_has_sender; }
+    [[nodiscard]]
+    bool has_value() const noexcept {
+        return m_has_sender;
+    }
 
-    [[nodiscard]] bool empty() const noexcept { return m_receiver == nullptr; }
+    [[nodiscard]]
+    bool empty() const noexcept {
+        return m_receiver == nullptr;
+    }
 
-    [[nodiscard]] bool full() const noexcept { return has_value(); }
+    [[nodiscard]]
+    bool full() const noexcept {
+        return has_value();
+    }
 
     task<> drop() {
         std::optional<T> item{std::nullopt};

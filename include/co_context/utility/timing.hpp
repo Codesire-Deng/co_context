@@ -4,7 +4,8 @@
 #include <concepts>
 
 template<std::invocable F>
-[[maybe_unused]] auto host_timing(const F &func) {
+[[maybe_unused]]
+auto host_timing(const F &func) {
     auto start = std::chrono::steady_clock::now();
 
     func();

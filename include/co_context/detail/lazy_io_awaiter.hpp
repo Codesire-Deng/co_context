@@ -770,7 +770,8 @@ struct lazy_who_am_i {
         return false;
     }
 
-    [[nodiscard]] std::coroutine_handle<> await_resume() const noexcept {
+    [[nodiscard]]
+    std::coroutine_handle<> await_resume() const noexcept {
         return handle;
     }
 

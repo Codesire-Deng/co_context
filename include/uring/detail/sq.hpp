@@ -100,7 +100,8 @@ namespace detail {
          * same effect as `io_uring_sq_ready`
          */
         template<uint64_t uring_flags>
-        [[nodiscard]] inline unsigned pending() const noexcept {
+        [[nodiscard]]
+        inline unsigned pending() const noexcept {
             /*
              * Without a barrier, we could miss an update and think the SQ
              * wasn't ready. We don't need the load acquire for non-SQPOLL since
@@ -137,7 +138,8 @@ namespace detail {
          * free and available for application.
          */
         template<uint64_t uring_flags>
-        [[nodiscard]] inline sq_entry *get_sq_entry() noexcept {
+        [[nodiscard]]
+        inline sq_entry *get_sq_entry() noexcept {
             constexpr int shift =
                 bool(uring_flags & IORING_SETUP_SQE128) ? 1 : 0;
 
