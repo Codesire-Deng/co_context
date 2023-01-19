@@ -29,7 +29,8 @@ namespace detail {
      */
     template<typename T>
     struct task_final_awaiter {
-        [[nodiscard]] consteval bool await_ready() const noexcept {
+        [[nodiscard]]
+        consteval bool await_ready() const noexcept {
             return false;
         }
 
@@ -233,7 +234,7 @@ namespace detail {
 } // namespace detail
 
 template<typename T = void>
-class CO_CONTEXT_AWAIT_HINT task {
+class [[CO_CONTEXT_AWAIT_HINT]] task {
   public:
     using promise_type = detail::task_promise<T>;
     using value_type = T;
@@ -246,7 +247,8 @@ class CO_CONTEXT_AWAIT_HINT task {
         ) noexcept
             : handle(current) {}
 
-        [[nodiscard]] inline bool await_ready() const noexcept {
+        [[nodiscard]]
+        inline bool await_ready() const noexcept {
             return !handle || handle.done();
         }
 
@@ -289,7 +291,8 @@ class CO_CONTEXT_AWAIT_HINT task {
         }
     }
 
-    [[nodiscard]] inline bool is_ready() const noexcept {
+    [[nodiscard]]
+    inline bool is_ready() const noexcept {
         return !handle || handle.done();
     }
 
@@ -335,7 +338,8 @@ class CO_CONTEXT_AWAIT_HINT task {
     /**
      * @brief wait for the task<> to complete, but do not get the result
      */
-    [[nodiscard]] auto when_ready() const noexcept {
+    [[nodiscard]]
+    auto when_ready() const noexcept {
         struct awaiter : awaiter_base {
             using awaiter_base::awaiter_base;
 

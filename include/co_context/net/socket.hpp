@@ -38,7 +38,10 @@ class socket {
         other.sockfd = tmp;
     }
 
-    [[nodiscard]] int fd() const noexcept { return sockfd; }
+    [[nodiscard]]
+    int fd() const noexcept {
+        return sockfd;
+    }
 
     socket &bind(const inet_address &addr);
 
@@ -48,30 +51,36 @@ class socket {
 
     socket &set_tcp_no_delay(bool on);
 
-    [[nodiscard]] inet_address get_local_addr() const;
+    [[nodiscard]]
+    inet_address get_local_addr() const;
 
-    [[nodiscard]] inet_address get_peer_addr() const;
+    [[nodiscard]]
+    inet_address get_peer_addr() const;
 
-    [[nodiscard]] auto connect(const inet_address &addr) const noexcept {
+    [[nodiscard]]
+    auto connect(const inet_address &addr) const noexcept {
         return lazy::connect(sockfd, addr.get_sockaddr(), addr.length());
     }
 
-    [[nodiscard]] auto recv(std::span<char> buf, int flags = 0) const noexcept {
+    [[nodiscard]]
+    auto recv(std::span<char> buf, int flags = 0) const noexcept {
         return lazy::recv(sockfd, buf, flags);
     }
 
-    [[nodiscard]] auto
-    send(std::span<const char> buf, int flags = 0) const noexcept {
+    [[nodiscard]]
+    auto send(std::span<const char> buf, int flags = 0) const noexcept {
         return lazy::send(sockfd, buf, flags);
     }
 
-    [[nodiscard]] auto close() noexcept {
+    [[nodiscard]]
+    auto close() noexcept {
         const int tmp = sockfd;
         sockfd = -1;
         return lazy::close(tmp);
     }
 
-    [[nodiscard]] auto shutdown_write() const noexcept {
+    [[nodiscard]]
+    auto shutdown_write() const noexcept {
         return lazy::shutdown(sockfd, SHUT_WR);
     }
 

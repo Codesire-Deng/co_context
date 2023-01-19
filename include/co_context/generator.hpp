@@ -286,15 +286,20 @@ class _Gen_promise_base {
         return {};
     }
 
-    [[nodiscard]] auto final_suspend() noexcept { return _Final_awaiter{}; }
+    [[nodiscard]]
+    auto final_suspend() noexcept {
+        return _Final_awaiter{};
+    }
 
-    [[nodiscard]] std::suspend_always yield_value(_Yielded _Val) noexcept {
+    [[nodiscard]]
+    std::suspend_always yield_value(_Yielded _Val) noexcept {
         _Ptr = ::std::addressof(_Val);
         return {};
     }
 
     // clang-format off
-    [[nodiscard]] auto yield_value(const std::remove_reference_t<_Yielded>& _Val)
+    [[nodiscard]]
+    auto yield_value(const std::remove_reference_t<_Yielded>& _Val)
         noexcept(std::is_nothrow_constructible_v<std::remove_cvref_t<_Yielded>, const std::remove_reference_t<_Yielded>&>)
         requires (std::is_rvalue_reference_v<_Yielded> &&
             std::constructible_from<std::remove_cvref_t<_Yielded>, const std::remove_reference_t<_Yielded>&>) {
@@ -306,7 +311,8 @@ class _Gen_promise_base {
     // clang-format off
     template <class _Rty, class _Vty, class _Alloc, class _Unused>
         requires std::same_as<_Gen_yield_t<_Gen_reference_t<_Rty, _Vty>>, _Yielded>
-    [[nodiscard]] auto yield_value(
+    [[nodiscard]]
+    auto yield_value(
         ::co_context::ranges::elements_of<generator<_Rty, _Vty, _Alloc>&&, _Unused> _Elem) noexcept {
         return _Nested_awaitable<_Rty, _Vty, _Alloc>{std::move(_Elem.range)};
     }
@@ -318,7 +324,8 @@ class _Gen_promise_base {
 #pragma GCC diagnostic ignored "-Wmismatched-new-delete"
     template <::std::ranges::input_range _Rng, class _Alloc>
         requires std::convertible_to<::std::ranges::range_reference_t<_Rng>, _Yielded>
-    [[nodiscard]] auto yield_value(::co_context::ranges::elements_of<_Rng, _Alloc> _Elem) noexcept {
+    [[nodiscard]]
+    auto yield_value(::co_context::ranges::elements_of<_Rng, _Alloc> _Elem) noexcept {
         // clang-format on
         using _Vty = ::std::ranges::range_value_t<_Rng>;
         return _Nested_awaitable<_Yielded, _Vty, _Alloc>{
@@ -352,7 +359,8 @@ class _Gen_promise_base {
     struct _Element_awaiter {
         std::remove_cvref_t<_Yielded> _Val;
 
-        [[nodiscard]] constexpr bool await_ready() const noexcept {
+        [[nodiscard]]
+        constexpr bool await_ready() const noexcept {
             return false;
         }
 
@@ -378,10 +386,14 @@ class _Gen_promise_base {
     };
 
     struct _Final_awaiter {
-        [[nodiscard]] bool await_ready() noexcept { return false; }
+        [[nodiscard]]
+        bool await_ready() noexcept {
+            return false;
+        }
 
         template<class _Promise>
-        [[nodiscard]] std::coroutine_handle<>
+        [[nodiscard]]
+        std::coroutine_handle<>
         await_suspend(std::coroutine_handle<_Promise> _Handle) noexcept {
 #ifdef __cpp_lib_is_pointer_interconvertible
             static_assert(std::is_pointer_interconvertible_base_of_v<
@@ -416,10 +428,14 @@ class _Gen_promise_base {
         ) noexcept
             : _Gen(::std::move(_Gen_)) {}
 
-        [[nodiscard]] bool await_ready() noexcept { return !_Gen._Coro; }
+        [[nodiscard]]
+        bool await_ready() noexcept {
+            return !_Gen._Coro;
+        }
 
         template<class _Promise>
-        [[nodiscard]] std::coroutine_handle<_Gen_promise_base>
+        [[nodiscard]]
+        std::coroutine_handle<_Gen_promise_base>
         await_suspend(std::coroutine_handle<_Promise> _Current) noexcept {
 #ifdef __cpp_lib_is_pointer_interconvertible
             static_assert(std::is_pointer_interconvertible_base_of_v<
@@ -477,7 +493,9 @@ class _Gen_iter {
         return *this;
     }
 
-    [[nodiscard]] _Ref operator*() const noexcept {
+    [[nodiscard]]
+    _Ref
+    operator*() const noexcept {
         assert(!_Coro.done() && "Can't dereference generator end iterator");
         return static_cast<_Ref>(*_Coro.promise()._Top.promise()._Ptr);
     }
@@ -490,7 +508,9 @@ class _Gen_iter {
 
     void operator++(int) { ++*this; }
 
-    [[nodiscard]] bool operator==(std::default_sentinel_t) const noexcept {
+    [[nodiscard]]
+    bool
+    operator==(std::default_sentinel_t) const noexcept {
         return _Coro.done();
     }
 
@@ -543,7 +563,8 @@ class generator
     struct EMPTY_BASES promise_type
         : _Promise_allocator<_Alloc>
         , _Gen_promise_base<_Gen_yield_t<_Ref>> {
-        [[nodiscard]] generator get_return_object() noexcept {
+        [[nodiscard]]
+        generator get_return_object() noexcept {
             return generator{
                 _Gen_secret_tag{},
                 std::coroutine_handle<promise_type>::from_promise(*this)};
@@ -571,7 +592,8 @@ class generator
         return *this;
     }
 
-    [[nodiscard]] _Gen_iter<_Value, _Ref> begin() {
+    [[nodiscard]]
+    _Gen_iter<_Value, _Ref> begin() {
         // Pre: _Coro is suspended at its initial suspend point
         assert(_Coro && "Can't call begin on moved-from generator");
         _Coro.resume();
@@ -581,7 +603,8 @@ class generator
                 from_address(_Coro.address())};
     }
 
-    [[nodiscard]] std::default_sentinel_t end() const noexcept {
+    [[nodiscard]]
+    std::default_sentinel_t end() const noexcept {
         return std::default_sentinel;
     }
 

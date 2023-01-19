@@ -32,11 +32,13 @@ class inet_address {
      */
     explicit inet_address(const struct sockaddr &saddr) noexcept;
 
-    [[nodiscard]] sa_family_t family() const noexcept {
+    [[nodiscard]]
+    sa_family_t family() const noexcept {
         return addr.sin_family;
     }
 
-    [[nodiscard]] uint16_t port() const noexcept {
+    [[nodiscard]]
+    uint16_t port() const noexcept {
         return ntohs(addr.sin_port);
     }
 
@@ -45,14 +47,18 @@ class inet_address {
         return *this;
     }
 
-    [[nodiscard]] std::string to_ip() const;
-    [[nodiscard]] std::string to_ip_port() const;
+    [[nodiscard]]
+    std::string to_ip() const;
+    [[nodiscard]]
+    std::string to_ip_port() const;
 
-    [[nodiscard]] const struct sockaddr *get_sockaddr() const noexcept {
+    [[nodiscard]]
+    const struct sockaddr *get_sockaddr() const noexcept {
         return reinterpret_cast<const struct sockaddr *>(&addr6);
     }
 
-    [[nodiscard]] socklen_t length() const noexcept {
+    [[nodiscard]]
+    socklen_t length() const noexcept {
         return family() == AF_INET6 ? sizeof(addr6) : sizeof(addr);
     }
 

@@ -134,21 +134,27 @@ class [[nodiscard]] uring final {
 
     int get_events() noexcept;
 
-    [[nodiscard]] unsigned sq_pending() const noexcept;
+    [[nodiscard]]
+    unsigned sq_pending() const noexcept;
 
-    [[nodiscard]] unsigned sq_space_left() const noexcept;
+    [[nodiscard]]
+    unsigned sq_space_left() const noexcept;
 
-    [[nodiscard]] unsigned get_sq_ring_entries() const noexcept;
+    [[nodiscard]]
+    unsigned get_sq_ring_entries() const noexcept;
 
-    [[nodiscard]] sq_entry *get_sq_entry() noexcept;
+    [[nodiscard]]
+    sq_entry *get_sq_entry() noexcept;
 
     void append_sq_entry(const sq_entry *sqe) noexcept;
 
     int wait_sq_ring();
 
-    [[nodiscard]] unsigned cq_ready_relaxed() const noexcept;
+    [[nodiscard]]
+    unsigned cq_ready_relaxed() const noexcept;
 
-    [[nodiscard]] unsigned cq_ready_acquire() const noexcept;
+    [[nodiscard]]
+    unsigned cq_ready_acquire() const noexcept;
 
     int wait_cq_entry(const cq_entry *(&cqe_ptr)) noexcept;
 
@@ -190,7 +196,8 @@ class [[nodiscard]] uring final {
 
     int unregister_ring_fd();
 
-    [[nodiscard]] constexpr bool is_cq_ring_need_enter() const noexcept;
+    [[nodiscard]]
+    constexpr bool is_cq_ring_need_enter() const noexcept;
 
   public:
     /**
@@ -226,12 +233,14 @@ class [[nodiscard]] uring final {
     constexpr bool is_sq_ring_need_enter(unsigned submit, unsigned &enter_flags)
         const noexcept;
 
-    [[nodiscard]] bool is_cq_ring_need_flush() const noexcept;
+    [[nodiscard]]
+    bool is_cq_ring_need_flush() const noexcept;
 
     void buf_ring_cq_advance(buf_ring &br, unsigned count) noexcept;
 
     // NOLINTNEXTLINE
-    [[nodiscard]] __peek_cq_entry_return_type __peek_cq_entry() noexcept;
+    [[nodiscard]]
+    __peek_cq_entry_return_type __peek_cq_entry() noexcept;
 
     template<bool has_ts>
     int _get_cq_entry /*NOLINT*/ (

@@ -26,29 +26,48 @@ struct spsc_cursor {
     T m_head = 0;
     T m_tail = 0;
 
-    [[nodiscard]] inline T head() const noexcept { return m_head & mask; }
+    [[nodiscard]]
+    inline T head() const noexcept {
+        return m_head & mask;
+    }
 
-    [[nodiscard]] inline T tail() const noexcept { return m_tail & mask; }
+    [[nodiscard]]
+    inline T tail() const noexcept {
+        return m_tail & mask;
+    }
 
-    [[nodiscard]] inline T raw_head() const noexcept { return m_head; }
+    [[nodiscard]]
+    inline T raw_head() const noexcept {
+        return m_head;
+    }
 
-    [[nodiscard]] inline T raw_tail() const noexcept { return m_tail; }
+    [[nodiscard]]
+    inline T raw_tail() const noexcept {
+        return m_tail;
+    }
 
-    [[nodiscard]] inline bool is_empty() const noexcept {
+    [[nodiscard]]
+    inline bool is_empty() const noexcept {
         return m_head == m_tail;
     }
 
-    [[nodiscard]] inline T size() const noexcept { return m_tail - m_head; }
+    [[nodiscard]]
+    inline T size() const noexcept {
+        return m_tail - m_head;
+    }
 
-    [[nodiscard]] inline T available_number() const noexcept {
+    [[nodiscard]]
+    inline T available_number() const noexcept {
         return capacity - (m_tail - m_head);
     }
 
-    [[nodiscard]] inline bool is_available() const noexcept {
+    [[nodiscard]]
+    inline bool is_available() const noexcept {
         return bool(capacity - (m_tail - m_head));
     }
 
-    [[nodiscard]] inline T load_head() const noexcept {
+    [[nodiscard]]
+    inline T load_head() const noexcept {
         if constexpr (is_thread_safe) {
             return as_c_atomic(m_head).load(std::memory_order_acquire) & mask;
         } else {
@@ -56,7 +75,8 @@ struct spsc_cursor {
         }
     }
 
-    [[nodiscard]] inline T load_tail() const noexcept {
+    [[nodiscard]]
+    inline T load_tail() const noexcept {
         if constexpr (is_thread_safe) {
             return as_c_atomic(m_tail).load(std::memory_order_acquire) & mask;
         } else {
@@ -64,7 +84,8 @@ struct spsc_cursor {
         }
     }
 
-    [[nodiscard]] inline T load_raw_head() const noexcept {
+    [[nodiscard]]
+    inline T load_raw_head() const noexcept {
         if constexpr (is_thread_safe) {
             return as_c_atomic(m_head).load(std::memory_order_acquire);
         } else {
@@ -72,7 +93,8 @@ struct spsc_cursor {
         }
     }
 
-    [[nodiscard]] inline T load_raw_tail() const noexcept {
+    [[nodiscard]]
+    inline T load_raw_tail() const noexcept {
         if constexpr (is_thread_safe) {
             return as_c_atomic(m_tail).load(std::memory_order_acquire);
         } else {
@@ -80,7 +102,8 @@ struct spsc_cursor {
         }
     }
 
-    [[nodiscard]] inline T load_raw_tail_relaxed() const noexcept {
+    [[nodiscard]]
+    inline T load_raw_tail_relaxed() const noexcept {
         if constexpr (is_thread_safe) {
             return as_c_atomic(m_tail).load(std::memory_order_relaxed);
         } else {
@@ -98,19 +121,23 @@ struct spsc_cursor {
         }
     }
 
-    [[nodiscard]] inline bool is_empty_load_head() const noexcept {
+    [[nodiscard]]
+    inline bool is_empty_load_head() const noexcept {
         return m_tail == load_raw_head();
     }
 
-    [[nodiscard]] inline bool is_empty_load_tail() const noexcept {
+    [[nodiscard]]
+    inline bool is_empty_load_tail() const noexcept {
         return m_head == load_raw_tail();
     }
 
-    [[nodiscard]] inline bool is_empty_load_tail_relaxed() const noexcept {
+    [[nodiscard]]
+    inline bool is_empty_load_tail_relaxed() const noexcept {
         return m_head == load_raw_tail_relaxed();
     }
 
-    [[nodiscard]] inline bool is_available_load_head() const noexcept {
+    [[nodiscard]]
+    inline bool is_available_load_head() const noexcept {
         return bool(capacity - (m_tail - load_raw_head()));
     }
 
