@@ -1,6 +1,7 @@
 #pragma once
 
 #include "co_context/config.hpp"
+#include "co_context/detail/compat.hpp"
 #include <atomic>
 
 namespace co_context::detail {
@@ -32,7 +33,7 @@ inline void spinlock::lock() noexcept {
         }
         while (occupied.load(std::memory_order_relaxed)) {
             if constexpr (config::is_using_hyper_threading) {
-                __builtin_ia32_pause();
+                CO_CONTEXT_PAUSE();
             }
         }
     }
