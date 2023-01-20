@@ -7,9 +7,14 @@ using namespace co_context;
 constexpr uint32_t total_switch = 2e8;
 uint32_t count = 0;
 
-task<> run() {
-    auto start = std::chrono::steady_clock::now();
+std::chrono::steady_clock::time_point start;
 
+task<> first() {
+    start = std::chrono::steady_clock::now();
+    co_return;
+}
+
+task<> run() {
     while (++count < total_switch) {
         co_await lazy::yield();
     }
@@ -28,6 +33,7 @@ task<> run() {
 
 int main() {
     io_context ctx;
+    ctx.co_spawn(first());
 
     for (int i = 0; i < config::swap_capacity / 2; ++i) {
         ctx.co_spawn(run());
