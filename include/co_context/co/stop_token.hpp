@@ -13,8 +13,24 @@ using stop_source = std::stop_source;
 
 using stop_token = std::stop_token;
 
+// Language feature required: CTAD for aggregates and aliases
+#if __cpp_deduction_guides >= 201907L
+
 template<typename Callback>
 using stop_callback = std::stop_callback<Callback>;
+
+#else
+
+template<typename Callback>
+class stop_callback : public std::stop_callback<Callback> {
+    using base = std::stop_callback<Callback>;
+    using base::base;
+};
+
+template<typename Callback>
+stop_callback(stop_token, Callback) -> stop_callback<Callback>;
+
+#endif
 
 } // namespace co_context
 
