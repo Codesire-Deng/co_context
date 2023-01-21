@@ -3,6 +3,8 @@
 #include <chrono>
 #include <concepts>
 
+namespace co_context {
+
 template<std::invocable F>
 [[maybe_unused]]
 auto host_timing(const F &func) {
@@ -16,3 +18,5 @@ auto host_timing(const F &func) {
 }
 
 // 2e9 ~ 4138.81ms -> 2.069ns/times
+
+} // namespace co_context
