@@ -1,11 +1,14 @@
 #pragma once
 
 #include "co_context/io_context.hpp"
+#include "co_context/utility/time_cast.hpp"
+#include "uring/utility/kernel_version.hpp"
 #include <cassert>
 #include <chrono>
 #include <coroutine>
 #include <cstdint>
 #include <span>
+#include <type_traits>
 
 namespace co_context::detail {
 
@@ -266,33 +269,70 @@ struct lazy_timeout_base : lazy_awaiter {
     __kernel_timespec ts;
 
   public:
-    template<class Rep, class Period = std::ratio<1>>
+    template<class Rep, class Period>
     void set_ts(std::chrono::duration<Rep, Period> duration) noexcept {
-        using namespace std;
-        using namespace std::literals;
-        ts.tv_sec = duration / 1s;
-        duration -= chrono::seconds(ts.tv_sec);
-        ts.tv_nsec =
-            duration_cast<chrono::duration<int64_t, std::nano>>(duration).count(
-            );
+        ts = to_kernel_timespec(duration);
     }
 
-    template<class Rep, class Period = std::ratio<1>>
-    // Should not be used directly
-    inline explicit lazy_timeout_base(
-        std::chrono::duration<Rep, Period> duration
+    template<class Duration>
+    void set_ts(
+        std::chrono::time_point<std::chrono::steady_clock, Duration> time_point
     ) noexcept {
-        set_ts(duration);
+        ts = to_kernel_timespec(time_point);
+    }
+
+    template<class Duration>
+    void set_ts(
+        std::chrono::time_point<std::chrono::system_clock, Duration> time_point
+    ) noexcept {
+        ts = to_kernel_timespec(time_point);
+    }
+
+    template<class Expire>
+    // Should not be used directly
+    inline explicit lazy_timeout_base(Expire expire) noexcept {
+        set_ts(expire);
     }
 };
 
+inline constexpr uint32_t timeout_relative_flag = IORING_TIMEOUT_ETIME_SUCCESS
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 15)
+                                                  | IORING_TIMEOUT_BOOTTIME
+#endif
+    ;
+
+inline constexpr uint32_t timeout_absolute_steady_flag =
+    IORING_TIMEOUT_ETIME_SUCCESS | IORING_TIMEOUT_ABS
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 15)
+    | IORING_TIMEOUT_BOOTTIME
+#endif
+    ;
+
+inline constexpr uint32_t timeout_absolute_realtime_flag =
+    IORING_TIMEOUT_ETIME_SUCCESS | IORING_TIMEOUT_ABS | IORING_TIMEOUT_REALTIME;
+
 struct lazy_timeout : lazy_timeout_base {
-    template<class Rep, class Period = std::ratio<1>>
-    inline lazy_timeout(
-        std::chrono::duration<Rep, Period> duration, unsigned int flags
+    template<class Rep, class Period>
+    inline explicit lazy_timeout(std::chrono::duration<Rep, Period> duration
     ) noexcept
         : lazy_timeout_base(duration) {
-        sqe->prep_timeout(ts, 0, flags);
+        sqe->prep_timeout(ts, 0, timeout_relative_flag);
+    }
+
+    template<class Duration>
+    inline explicit lazy_timeout(
+        std::chrono::time_point<std::chrono::steady_clock, Duration> time_point
+    ) noexcept
+        : lazy_timeout_base(time_point) {
+        sqe->prep_timeout(ts, 0, timeout_absolute_steady_flag);
+    }
+
+    template<class Duration>
+    inline explicit lazy_timeout(
+        std::chrono::time_point<std::chrono::system_clock, Duration> time_point
+    ) noexcept
+        : lazy_timeout_base(time_point) {
+        sqe->prep_timeout(ts, 0, timeout_absolute_realtime_flag);
     }
 };
 
@@ -303,7 +343,7 @@ struct lazy_timeout_remove : lazy_awaiter {
 };
 
 struct lazy_timeout_update : lazy_timeout_base {
-    template<class Rep, class Period = std::ratio<1>>
+    template<class Rep, class Period>
     inline lazy_timeout_update(
         std::chrono::duration<Rep, Period> duration,
         uint64_t user_data,
@@ -367,7 +407,7 @@ struct lazy_cancel_fd : lazy_awaiter {
 };
 
 struct lazy_link_timeout_base : lazy_timeout_base {
-    template<class Rep, class Period = std::ratio<1>>
+    template<class Rep, class Period>
     // Should not be used directly
     inline lazy_link_timeout_base(
         std::chrono::duration<Rep, Period> duration, unsigned int flags
@@ -380,13 +420,11 @@ struct lazy_link_timeout_base : lazy_timeout_base {
 struct lazy_link_timeout : lazy_link_io {
     lazy_link_timeout_base timer;
 
-    template<class Rep, class Period = std::ratio<1>>
+    template<class Rep, class Period>
     inline lazy_link_timeout(
-        lazy_awaiter &&timed_io,
-        std::chrono::duration<Rep, Period> duration,
-        unsigned int flags
+        lazy_awaiter &&timed_io, std::chrono::duration<Rep, Period> duration
     ) noexcept
-        : timer(duration, flags) {
+        : timer(duration, /*fixed flag*/ 0) {
         // Mark timed_io as normal task type, but set sqe link.
         timed_io.sqe->set_link();
         // Mark timer as lazy_link_sqe task type, but without sqe link.

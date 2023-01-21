@@ -159,25 +159,54 @@ inline namespace lazy {
     /**
      * @brief Set duration timeout.
      *
-     * @param flags See man io_uring_enter(2).
      * @return lazy_awaiter
      */
-    template<class Rep, class Period = std::ratio<1>>
+    template<class Rep, class Period>
     [[CO_CONTEXT_AWAIT_HINT]]
-    inline detail::lazy_timeout timeout(
-        std::chrono::duration<Rep, Period> duration, unsigned int flags = 0
-    ) noexcept {
-        return detail::lazy_timeout{duration, flags};
+    inline detail::lazy_timeout
+    timeout(std::chrono::duration<Rep, Period> duration) noexcept {
+        return detail::lazy_timeout{duration};
     }
 
-    template<class Rep, class Period = std::ratio<1>>
+    /**
+     * @brief Set steady time_point timeout.
+     *
+     * @return lazy_awaiter
+     */
+    template<class Duration>
+    [[CO_CONTEXT_AWAIT_HINT]]
+    inline detail::lazy_timeout timeout_at(
+        std::chrono::time_point<std::chrono::steady_clock, Duration> time_point
+    ) noexcept {
+        return detail::lazy_timeout{time_point};
+    }
+
+    /**
+     * @brief Set realtime time_point timeout.
+     *
+     * @return lazy_awaiter
+     */
+    template<class Duration>
+    [[CO_CONTEXT_AWAIT_HINT]]
+    inline detail::lazy_timeout timeout_at(
+        std::chrono::time_point<std::chrono::system_clock, Duration> time_point
+    ) noexcept {
+        static_assert(
+            liburingcxx::is_kernel_reach(5, 15)
+                || std::chrono::system_clock::is_steady,
+            "io_uring timeouts only use the CLOCK_MONOTONIC clock source "
+            "until 5.15. That means the clock must be steady."
+        );
+        return detail::lazy_timeout{time_point};
+    }
+
+    template<class Rep, class Period>
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_link_timeout timeout(
         detail::lazy_awaiter &&timed_io,
-        std::chrono::duration<Rep, Period> duration,
-        unsigned int flags = 0
+        std::chrono::duration<Rep, Period> duration
     ) noexcept {
-        return detail::lazy_link_timeout{std::move(timed_io), duration, flags};
+        return detail::lazy_link_timeout{std::move(timed_io), duration};
     }
 
     [[CO_CONTEXT_AWAIT_HINT]]
@@ -186,7 +215,7 @@ inline namespace lazy {
         return detail::lazy_timeout_remove{user_data, flags};
     }
 
-    template<class Rep, class Period = std::ratio<1>>
+    template<class Rep, class Period>
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_timeout_update timeout_update(
         std::chrono::duration<Rep, Period> duration,
