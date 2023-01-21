@@ -209,6 +209,24 @@ inline namespace lazy {
         return detail::lazy_link_timeout{std::move(timed_io), duration};
     }
 
+    template<class Duration>
+    [[CO_CONTEXT_AWAIT_HINT]]
+    inline detail::lazy_link_timeout timeout_at(
+        detail::lazy_awaiter &&timed_io,
+        std::chrono::time_point<std::chrono::steady_clock, Duration> time_point
+    ) noexcept {
+        return detail::lazy_link_timeout{std::move(timed_io), time_point};
+    }
+
+    template<class Duration>
+    [[CO_CONTEXT_AWAIT_HINT]]
+    inline detail::lazy_link_timeout timeout_at(
+        detail::lazy_awaiter &&timed_io,
+        std::chrono::time_point<std::chrono::system_clock, Duration> time_point
+    ) noexcept {
+        return detail::lazy_link_timeout{std::move(timed_io), time_point};
+    }
+
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_timeout_remove
     timeout_remove(uint64_t user_data, unsigned flags) noexcept {
