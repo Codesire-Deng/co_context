@@ -9,9 +9,19 @@ task<> cycle(int sec, const char *message) {
     }
 }
 
+task<> cycle_abs(int sec, const char *message) {
+    auto next = std::chrono::steady_clock::now();
+    while (true) {
+        next = next + std::chrono::seconds{sec};
+        co_await timeout_at(next);
+        printf("%s\n", message);
+    }
+}
+
 int main() {
     io_context ctx;
     ctx.co_spawn(cycle(1, "1 sec"));
+    ctx.co_spawn(cycle_abs(1, "1 sec [abs]"));
     ctx.co_spawn(cycle(3, "\t3 sec"));
     ctx.start();
     ctx.join();
