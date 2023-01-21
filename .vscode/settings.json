@@ -121,5 +121,6 @@
         "queue": "cpp",
         "stack": "cpp"
     },
-    "cmake.buildTask": true
+    "cmake.buildTask": true,
+    "cmake.buildBeforeRun": false
 }

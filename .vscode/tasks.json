@@ -26,7 +26,7 @@
             "presentation": {
                 "echo": true,
                 "reveal": "always",
-                "revealProblems": "onProblem",
+                "revealProblems": "never",
                 "focus": true,
                 "panel": "dedicated",
                 "showReuseMessage": true,
