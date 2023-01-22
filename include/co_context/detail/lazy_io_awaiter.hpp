@@ -271,21 +271,21 @@ struct lazy_timeout_base : lazy_awaiter {
   public:
     template<class Rep, class Period>
     void set_ts(std::chrono::duration<Rep, Period> duration) noexcept {
-        ts = to_kernel_timespec(duration);
+        ts = to_kernel_timespec_biased(duration);
     }
 
     template<class Duration>
     void set_ts(
         std::chrono::time_point<std::chrono::steady_clock, Duration> time_point
     ) noexcept {
-        ts = to_kernel_timespec(time_point);
+        ts = to_kernel_timespec_biased(time_point);
     }
 
     template<class Duration>
     void set_ts(
         std::chrono::time_point<std::chrono::system_clock, Duration> time_point
     ) noexcept {
-        ts = to_kernel_timespec(time_point);
+        ts = to_kernel_timespec_biased(time_point);
     }
 
     template<class Expire>
