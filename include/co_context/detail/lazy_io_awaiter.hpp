@@ -303,12 +303,7 @@ inline constexpr uint32_t timeout_relative_flag = 0
 #endif
     ;
 
-inline constexpr uint32_t timeout_absolute_steady_flag =
-    IORING_TIMEOUT_ABS
-#if LIBURINGCXX_IS_KERNEL_REACH(5, 15)
-    | IORING_TIMEOUT_BOOTTIME
-#endif
-    ;
+inline constexpr uint32_t timeout_absolute_steady_flag = IORING_TIMEOUT_ABS;
 
 inline constexpr uint32_t timeout_absolute_realtime_flag =
     IORING_TIMEOUT_ABS | IORING_TIMEOUT_REALTIME;
