@@ -13,7 +13,7 @@ endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-project(co_context VERSION 0.8.1 LANGUAGES CXX)
+project(co_context VERSION 0.8.2 LANGUAGES CXX)
 
 if (NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
     message(WARNING "co_context only supports Linux currently, but the target OS is ${CMAKE_SYSTEM_NAME}.")

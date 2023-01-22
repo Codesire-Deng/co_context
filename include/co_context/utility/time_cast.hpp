@@ -1,5 +1,6 @@
 #pragma once
 
+#include "co_context/config.hpp"
 #include <chrono>
 #include <linux/time_types.h>
 
@@ -34,6 +35,18 @@ inline __kernel_timespec to_kernel_timespec(
     std::chrono::time_point<std::chrono::system_clock, Duration> time_point
 ) {
     return to_kernel_timespec(time_point.time_since_epoch());
+}
+
+template<class Timespec>
+[[nodiscard]]
+inline __kernel_timespec to_kernel_timespec_biased(Timespec timespec) {
+    if constexpr (config::timeout_bias_nanosecond == 0) {
+        return to_kernel_timespec(timespec);
+    } else {
+        constexpr auto bias =
+            std::chrono::nanoseconds{config::timeout_bias_nanosecond};
+        return to_kernel_timespec(timespec + bias);
+    }
 }
 
 } // namespace co_context

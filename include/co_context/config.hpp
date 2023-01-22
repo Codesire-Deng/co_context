@@ -120,6 +120,19 @@ namespace config {
     inline constexpr bool enable_link_io_result = false;
     // ========================================================================
 
+    // ========================= timer configuration ==========================
+    /**
+     * @brief Fix the timer expiring time point, to improve accuracy.
+     * E.g. timeout(time) => timeout(time + bias);
+     * @note The accuracy of the timer is mainly limited by the OS. The actual
+     * time is usually 20~500 microseconds later than the scheduled time.
+     * @warning If it is more important to ensure that no network signal is
+     * missed than to ensure accuracy, it is recommended to set bias to 0.
+     */
+    // inline constexpr int64_t timeout_bias_nanosecond = 0;
+    inline constexpr int64_t timeout_bias_nanosecond = -60'000;
+    // ========================================================================
+
 } // namespace config
 
 // logging config
