@@ -57,29 +57,29 @@ class socket {
     [[nodiscard]]
     inet_address get_peer_addr() const;
 
-    [[nodiscard]]
+    [[CO_CONTEXT_AWAIT_HINT]]
     auto connect(const inet_address &addr) const noexcept {
         return lazy::connect(sockfd, addr.get_sockaddr(), addr.length());
     }
 
-    [[nodiscard]]
+    [[CO_CONTEXT_AWAIT_HINT]]
     auto recv(std::span<char> buf, int flags = 0) const noexcept {
         return lazy::recv(sockfd, buf, flags);
     }
 
-    [[nodiscard]]
+    [[CO_CONTEXT_AWAIT_HINT]]
     auto send(std::span<const char> buf, int flags = 0) const noexcept {
         return lazy::send(sockfd, buf, flags);
     }
 
-    [[nodiscard]]
+    [[CO_CONTEXT_AWAIT_HINT]]
     auto close() noexcept {
         const int tmp = sockfd;
         sockfd = -1;
         return lazy::close(tmp);
     }
 
-    [[nodiscard]]
+    [[CO_CONTEXT_AWAIT_HINT]]
     auto shutdown_write() const noexcept {
         return lazy::shutdown(sockfd, SHUT_WR);
     }
