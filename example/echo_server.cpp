@@ -3,7 +3,7 @@ using namespace co_context;
 
 task<> session(int sockfd) {
     co_context::socket sock{sockfd};
-    char buf[1000];
+    char buf[8192];
 
     while (true) {
         int nr = co_await sock.recv(buf);

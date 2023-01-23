@@ -8,7 +8,7 @@ io_context worker[worker_num], balancer;
 
 task<> session(int sockfd) {
     co_context::socket sock{sockfd};
-    char buf[1000];
+    char buf[8192];
     int nr = co_await sock.recv(buf);
 
     while (nr > 0) {
