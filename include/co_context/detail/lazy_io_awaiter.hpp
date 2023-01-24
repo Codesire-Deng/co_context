@@ -1,5 +1,6 @@
 #pragma once
 
+#include "co_context/detail/thread_meta.hpp"
 #include "co_context/io_context.hpp"
 #include "co_context/utility/time_cast.hpp"
 #include "uring/utility/kernel_version.hpp"
@@ -413,12 +414,18 @@ struct lazy_link_timeout_base : lazy_timeout_base {
     inline lazy_link_timeout_base(Expire expire, unsigned int flags) noexcept
         : lazy_timeout_base(expire) {
         sqe->prep_link_timeout(this->ts, flags);
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 17)
+        sqe->set_cqe_skip();
+        --this_thread.worker->requests_to_reap;
+#else
         // Mark timer as lazy_link_sqe task type, but without sqe link.
-        // See below.
+        // The purpose is to make io_context to handle the timed_io and ignore
+        // the timer.
         sqe->set_data(
             this->io_info.as_user_data()
             | uint8_t(user_data_type::task_info_ptr__link_sqe)
         );
+#endif
     }
 };
 
