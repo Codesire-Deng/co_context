@@ -227,7 +227,7 @@ void worker_meta::handle_cq_entry(const liburingcxx::cq_entry *const cqe
             // if link_io_result is not enabled, we can skip the
             // lazy_link_sqe.
             break;
-        case mux::none:
+        [[unlikely]] case mux::none:
             assert(false && "handle_cq_entry(): unknown case");
     }
 }
@@ -243,8 +243,8 @@ void worker_meta::handle_reserved_user_data(const uint64_t user_data) noexcept {
 #endif
         case mux::nop:
             ++requests_to_reap; // compensate this number. see handle_cqe()
-            [[fallthrough]];
-        case mux::none:
+            break;
+        [[unlikely]] case mux::none:
             break;
     }
 }
