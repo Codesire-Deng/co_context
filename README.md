@@ -2,6 +2,10 @@
 
 # co_context
 
+[![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](https://github.com/Codesire-Deng/co_context/blob/main/LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Linux-blue)](https://img.shields.io/badge/Platform-Linux-blue)
+[![Language](https://img.shields.io/badge/Language-C%2B%2B20-red)](https://en.cppreference.com/w/cpp/compiler_support/20)
+
 co_context 是一个**协程**并发框架，提供可靠的**性能**和强**易用性**，让 C++ 初学者也能轻松写出高并发程序。
 co_context 基于 Linux [io_uring](https://github.com/axboe/liburing)，其性能通常优于 epoll。
 

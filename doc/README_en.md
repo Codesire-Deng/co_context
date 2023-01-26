@@ -2,6 +2,10 @@
 
 # co_context
 
+[![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](https://github.com/Codesire-Deng/co_context/blob/main/LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Linux-blue)](https://img.shields.io/badge/Platform-Linux-blue)
+[![Language](https://img.shields.io/badge/Language-C%2B%2B20-red)](https://en.cppreference.com/w/cpp/compiler_support/20)
+
 A C++20 **coroutine** framework offering highly-concurrent I/O with a reasonable latency, based on Linux [io_uring](https://github.com/axboe/liburing). 
 
 > For performance reasons, we have rewritten [liburing](https://github.com/axboe/liburing), as [liburingcxx](https://github.com/Codesire-Deng/liburingcxx).
