@@ -147,7 +147,7 @@ struct worker_meta final {
     uint32_t poll_completion() noexcept;
 
     /**
-     * @brief forward a coroutine to the reap_swap. 
+     * @brief forward a coroutine to the reap_swap.
      * @warning The reap_swap will not be checked for full.
      */
     void forward_task(std::coroutine_handle<> handle) noexcept;
