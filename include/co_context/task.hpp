@@ -93,6 +93,11 @@ namespace detail {
             parent_coro = continuation;
         }
 
+        task_promise_base(const task_promise_base &) = delete;
+        task_promise_base(task_promise_base &&) = delete;
+        task_promise_base &operator=(const task_promise_base &) = delete;
+        task_promise_base &operator=(task_promise_base &&) = delete;
+
       private:
         std::coroutine_handle<> parent_coro{std::noop_coroutine()};
     };
@@ -114,7 +119,7 @@ namespace detail {
                     break;
                 case value_state::exception:
                     exception_ptr.~exception_ptr();
-                    [[fallthrough]];
+                    break;
                 default:
                     break;
             }
@@ -356,6 +361,10 @@ class [[CO_CONTEXT_AWAIT_HINT]] task {
             handle.promise().is_detached_flag = promise_type::is_detached;
         }
         handle = nullptr;
+    }
+
+    friend void swap(task &a, task &b) noexcept {
+        std::swap(a.handle, b.handle);
     }
 
   private:
