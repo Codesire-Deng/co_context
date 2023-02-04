@@ -453,6 +453,7 @@ struct lazy_link_timeout
         return {};
     }
 
+  private:
     void arrange_io(lazy_awaiter &&timed_io) noexcept {
         // Mark timed_io as normal task type, but set sqe link.
         timed_io.sqe->set_link();
@@ -464,6 +465,7 @@ struct lazy_link_timeout
         this->last_io = &timed_io;
     }
 
+  public:
     template<class Rep, class Period>
     inline lazy_link_timeout(
         lazy_awaiter &&timed_io, std::chrono::duration<Rep, Period> duration
