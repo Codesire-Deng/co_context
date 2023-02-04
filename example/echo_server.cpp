@@ -4,11 +4,13 @@ using namespace co_context;
 task<> session(int sockfd) {
     co_context::socket sock{sockfd};
     char buf[8192];
+    int nr = co_await sock.recv(buf);
 
-    while (true) {
-        int nr = co_await sock.recv(buf);
-        co_await sock.send({buf, (size_t)nr});
+    while (nr > 0) {
+        nr = co_await (sock.send({buf, (size_t)nr}) && sock.recv(buf));
     }
+
+    sock.close().detach();
 }
 
 task<> server(const uint16_t port) {

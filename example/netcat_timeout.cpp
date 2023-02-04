@@ -25,6 +25,7 @@ task<> session(Socket sock) {
         nr = co_await timeout(sock.recv(buf), 3s);
     }
 
+    sock.close().detach();
     if (nr < 0) {
         log_error(-nr);
     }

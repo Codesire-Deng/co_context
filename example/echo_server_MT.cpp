@@ -14,6 +14,8 @@ task<> session(int sockfd) {
     while (nr > 0) {
         nr = co_await (sock.send({buf, (size_t)nr}) && sock.recv(buf));
     }
+
+    sock.close().detach();
 }
 
 task<> server(const uint16_t port) {

@@ -10,6 +10,7 @@ task<> reply(co_context::socket sock) {
     while (n > 0) {
         n = co_await (sock.send({"+OK\r\n", 5}) && sock.recv(recv_buf));
     }
+    sock.close().detach();
 }
 
 task<> server() {
