@@ -80,6 +80,11 @@ class sq_entry final : private io_uring_sqe {
         this->flags |= IOSQE_CQE_SKIP_SUCCESS;
         return *this;
     }
+
+    [[nodiscard]]
+    inline bool is_cqe_skip() const noexcept {
+        return (this->flags & IOSQE_CQE_SKIP_SUCCESS);
+    }
 #endif
 
   private:
