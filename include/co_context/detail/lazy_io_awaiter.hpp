@@ -1,6 +1,7 @@
 #pragma once
 
 #include "co_context/detail/thread_meta.hpp"
+#include "co_context/detail/user_data.hpp"
 #include "co_context/io_context.hpp"
 #include "co_context/utility/time_cast.hpp"
 #include "uring/utility/kernel_version.hpp"
@@ -42,6 +43,17 @@ class lazy_awaiter {
     }
 
     /*NOLINT*/ int32_t await_resume() const noexcept { return io_info.result; }
+
+    std::suspend_never detach() noexcept {
+#if LIBURINGCXX_IS_KERNEL_REACH(5, 17)
+        assert(!sqe->is_cqe_skip());
+        sqe->set_cqe_skip();
+        --this_thread.worker->requests_to_reap;
+#else
+        sqe->set_data(uint64_t(reserved_user_data::nop));
+#endif
+        return {};
+    }
 
   protected:
     friend struct lazy_link_io;
@@ -435,6 +447,11 @@ struct lazy_link_timeout
     using lazy_link_io::await_ready;
     using lazy_link_io::await_suspend;
     using lazy_link_io::await_resume;
+
+    std::suspend_never detach() noexcept {
+        this->last_io->detach();
+        return {};
+    }
 
     void arrange_io(lazy_awaiter &&timed_io) noexcept {
         // Mark timed_io as normal task type, but set sqe link.
