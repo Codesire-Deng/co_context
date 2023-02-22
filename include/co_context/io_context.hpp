@@ -18,17 +18,13 @@
  */
 #pragma once
 
-#include "uring/uring.hpp"
 #include "co_context/config.hpp"
 #include "co_context/detail/io_context_meta.hpp"
 #include "co_context/detail/task_info.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/detail/thread_safety.hpp"
-#include "co_context/detail/uring_type.hpp"
 #include "co_context/detail/worker_meta.hpp"
 #include "co_context/task.hpp"
-#include <cstdint>
-#include <queue>
 #include <sys/types.h>
 #include <thread>
 
@@ -37,9 +33,6 @@ namespace co_context {
 using config::cache_line_size;
 
 class [[nodiscard]] io_context final {
-  public:
-    using uring = detail::uring;
-
   private:
     using task_info = detail::task_info;
 
@@ -114,8 +107,6 @@ class [[nodiscard]] io_context final {
             host_thread.join();
         }
     }
-
-    inline uring &ring() noexcept { return worker.ring; }
 
     ~io_context() noexcept = default;
 
