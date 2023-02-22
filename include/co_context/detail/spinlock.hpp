@@ -33,7 +33,7 @@ inline void spinlock::lock() noexcept {
         }
         while (occupied.load(std::memory_order_relaxed)) {
             if constexpr (config::is_using_hyper_threading) {
-                CO_CONTEXT_PAUSE();
+                CO_CONTEXT_PAUSE;
             }
         }
     }

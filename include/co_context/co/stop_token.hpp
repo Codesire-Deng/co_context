@@ -95,7 +95,7 @@ class stop_token {
     friend class stop_callback;
 
     static void do_yield() noexcept {
-        CO_CONTEXT_PAUSE();
+        CO_CONTEXT_PAUSE;
         std::this_thread::yield();
     }
 
