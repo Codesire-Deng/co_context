@@ -1,0 +1,63 @@
+---
+Checks:    "bugprone-*,\
+            cert-*,\
+            clang-analyzer-*,\
+            concurrency-*,\
+            google-*,\
+            llvm-*,\
+            misc-*,\
+            modernize-*,\
+            portability-*,\
+            performance-*,\
+            readability-*,\
+            -bugprone-easily-swappable-parameters,\
+            -bugprone-reserved-identifier,\
+            -cert-dcl51-cpp,\
+            -cert-dcl37-c,\
+            -readability-magic-numbers,\
+            -readability-identifier-length,\
+            -readability-implicit-bool-conversion,\
+            -readability-isolate-declaration,\
+            -readability-static-accessed-through-instance,\
+            -readability-redundant-access-specifiers,\
+            -google-build-using-namespace,\
+            -google-readability-casting,\
+            -google-readability-todo,\
+            -modernize-avoid-c-arrays,\
+            -modernize-use-trailing-return-type,\
+            -misc-non-private-member-variables-in-classes"
+WarningsAsErrors:   '-*'
+HeaderFilterRegex: '^.*\.hpp$'
+FormatStyle: file
+AnalyzeTemporaryDtors: false
+CheckOptions:
+  - key:             readability-identifier-naming.ClassCase
+    value:           lower_case
+  - key:             readability-identifier-naming.ClassConstantCase
+    value:           lower_case
+  - key:             readability-identifier-naming.ClassConstantPrefix
+    value:           ''
+  - key:             readability-identifier-naming.EnumCase
+    value:           lower_case
+  - key:             readability-identifier-naming.EnumConstantCase
+    value:           aNy_CasE
+  - key:             readability-identifier-naming.FunctionCase
+    value:           lower_case
+  - key:             readability-identifier-naming.GlobalConstantCase
+    value:           aNy_CasE
+  - key:             readability-identifier-naming.MemberCase
+    value:           lower_case
+  - key:             readability-identifier-naming.NamespaceCase
+    value:           lower_case
+  - key:             readability-identifier-naming.PublicMemberSuffix
+    value:           ''
+  - key:             readability-identifier-naming.PrivateMemberSuffix
+    value:           ''
+  - key:             readability-identifier-naming.ProtectedMemberSuffix
+    value:           ''
+  - key:             readability-identifier-naming.MethodCase
+    value:           lower_case
+  - key:             readability-identifier-naming.ParameterCase
+    value:           lower_case
+  - key:             readability-identifier-naming.VariableCase
+    value:           lower_case
