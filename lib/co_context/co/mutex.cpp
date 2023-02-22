@@ -1,4 +1,5 @@
 #include "co_context/co/mutex.hpp"
+#include "co_context/detail/compat.hpp"
 #include "co_context/io_context.hpp"
 #include <cassert>
 

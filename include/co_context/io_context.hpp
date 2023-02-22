@@ -20,7 +20,6 @@
 
 #include "co_context/config.hpp"
 #include "co_context/detail/io_context_meta.hpp"
-#include "co_context/detail/task_info.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/detail/thread_safety.hpp"
 #include "co_context/detail/worker_meta.hpp"
@@ -33,10 +32,36 @@ namespace co_context {
 using config::cache_line_size;
 
 class [[nodiscard]] io_context final {
-  private:
-    using task_info = detail::task_info;
+  public:
+    explicit io_context() noexcept;
 
-    friend struct detail::worker_meta;
+    void co_spawn(task<void> &&entrance) noexcept;
+
+    template<safety is_thread_safe>
+    void co_spawn(task<void> &&entrance) noexcept;
+
+    void can_stop() noexcept { will_stop = true; }
+
+    // start a standalone thread to run.
+    void start();
+
+    void join() {
+        if (host_thread.joinable()) {
+            host_thread.join();
+        }
+    }
+
+    ~io_context() noexcept = default;
+
+    /**
+     * ban all copying or moving
+     */
+    io_context(const io_context &) = delete;
+    io_context(io_context &&) = delete;
+    io_context &operator=(const io_context &) = delete;
+    io_context &operator=(io_context &&) = delete;
+
+  private:
     using worker_meta = detail::worker_meta;
 
   private:
@@ -81,44 +106,8 @@ class [[nodiscard]] io_context final {
 
     void do_worker_part();
 
-  public:
-    explicit io_context() noexcept {
-        auto &meta = detail::io_context_meta;
-        std::lock_guard lg{meta.mtx};
-        this->id = meta.create_count++;
-        log::d(
-            "&meta.create_count = %lx  value = %u\n", &meta.create_count,
-            meta.create_count
-        );
-    }
-
-    void co_spawn(task<void> &&entrance) noexcept;
-
-    template<safety is_thread_safe>
-    void co_spawn(task<void> &&entrance) noexcept;
-
-    void can_stop() noexcept { will_stop = true; }
-
-    // start a standalone thread to run.
-    void start();
-
-    void join() {
-        if (host_thread.joinable()) {
-            host_thread.join();
-        }
-    }
-
-    ~io_context() noexcept = default;
-
-    /**
-     * ban all copying or moving
-     */
-    io_context(const io_context &) = delete;
-    io_context(io_context &&) = delete;
-    io_context &operator=(const io_context &) = delete;
-    io_context &operator=(io_context &&) = delete;
-
   private:
+    friend struct detail::worker_meta;
     friend class co_context::mutex;
     friend class co_context::condition_variable;
     friend class co_context::counting_semaphore;

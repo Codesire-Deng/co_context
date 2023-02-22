@@ -26,6 +26,16 @@
 
 namespace co_context {
 
+io_context::io_context() noexcept {
+    auto &meta = detail::io_context_meta;
+    std::lock_guard lg{meta.mtx};
+    this->id = meta.create_count++;
+    log::d(
+        "&meta.create_count = %lx  value = %u\n", &meta.create_count,
+        meta.create_count
+    );
+}
+
 // Must be called by corresponding thread.
 void io_context::init() {
     this->tid = ::gettid();

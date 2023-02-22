@@ -1,6 +1,7 @@
 #pragma once
 
 #include "co_context/detail/thread_meta.hpp"
+#include "co_context/detail/task_info.hpp"
 #include "co_context/detail/user_data.hpp"
 #include "co_context/io_context.hpp"
 #include "co_context/utility/time_cast.hpp"
