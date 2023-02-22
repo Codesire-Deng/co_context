@@ -1,8 +1,9 @@
-cmake_minimum_required(VERSION 3.20.0)
+cmake_minimum_required(VERSION 3.14)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-option(FORCE_TO_USE_MIMALLOC "Force the use of mimalloc version 2.0 or above" OFF)
+option(FORCE_TO_USE_EPOLL "Force the use of epoll although io_uring is available." OFF)
+option(FORCE_TO_USE_MIMALLOC "Force the use of mimalloc version 2.0 or above." OFF)
 option(FORCE_TO_USE_LIBCXX "Force the use of LLVM libc++. Requires clang." OFF)
 option(BUILD_EXAMPLES "Build the examples" ON)
 option(BUILD_TESTS "Build the tests" OFF)
@@ -14,7 +15,7 @@ endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-project(co_context VERSION 0.8.2 LANGUAGES CXX)
+project(co_context VERSION 0.9.0 LANGUAGES CXX)
 
 if (NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
     message(WARNING "co_context only supports Linux currently, but the target OS is ${CMAKE_SYSTEM_NAME}.")
@@ -103,6 +104,13 @@ if (mi_version)
     message(NOTICE "mimalloc ${mi_version} enabled")
 else()
     message(WARNING "mimalloc disabled")
+endif()
+
+if (FORCE_TO_USE_EPOLL OR kernel_version VERSION_LESS "5.6")
+    add_compile_definitions(USE_EPOLL)
+    message(NOTICE "epoll enabled, io_uring disabled")
+else()
+    add_compile_definitions(USE_IO_URING)
 endif()
 
 include_directories(${PROJECT_SOURCE_DIR}/include)
