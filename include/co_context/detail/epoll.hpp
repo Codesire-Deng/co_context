@@ -13,7 +13,7 @@ namespace co_context::detail {
 class epoll final {
   private:
     int epoll_fd = -1;
-    unsigned entries = 0;
+    int entries = 0;
     std::unique_ptr<::epoll_event[]> events_buf;
 
   public:
@@ -25,28 +25,32 @@ class epoll final {
         }
     };
 
-    void init(unsigned entries) noexcept {
+    void init(int entries) noexcept {
         const int fd = ::epoll_create1(EPOLL_CLOEXEC);
         if (fd < 0) {
             perror("epoll_create1");
             std::terminate();
         }
+        assert(entries > 0);
+        events_buf = std::make_unique<::epoll_event[]>(entries);
         this->entries = entries;
-        events_buf.reset(new ::epoll_event[entries]);
         epoll_fd = fd;
     }
 
-    int fd() const noexcept { return epoll_fd; }
+    [[nodiscard]]
+    int fd() const noexcept {
+        return epoll_fd;
+    }
 
-    int add(int fd, ::epoll_event event) noexcept {
+    int add(int fd, ::epoll_event event) /* NOLINT */ noexcept {
         return ::epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &event);
     }
 
-    int mod(int fd, ::epoll_event event) noexcept {
+    int mod(int fd, ::epoll_event event) /* NOLINT */ noexcept {
         return ::epoll_ctl(epoll_fd, EPOLL_CTL_MOD, fd, &event);
     }
 
-    int del(int fd, ::epoll_event event) noexcept {
+    int del(int fd, ::epoll_event event) /* NOLINT */ noexcept {
         return ::epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, &event);
     }
 
