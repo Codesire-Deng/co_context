@@ -2,13 +2,28 @@
 
 #include <cassert>
 #include <cerrno>
+#include <co_context/config.hpp>
 #include <cstdio>
 #include <exception>
 #include <memory>
 #include <span>
 #include <sys/epoll.h>
+#include <utility>
+#include <vector>
 
 namespace co_context::detail {
+
+struct epoll_fd_data {
+    union user_data {
+        int64_t i64;
+        uint64_t u64;
+        void *ptr;
+    };
+
+    uint32_t interests;
+    user_data in;
+    user_data out;
+};
 
 class epoll final {
   public:
@@ -31,7 +46,8 @@ class epoll final {
         : epoll_fd(o.epoll_fd)
         , entries(o.entries)
         , events_buf(std::move(o.events_buf))
-        , ready_entries(o.ready_entries) {
+        , ready_entries(o.ready_entries)
+        , fd_data(std::move(o.fd_data)) {
         o.epoll_fd = -1;
         o.entries = 0;
         o.ready_entries = 0;
@@ -45,6 +61,7 @@ class epoll final {
         this->entries = o.entries;
         this->events_buf = std::move(o.events_buf);
         this->ready_entries = o.ready_entries;
+        this->fd_data = std::move(o.fd_data);
         o.epoll_fd = -1;
         o.entries = 0;
         o.ready_entries = 0;
@@ -106,11 +123,11 @@ class epoll final {
                  && std::is_void_v<std::invoke_result_t<F, epoll_event *>>
     uint32_t for_each_event(F &&f
     ) noexcept(noexcept(f(std::declval<epoll_event *>()))) {
-        for (auto *e = events_buf.get(), *const end = e + ready_entries;
-             e != end; ++e) {
+        uint32_t nr = std::exchange(ready_entries, 0);
+        for (auto *e = events_buf.get(), *const end = e + nr; e != end; ++e) {
             f(e);
         }
-        return ready_entries;
+        return nr;
     }
 
     template<typename F>
@@ -120,8 +137,7 @@ class epoll final {
         noexcept(f(std::declval<epoll_event *>()))
     ) {
         wait(timeout);
-        for_each_event(std::forward<F>(f));
-        return ready_entries;
+        return for_each_event(std::forward<F>(f));
     }
 
     friend void swap(epoll &a, epoll &b) noexcept {
@@ -129,13 +145,24 @@ class epoll final {
         std::swap(a.entries, b.entries);
         std::swap(a.events_buf, b.events_buf);
         std::swap(a.ready_entries, b.ready_entries);
+        std::swap(a.fd_data, b.fd_data);
     }
 
   private:
     int epoll_fd = -1;
     int entries = 0;
     std::unique_ptr<epoll_event[]> events_buf;
-    uint32_t ready_entries;
+    uint32_t ready_entries = 0;
+
+  public:
+    std::vector<epoll_fd_data> fd_data{config::default_epoll_entries};
+
+    auto &make_fd_data(int fd) noexcept {
+        if (fd >= fd_data.size()) {
+            fd_data.resize((size_t)fd * 2);
+        }
+        return fd_data[fd];
+    }
 };
 
 } // namespace co_context::detail
