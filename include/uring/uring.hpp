@@ -177,8 +177,8 @@ class [[nodiscard]] uring final {
     template<typename F>
         requires std::regular_invocable<F, cq_entry *>
                  && std::is_void_v<std::invoke_result_t<F, cq_entry *>>
-    unsigned for_each_cqe(F f) noexcept(noexcept(f(std::declval<cq_entry *>()))
-    ) {
+    unsigned for_each_cqe(F &&f
+    ) noexcept(noexcept(f(std::declval<cq_entry *>()))) {
         unsigned count = 0;
         for (auto head = *cq.khead; head != io_uring_smp_load_acquire(cq.ktail);
              ++head, ++count) {
