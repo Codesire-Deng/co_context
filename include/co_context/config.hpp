@@ -59,10 +59,12 @@ namespace config {
      * @brief Use msg_ring to co_spawn betweens io_contexts, instead of
      * eventfd, std::mutex and std::queue.
      */
-#define CO_CONTEXT_IS_USING_MSG_RING LIBURINGCXX_IS_KERNEL_REACH(5, 18)
-#define CO_CONTEXT_IS_USING_EVENTFD  !CO_CONTEXT_IS_USING_MSG_RING
-    inline constexpr bool is_using_msg_ring =
-        LIBURINGCXX_IS_KERNEL_REACH(5, 18);
+#if defined(USE_IO_URING) && LIBURINGCXX_IS_KERNEL_REACH(5, 18)
+#define CO_CONTEXT_IS_USING_MSG_RING 1
+#else
+#define CO_CONTEXT_IS_USING_MSG_RING 0
+#endif
+#define CO_CONTEXT_IS_USING_EVENTFD (!CO_CONTEXT_IS_USING_MSG_RING)
 
     /**
      * @brief This tells if a standalone thread will run in kernel space.
