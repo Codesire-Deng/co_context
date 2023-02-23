@@ -15,12 +15,6 @@ class epoll final {
     using epoll_event = ::epoll_event;
     using epoll_data_t = ::epoll_data_t;
 
-  private:
-    int epoll_fd = -1;
-    int entries = 0;
-    std::unique_ptr<epoll_event[]> events_buf;
-    uint32_t ready_entries;
-
   public:
     explicit epoll() noexcept = default;
 
@@ -29,6 +23,33 @@ class epoll final {
             ::close(epoll_fd);
         }
     };
+
+    epoll(const epoll &) = delete;
+    epoll &operator=(const epoll &) = delete;
+
+    epoll(epoll &&o) noexcept
+        : epoll_fd(o.epoll_fd)
+        , entries(o.entries)
+        , events_buf(std::move(o.events_buf))
+        , ready_entries(o.ready_entries) {
+        o.epoll_fd = -1;
+        o.entries = 0;
+        o.ready_entries = 0;
+    }
+
+    epoll &operator=(epoll &&o) noexcept {
+        if (this == &o) {
+            return *this;
+        }
+        this->epoll_fd = o.epoll_fd;
+        this->entries = o.entries;
+        this->events_buf = std::move(o.events_buf);
+        this->ready_entries = o.ready_entries;
+        o.epoll_fd = -1;
+        o.entries = 0;
+        o.ready_entries = 0;
+        return *this;
+    }
 
     void init(int entries) noexcept {
         const int fd = ::epoll_create1(EPOLL_CLOEXEC);
@@ -102,6 +123,19 @@ class epoll final {
         for_each_event(std::forward<F>(f));
         return ready_entries;
     }
+
+    friend void swap(epoll &a, epoll &b) noexcept {
+        std::swap(a.epoll_fd, b.epoll_fd);
+        std::swap(a.entries, b.entries);
+        std::swap(a.events_buf, b.events_buf);
+        std::swap(a.ready_entries, b.ready_entries);
+    }
+
+  private:
+    int epoll_fd = -1;
+    int entries = 0;
+    std::unique_ptr<epoll_event[]> events_buf;
+    uint32_t ready_entries;
 };
 
 } // namespace co_context::detail
