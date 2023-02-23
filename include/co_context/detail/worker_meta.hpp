@@ -208,10 +208,8 @@ inline void worker_meta::co_spawn_safe_msg_ring(std::coroutine_handle<> handle
                      | uint8_t(user_data_type::coroutine_handle);
     sqe->prep_msg_ring(ring_fd, 0, user_data, 0);
     sqe->set_data(uint64_t(reserved_user_data::nop));
-#if LIBURINGCXX_IS_KERNEL_REACH(5, 17)
     sqe->set_cqe_skip();
     --from.requests_to_reap;
-#endif
 }
 #endif
 
