@@ -1,6 +1,11 @@
 #pragma once
 
+#if defined(USE_IO_URING)
 #include "co_context/detail/lazy_io_awaiter.hpp"
+#elif defined(USE_EPOLL)
+#include "co_context/detail/lazy_io_awaiter_epoll.hpp"
+#endif
+
 #include "co_context/detail/hint.hpp"
 
 namespace co_context {
@@ -62,12 +67,14 @@ inline namespace lazy {
         return detail::lazy_readv2{fd, iovecs, offset, flags};
     }
 
+#ifdef USE_IO_URING
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_read_fixed read_fixed(
         int fd, std::span<char> buf, uint64_t offset, uint16_t buf_index
     ) noexcept {
         return detail::lazy_read_fixed{fd, buf, offset, buf_index};
     }
+#endif
 
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_writev writev(
@@ -76,12 +83,14 @@ inline namespace lazy {
         return detail::lazy_writev{fd, iovecs, offset};
     }
 
+#ifdef USE_IO_URING
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_write_fixed write_fixed(
         int fd, std::span<const char> buf, uint64_t offset, uint16_t buf_index
     ) noexcept {
         return detail::lazy_write_fixed{fd, buf, offset, buf_index};
     }
+#endif
 
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_recvmsg
@@ -89,7 +98,7 @@ inline namespace lazy {
         return detail::lazy_recvmsg{fd, msg, flags};
     }
 
-#if LIBURINGCXX_IS_KERNEL_REACH(5, 20)
+#if defined(USE_IO_URING) && LIBURINGCXX_IS_KERNEL_REACH(5, 20)
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_recvmsg_multishot
     recvmsg_multishot(int fd, msghdr *msg, unsigned int flags) noexcept {
@@ -135,10 +144,12 @@ inline namespace lazy {
         return detail::lazy_fsync{fd, fsync_flags};
     }
 
+#ifdef USE_IO_URING
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_uring_nop uring_nop() noexcept {
         return detail::lazy_uring_nop{};
     }
+#endif
 
     /**
      * @brief Set timeout. When it expires, the coroutine will wake up
@@ -249,6 +260,7 @@ inline namespace lazy {
         return detail::lazy_accept{fd, addr, addrlen, flags};
     }
 
+#ifdef USE_IO_URING
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_accept_direct accept_direct(
         int fd,
@@ -259,8 +271,9 @@ inline namespace lazy {
     ) noexcept {
         return detail::lazy_accept_direct{fd, addr, addrlen, flags, file_index};
     }
+#endif
 
-#if LIBURINGCXX_IS_KERNEL_REACH(5, 19)
+#if defined(USE_IO_URING) && LIBURINGCXX_IS_KERNEL_REACH(5, 19)
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_multishot_accept multishot_accept(
         int fd, sockaddr *addr, socklen_t *addrlen, int flags
@@ -269,7 +282,7 @@ inline namespace lazy {
     }
 #endif
 
-#if LIBURINGCXX_IS_KERNEL_REACH(5, 19)
+#if defined(USE_IO_URING) && LIBURINGCXX_IS_KERNEL_REACH(5, 19)
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_multishot_accept_direct multishot_accept_direct(
         int fd, sockaddr *addr, socklen_t *addrlen, int flags
@@ -278,11 +291,13 @@ inline namespace lazy {
     }
 #endif
 
+#ifdef USE_IO_URING
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_cancel
     cancel(uint64_t user_data, int flags = 0) noexcept {
         return detail::lazy_cancel{user_data, flags};
     }
+#endif
 
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_cancel_fd
@@ -330,11 +345,13 @@ inline namespace lazy {
         return detail::lazy_close{fd};
     }
 
+#ifdef USE_IO_URING
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_close_direct close_direct(unsigned file_index
     ) noexcept {
         return detail::lazy_close_direct{file_index};
     }
+#endif
 
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_read
@@ -377,13 +394,16 @@ inline namespace lazy {
         return detail::lazy_send{sockfd, buf, flags};
     }
 
+#ifdef USE_IO_URING
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_send_zc send_zc(
         int sockfd, std::span<const char> buf, int flags, unsigned zc_flags
     ) noexcept {
         return detail::lazy_send_zc{sockfd, buf, flags, zc_flags};
     }
+#endif
 
+#ifdef USE_IO_URING
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_send_zc_fixed send_zc_fixed(
         int sockfd,
@@ -395,12 +415,15 @@ inline namespace lazy {
         return detail::lazy_send_zc_fixed{
             sockfd, buf, flags, zc_flags, buf_index};
     }
+#endif
 
+#ifdef USE_IO_URING
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_sendmsg_zc
     sendmsg_zc(int fd, const msghdr *msg, unsigned flags) noexcept {
         return detail::lazy_sendmsg_zc{fd, msg, flags};
     }
+#endif
 
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_recv
@@ -408,7 +431,7 @@ inline namespace lazy {
         return detail::lazy_recv{sockfd, buf, flags};
     }
 
-#if LIBURINGCXX_IS_KERNEL_REACH(5, 20)
+#if defined(USE_IO_URING) && LIBURINGCXX_IS_KERNEL_REACH(5, 20)
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_recv_multishot
     recv_multishot(int sockfd, std::span<char> buf, int flags = 0) noexcept {
@@ -422,12 +445,14 @@ inline namespace lazy {
         return detail::lazy_openat2{dfd, path, how};
     }
 
+#ifdef USE_IO_URING
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_openat2_direct openat2_direct(
         int dfd, const char *path, open_how *how, unsigned int file_index
     ) noexcept {
         return detail::lazy_openat2_direct{dfd, path, how, file_index};
     }
+#endif
 
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_epoll_ctl
@@ -435,18 +460,22 @@ inline namespace lazy {
         return detail::lazy_epoll_ctl{epfd, fd, op, ev};
     }
 
+#ifdef USE_IO_URING
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_provide_buffers provide_buffers(
         const void *addr, int len, int nr, int bgid, int bid
     ) noexcept {
         return detail::lazy_provide_buffers{addr, len, nr, bgid, bid};
     }
+#endif
 
+#ifdef USE_IO_URING
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_remove_buffers
     remove_buffers(int nr, int bgid) noexcept {
         return detail::lazy_remove_buffers{nr, bgid};
     }
+#endif
 
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_shutdown shutdown(int fd, int how) noexcept {
@@ -527,7 +556,7 @@ inline namespace lazy {
         return detail::lazy_link{oldpath, newpath, flags};
     }
 
-#if LIBURINGCXX_IS_KERNEL_REACH(5, 18)
+#if defined(USE_IO_URING) && LIBURINGCXX_IS_KERNEL_REACH(5, 18)
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_msg_ring msg_ring(
         int fd, uint32_t cqe_res, uint64_t cqe_user_data, uint32_t flags
@@ -536,7 +565,7 @@ inline namespace lazy {
     }
 #endif
 
-#if LIBURINGCXX_IS_KERNEL_REACH(6, 2)
+#if defined(USE_IO_URING) && LIBURINGCXX_IS_KERNEL_REACH(6, 2)
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_msg_ring_cqe_flags msg_ring_cqe_flags(
         int fd,
@@ -584,6 +613,7 @@ inline namespace lazy {
         return detail::lazy_socket{domain, type, protocol, flags};
     }
 
+#ifdef USE_IO_URING
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_socket_direct make_socket_direct(
         int domain,
@@ -595,13 +625,16 @@ inline namespace lazy {
         return detail::lazy_socket_direct{
             domain, type, protocol, file_index, flags};
     }
+#endif
 
+#ifdef USE_IO_URING
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_socket_direct_alloc make_socket_direct_alloc(
         int domain, int type, int protocol, unsigned int flags
     ) noexcept {
         return detail::lazy_socket_direct_alloc{domain, type, protocol, flags};
     }
+#endif
 
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_yield yield() noexcept {
