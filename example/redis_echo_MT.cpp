@@ -10,9 +10,15 @@ io_context worker[worker_num], balancer;
 
 task<> reply(co_context::socket sock) {
     char recv_buf[100];
-    int n = co_await sock.recv(recv_buf);
-    while (n > 0) {
-        n = co_await (sock.send({"+OK\r\n", 5}) && sock.recv(recv_buf));
+    while (true) {
+        int nr = co_await sock.recv(recv_buf);
+        if (nr <= 0) [[unlikely]] {
+            break;
+        }
+        int nw = co_await (sock.send({"+OK\r\n", 5}));
+        if (nw <= 0) [[unlikely]] {
+            break;
+        }
     }
 }
 
