@@ -7,8 +7,15 @@ task<> session(int sockfd) {
 
     while (true) {
         int nr = co_await sock.recv(buf);
-        co_await sock.send({buf, (size_t)nr});
+        if (nr <= 0) [[unlikely]] {
+            break;
+        }
+        int nw = co_await sock.send({buf, (size_t)nr});
+        if (nw <= 0) [[unlikely]] {
+            break;
+        }
     }
+    ::close(sockfd);
 }
 
 task<> server(const uint16_t port) {

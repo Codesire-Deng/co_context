@@ -16,6 +16,7 @@ task<> reply(co_context::socket sock) {
             break;
         }
     }
+    ::close(sock.fd());
 }
 
 task<> server() {

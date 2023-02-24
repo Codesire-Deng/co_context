@@ -9,11 +9,18 @@ io_context worker[worker_num], balancer;
 task<> session(int sockfd) {
     co_context::socket sock{sockfd};
     char buf[8192];
-    int nr = co_await sock.recv(buf);
 
-    while (nr > 0) {
-        nr = co_await (sock.send({buf, (size_t)nr}) && sock.recv(buf));
+    while (true) {
+        int nr = co_await sock.recv(buf);
+        if (nr <= 0) [[unlikely]] {
+            break;
+        }
+        int nw = co_await sock.send({buf, (size_t)nr});
+        if (nw <= 0) [[unlikely]] {
+            break;
+        }
     }
+    ::close(sockfd);
 }
 
 task<> server(const uint16_t port) {
