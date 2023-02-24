@@ -98,7 +98,14 @@ namespace config {
         std::bit_ceil<uint32_t>(swap_capacity * 2ULL);
 
     inline constexpr uint32_t default_epoll_entries =
-        std::bit_ceil<uint32_t>(swap_capacity * 2ULL);
+        std::bit_ceil<uint32_t>(swap_capacity);
+
+    inline constexpr uint32_t default_io_entries =
+#if defined(USE_IO_URING)
+        default_io_uring_entries;
+#elif defined(USE_EPOLL)
+        default_epoll_entries;
+#endif
 
     /**
      * @brief Maximal batch size of submissions. -1 means the batch size is
