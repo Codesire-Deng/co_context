@@ -112,6 +112,7 @@ inline namespace lazy {
         return detail::lazy_sendmsg{fd, msg, flags};
     }
 
+#ifdef USE_IO_URING
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_poll_add poll_add(int fd, unsigned poll_mask) noexcept {
         return detail::lazy_poll_add{fd, poll_mask};
@@ -138,6 +139,7 @@ inline namespace lazy {
         return detail::lazy_poll_update{
             old_user_data, new_user_data, poll_mask, flags};
     }
+#endif
 
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_fsync fsync(int fd, uint32_t fsync_flags) noexcept {
@@ -311,11 +313,13 @@ inline namespace lazy {
         return detail::lazy_connect{sockfd, addr, addrlen};
     }
 
+#ifdef USE_IO_URING
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_files_update
     files_update(std::span<int> fds, int offset) noexcept {
         return detail::lazy_files_update{fds, offset};
     }
+#endif
 
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_fallocate
@@ -329,6 +333,7 @@ inline namespace lazy {
         return detail::lazy_openat{dfd, path, flags, mode};
     }
 
+#ifdef USE_IO_URING
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_openat_direct openat_direct(
         int dfd,
@@ -339,6 +344,7 @@ inline namespace lazy {
     ) noexcept {
         return detail::lazy_openat_direct{dfd, path, flags, mode, file_index};
     }
+#endif
 
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_close close(int fd) noexcept {
