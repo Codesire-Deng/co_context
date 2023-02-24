@@ -176,7 +176,7 @@ struct lazy_readv : lazy_awaiter {
     inline lazy_readv(
         int fd, std::span<const iovec> iovecs, uint64_t offset
     ) noexcept {
-        result = ::preadv2(fd, iovecs.data(), iovecs.size(), offset, 0);
+        result = ::preadv(fd, iovecs.data(), iovecs.size(), offset);
         check_error();
     }
 };
@@ -194,7 +194,7 @@ struct lazy_writev : lazy_awaiter {
     inline lazy_writev(
         int fd, std::span<const iovec> iovecs, uint64_t offset
     ) noexcept {
-        result = ::pwritev2(fd, iovecs.data(), iovecs.size(), offset, 0);
+        result = ::pwritev(fd, iovecs.data(), iovecs.size(), offset);
         check_error();
     }
 };
