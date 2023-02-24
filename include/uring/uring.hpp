@@ -25,10 +25,10 @@
 #define _GNU_SOURCE /* Required for musl to expose cpu_set_t */
 #endif
 
-#include "uring/cq_entry.hpp"
 #include "uring/barrier.h"
 #include "uring/buf_ring.hpp"
 #include "uring/compat.h"
+#include "uring/cq_entry.hpp"
 #include "uring/detail/cq.hpp"
 #include "uring/detail/int_flags.h"
 #include "uring/detail/sq.hpp"

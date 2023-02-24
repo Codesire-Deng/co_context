@@ -1,7 +1,7 @@
 #pragma once
 
-#include "co_context/utility/defer.hpp"
 #include "co_context/config.hpp"
+#include "co_context/utility/defer.hpp"
 #include <netdb.h>
 #include <netinet/in.h>
 #include <string>

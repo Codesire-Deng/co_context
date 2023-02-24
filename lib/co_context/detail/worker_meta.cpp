@@ -1,6 +1,6 @@
-#include "co_context/config.hpp"
 #include "co_context/co/condition_variable.hpp"
 #include "co_context/co/semaphore.hpp"
+#include "co_context/config.hpp"
 #include "co_context/detail/compat.hpp"
 #include "co_context/detail/poller_type.hpp"
 #include "co_context/detail/task_info.hpp"

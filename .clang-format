@@ -60,7 +60,7 @@ ReflowComments: true
 RequiresClausePosition: OwnLine # clang-format 15
 SeparateDefinitionBlocks: Always
 ShortNamespaceLines: 5
-SortIncludes:    false
+SortIncludes: CaseInsensitive
 SortUsingDeclarations: false
 SpaceAfterCStyleCast: false
 SpaceAfterLogicalNot: false
