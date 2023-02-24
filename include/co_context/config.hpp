@@ -12,6 +12,13 @@ namespace co_context {
 namespace config {
 
     // ================== io_uring/liburingcxx configuration ==================
+    inline constexpr bool is_using_io_uring =
+#ifdef USE_IO_URING
+        true;
+#else
+        false;
+#endif
+
     inline constexpr unsigned io_uring_setup_flags = 0;
     // inline constexpr unsigned io_uring_setup_flags = IORING_SETUP_SQPOLL;
 
@@ -27,6 +34,15 @@ namespace config {
             : (IORING_SETUP_COOP_TASKRUN | IORING_SETUP_TASKRUN_FLAG);
 
     inline constexpr uint64_t uring_setup_flags = 0;
+    // ========================================================================
+
+    // ========================= epoll configuration ==========================
+    inline constexpr bool is_using_epoll =
+#ifdef USE_EPOLL
+        true;
+#else
+        false;
+#endif
     // ========================================================================
 
     // ========================== CPU configuration ===========================
@@ -54,17 +70,6 @@ namespace config {
     using ctx_id_t = uint8_t;
 
     inline constexpr bool is_using_hyper_threading = true;
-
-    /**
-     * @brief Use msg_ring to co_spawn betweens io_contexts, instead of
-     * eventfd, std::mutex and std::queue.
-     */
-#if defined(USE_IO_URING) && LIBURINGCXX_IS_KERNEL_REACH(5, 18)
-#define CO_CONTEXT_IS_USING_MSG_RING 1
-#else
-#define CO_CONTEXT_IS_USING_MSG_RING 0
-#endif
-#define CO_CONTEXT_IS_USING_EVENTFD (!CO_CONTEXT_IS_USING_MSG_RING)
 
     /**
      * @brief This tells if a standalone thread will run in kernel space.
@@ -108,6 +113,17 @@ namespace config {
 #endif
 
     /**
+     * @brief Use msg_ring to co_spawn betweens io_contexts, instead of
+     * eventfd, std::mutex and std::queue.
+     */
+#if defined(USE_IO_URING) && LIBURINGCXX_IS_KERNEL_REACH(5, 18)
+#define CO_CONTEXT_IS_USING_MSG_RING 1
+#else
+#define CO_CONTEXT_IS_USING_MSG_RING 0
+#endif
+#define CO_CONTEXT_IS_USING_EVENTFD (!CO_CONTEXT_IS_USING_MSG_RING)
+
+    /**
      * @brief Maximal batch size of submissions. -1 means the batch size is
      * unlimited.
      * @note Once the threshold is reached, it is not mandatary to submit to
@@ -119,6 +135,8 @@ namespace config {
     // ========================================================================
 
     // ========================== net configuration ===========================
+    inline constexpr bool is_socket_nonblocking = is_using_epoll;
+
     inline constexpr bool is_loopback_only = true;
     // inline constexpr bool is_loopback_only = false;
     // ========================================================================
