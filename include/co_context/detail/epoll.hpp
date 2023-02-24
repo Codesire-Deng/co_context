@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cerrno>
 #include <co_context/config.hpp>
+#include <coroutine>
 #include <cstdio>
 #include <exception>
 #include <memory>
@@ -18,9 +19,16 @@ struct epoll_fd_data {
         int64_t i64;
         uint64_t u64;
         void *ptr;
+        std::coroutine_handle<> handle;
+
+        user_data() noexcept : u64(0) {}
+
+        ~user_data() noexcept = default;
     };
 
-    uint32_t interests;
+    static_assert(sizeof(user_data) <= 8);
+
+    uint32_t interests = 0;
     user_data in;
     user_data out;
 };
@@ -105,7 +113,7 @@ class epoll final {
 
     int mod_or_add(int fd, const epoll_event &event) /* NOLINT */ noexcept {
         int res = mod(fd, event);
-        return res != ENOENT ? res : add(fd, event);
+        return (res != -1 || errno != ENOENT) ? res : add(fd, event);
     }
 
     uint32_t wait(int timeout = -1) noexcept {
@@ -158,8 +166,9 @@ class epoll final {
     std::vector<epoll_fd_data> fd_data{config::default_epoll_entries};
 
     auto &make_fd_data(int fd) noexcept {
-        if (fd >= fd_data.size()) {
-            fd_data.resize((size_t)fd * 2);
+        assert(fd >= 0);
+        if (size_t(fd) >= fd_data.size()) {
+            fd_data.resize(size_t(fd) * 2);
         }
         return fd_data[fd];
     }
