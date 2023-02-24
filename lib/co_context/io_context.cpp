@@ -41,8 +41,7 @@ void io_context::init() {
     this->tid = ::gettid();
     detail::this_thread.ctx = this;
     detail::this_thread.ctx_id = this->id;
-
-    this->worker.init(config::default_io_uring_entries);
+    this->worker.init(config::default_io_entries);
 }
 
 void io_context::start() {
@@ -103,11 +102,10 @@ void io_context::do_completion_part() noexcept {
         uint32_t will_not_wait =
             num | worker.has_task_ready() | worker.requests_to_submit;
         if (will_not_wait == 0) [[unlikely]] {
-            worker.wait_uring();
-            num = worker.poll_completion();
+            num = worker.wait_and_poll_completion();
             if constexpr (config::is_log_i) {
                 if (num == 0) [[unlikely]] {
-                    log::i("wait_cq_entry() gets 0 cqe.\n");
+                    log::i("wait_and_poll_completion() gets 0 cqe/event.\n");
                 }
             }
         }

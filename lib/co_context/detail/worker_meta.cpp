@@ -2,6 +2,7 @@
 #include "co_context/co/condition_variable.hpp"
 #include "co_context/co/semaphore.hpp"
 #include "co_context/detail/compat.hpp"
+#include "co_context/detail/poller_type.hpp"
 #include "co_context/detail/task_info.hpp"
 #include "co_context/detail/thread_meta.hpp"
 #include "co_context/detail/user_data.hpp"
@@ -9,8 +10,6 @@
 #include "co_context/log/log.hpp"
 #include "co_context/utility/as_buffer.hpp"
 #include "co_context/utility/set_cpu_affinity.hpp"
-#include "uring/cq_entry.hpp"
-#include "uring/uring_define.hpp"
 #include <atomic>
 #include <cerrno>
 #include <coroutine>
@@ -29,35 +28,41 @@ namespace co_context::detail {
 
 thread_local thread_meta this_thread;
 
-#if CO_CONTEXT_IS_USING_EVENTFD
 worker_meta::worker_meta() noexcept {
+#if CO_CONTEXT_IS_USING_EVENTFD
     co_spawn_event_fd = ::eventfd(0, 0);
     if (co_spawn_event_fd == -1) [[unlikely]] {
         log::e("Errors on eventfd(). errno = %d\n", errno);
         std::terminate();
     }
+#endif
 }
 
 worker_meta::~worker_meta() noexcept {
+#if CO_CONTEXT_IS_USING_EVENTFD
     if (co_spawn_event_fd != -1) [[likely]] {
         ::close(co_spawn_event_fd);
     }
-}
 #endif
+}
 
-void worker_meta::init(unsigned io_uring_entries) {
+void worker_meta::init(unsigned io_entries) {
     this->ctx_id = this_thread.ctx_id;
     this_thread.worker = this;
 
-    ring.init(io_uring_entries);
-
+#ifdef USE_IO_URING
+    ring.init(io_entries);
 #if CO_CONTEXT_IS_USING_MSG_RING
     this->ring_fd = ring.fd();
 #endif
-
-    if (!check_init(io_uring_entries)) {
+    if (!check_init(io_entries)) {
         std::terminate();
     }
+#endif
+
+#ifdef USE_EPOLL
+    poller.init(int(io_entries));
+#endif
 
 #ifdef CO_CONTEXT_USE_CPU_AFFINITY
 #error TODO: this part should be refactored.
@@ -77,6 +82,7 @@ void worker_meta::init(unsigned io_uring_entries) {
     log::i("io_context[%u] init a worker\n", detail::this_thread.ctx_id);
 }
 
+#ifdef USE_IO_URING
 bool worker_meta::check_init(unsigned expect_sqring_size) const noexcept {
     const unsigned actual_sqring_size = ring.get_sq_ring_entries();
 
@@ -100,7 +106,9 @@ bool worker_meta::check_init(unsigned expect_sqring_size) const noexcept {
 
     return true;
 }
+#endif
 
+#ifdef USE_IO_URING
 liburingcxx::sq_entry *worker_meta::get_free_sqe() noexcept {
     log::v("worker[%u] get_free_sqe\n", this_thread.ctx_id);
     ++requests_to_reap; // NOTE may required no reap or required multi-reap.
@@ -110,13 +118,25 @@ liburingcxx::sq_entry *worker_meta::get_free_sqe() noexcept {
     assert(sqe != nullptr);
     return sqe;
 }
+#endif
 
 #if CO_CONTEXT_IS_USING_EVENTFD
+#ifdef USE_IO_URING
 void worker_meta::listen_on_co_spawn() noexcept {
     auto *const sqe = get_free_sqe();
     sqe->prep_read(co_spawn_event_fd, as_buf(&co_spawn_event_buf), 0);
     sqe->set_data(static_cast<uint64_t>(reserved_user_data::co_spawn_event));
 }
+#endif
+#ifdef USE_EPOLL
+void worker_meta::listen_on_co_spawn() noexcept {
+    epoll_event e;
+    e.events = EPOLLIN;
+    e.data.u64 = static_cast<uint64_t>(reserved_user_data::co_spawn_event);
+    [[maybe_unused]] int res = poller.add(co_spawn_event_fd, e);
+    assert(res == 0);
+}
+#endif
 #endif
 
 std::coroutine_handle<> worker_meta::schedule() noexcept {
@@ -140,6 +160,7 @@ void worker_meta::work_once() {
 }
 
 void worker_meta::check_submission_threshold() noexcept {
+#ifdef USE_IO_URING
     if constexpr (config::submission_threshold != -1) {
         if (requests_to_submit >= config::submission_threshold) {
             [[maybe_unused]] int res = ring.submit_and_get_events();
@@ -147,9 +168,11 @@ void worker_meta::check_submission_threshold() noexcept {
             requests_to_submit = 0;
         }
     }
+#endif
 }
 
 void worker_meta::poll_submission() noexcept {
+#ifdef USE_IO_URING
     // submit sqes
     if (requests_to_submit) [[likely]] {
         bool will_wait = !has_task_ready();
@@ -157,6 +180,10 @@ void worker_meta::poll_submission() noexcept {
         assert(res >= 0 && "exception at uring::submit_and_wait");
         requests_to_submit = 0;
     }
+#endif
+#ifdef USE_EPOLL
+    requests_to_submit = 0;
+#endif
 }
 
 void worker_meta::forward_task(std::coroutine_handle<> handle) noexcept {
@@ -172,6 +199,7 @@ void worker_meta::forward_task(std::coroutine_handle<> handle) noexcept {
     cur.push();
 }
 
+#ifdef USE_IO_URING
 void worker_meta::handle_cq_entry(const liburingcxx::cq_entry *const cqe
 ) noexcept {
     --requests_to_reap;
@@ -231,6 +259,49 @@ void worker_meta::handle_cq_entry(const liburingcxx::cq_entry *const cqe
             assert(false && "handle_cq_entry(): unknown case");
     }
 }
+#endif
+
+#ifdef USE_EPOLL
+void worker_meta::handle_ep_event(const epoll_event *const e_ptr) noexcept {
+    --requests_to_reap;
+    log::v("ctx poll_completion found, remaining=%d\n", requests_to_reap);
+
+    const epoll_event e = *e_ptr;
+
+    if (config::is_log_d && (e.events & ~(EPOLLIN | EPOLLOUT))) {
+        log::d(
+            "worker_meta::handle_ep_event: unknown events type: %u\n", e.events
+        );
+    }
+
+    if constexpr (uint64_t(detail::reserved_user_data::none) > 0) {
+        if (e.data.u64 < uint64_t(detail::reserved_user_data::none))
+            [[unlikely]] {
+            handle_reserved_user_data(e.data.u64);
+            return;
+        }
+    }
+
+    assert((e.data.u64 & 0b111) == 0); // no multiplexer yet
+    const auto &data = *reinterpret_cast<epoll_fd_data *>(e.data.ptr);
+    if (e.events & EPOLLIN) {
+        // PERF check if this is necessary.
+        if (data.in.handle) [[likely]] {
+            forward_task(data.in.handle);
+        } else {
+            log::d("worker_meta::handle_ep_event: in.handler is nullptr\n");
+        }
+    }
+    if (e.events & EPOLLOUT) {
+        // NOTE the fd may be invaild due to async user code
+        if (data.out.handle) [[likely]] {
+            forward_task(data.out.handle);
+        } else {
+            log::d("worker_meta::handle_ep_event: out.handler is nullptr\n");
+        }
+    }
+}
+#endif
 
 void worker_meta::handle_reserved_user_data(const uint64_t user_data) noexcept {
     using mux = detail::reserved_user_data;
@@ -286,7 +357,10 @@ void worker_meta::handle_co_spawn_events() noexcept {
         co_spawn_local_queue.pop();
     }
 
+#ifdef USE_IO_URING
+    // regenerate reading request for io_uring
     listen_on_co_spawn();
+#endif
 }
 #endif
 

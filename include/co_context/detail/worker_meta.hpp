@@ -2,13 +2,14 @@
 
 #include "co_context/config.hpp"
 #include "co_context/detail/io_context_meta.hpp"
+#include "co_context/detail/poller_type.hpp"
 #include "co_context/detail/spsc_cursor.hpp"
 #include "co_context/detail/thread_meta.hpp"
-#include "co_context/detail/uring_type.hpp"
 #include "co_context/detail/user_data.hpp"
 #include "co_context/log/log.hpp"
 #include <coroutine>
 #include <cstdint>
+#include <cstring>
 #include <mutex>
 #include <queue>
 #include <thread>
@@ -33,11 +34,18 @@ struct worker_meta final {
      * Data sharing with the ring
      * ---------------------------------------------------
      */
+#ifdef USE_IO_URING
     // An instant of io_uring
     alignas(cache_line_size) uring ring;
-
 #if CO_CONTEXT_IS_USING_EVENTFD
     uint64_t co_spawn_event_buf = 0;
+#endif
+#endif
+
+#ifdef USE_EPOLL
+    using epoll_event = epoll::epoll_event;
+    using epoll_data_t = epoll::epoll_data_t;
+    alignas(cache_line_size) epoll poller;
 #endif
 
     /**
@@ -97,16 +105,16 @@ struct worker_meta final {
         return !reap_cur.is_empty();
     }
 
+#ifdef USE_IO_URING
     liburingcxx::sq_entry *get_free_sqe() noexcept;
 
     [[nodiscard]]
     bool is_ring_need_enter() const noexcept;
+#endif
 
 #if CO_CONTEXT_IS_USING_EVENTFD
     void listen_on_co_spawn() noexcept;
 #endif
-
-    void wait_uring() noexcept;
 
     [[nodiscard]]
     cur_t number_to_schedule() const noexcept {
@@ -114,11 +122,7 @@ struct worker_meta final {
         return cur.size();
     }
 
-    // Get a coroutine to run. Guarantee to be non-null.
-    [[nodiscard]]
-    std::coroutine_handle<> schedule() noexcept;
-
-    void init(unsigned io_uring_entries);
+    void init(unsigned io_entries);
 
     void co_spawn_unsafe(std::coroutine_handle<> handle) noexcept;
 
@@ -140,12 +144,23 @@ struct worker_meta final {
     void poll_submission() noexcept;
 
     /**
-     * @brief poll the uring completion queue
+     * @brief poll the uring completion queue (Nonblocking)
      *
-     * @return number of cqes handled by worker
+     * @return number of cqes/events handled by worker
      */
     uint32_t poll_completion() noexcept;
 
+    /**
+     * @brief poll the uring completion queue (Blocking)
+     *
+     * @return number of cqes/events handled by worker
+     */
+    uint32_t wait_and_poll_completion() noexcept;
+
+    explicit worker_meta() noexcept;
+    ~worker_meta() noexcept;
+
+  private:
     /**
      * @brief forward a coroutine to the reap_swap.
      * @warning The reap_swap will not be checked for full.
@@ -153,24 +168,32 @@ struct worker_meta final {
     void forward_task(std::coroutine_handle<> handle) noexcept;
 
     /**
+     * @brief Get a coroutine to run. Guarantee to be non-null.
+     */
+    [[nodiscard]]
+    std::coroutine_handle<> schedule() noexcept;
+
+#ifdef USE_IO_URING
+    /**
      * @brief handle an non-null cq_entry from the cq of io_uring
      */
     void handle_cq_entry(const liburingcxx::cq_entry *) noexcept;
+#endif
+
+#ifdef USE_EPOLL
+    void handle_ep_event(const epoll_event *) noexcept;
+#endif
 
     void handle_reserved_user_data(uint64_t user_data) noexcept;
 
 #if CO_CONTEXT_IS_USING_EVENTFD
     void handle_co_spawn_events() noexcept;
-    explicit worker_meta() noexcept;
-    ~worker_meta() noexcept;
-#else
-    explicit worker_meta() noexcept = default;
-    ~worker_meta() noexcept = default;
 #endif
 
-  private:
+#ifdef USE_IO_URING
     [[nodiscard]]
     bool check_init(unsigned expect_sqring_size) const noexcept;
+#endif
 };
 
 inline void worker_meta::co_spawn_unsafe(std::coroutine_handle<> handle
@@ -216,7 +239,7 @@ inline void worker_meta::co_spawn_safe_msg_ring(std::coroutine_handle<> handle
 inline void worker_meta::co_spawn_auto(std::coroutine_handle<> handle
 ) noexcept {
     // MT-unsafe in some scenes (for meta.ready_count == 0)
-    // before calling io_context::start(), this_thread.ctx is nullptr.
+    // before calling io_context::start(), this_thread.worker is nullptr.
     if (detail::this_thread.worker == this
         || io_context_meta.ready_count == 0) {
         this->co_spawn_unsafe(handle);
@@ -230,22 +253,32 @@ inline void worker_meta::co_spawn_auto(std::coroutine_handle<> handle
 }
 
 inline uint32_t worker_meta::poll_completion() noexcept {
+#ifdef USE_IO_URING
     using cq_entry = liburingcxx::cq_entry;
-
-    uint32_t num = ring.for_each_cqe([this](const cq_entry *cqe) noexcept {
+    return ring.for_each_cqe([this](const cq_entry *cqe) noexcept {
         this->handle_cq_entry(cqe);
     });
-
-    return num;
+#endif
+#ifdef USE_EPOLL
+    // non-blocking epoll_wait
+    return poller.wait_and_for_each_event(
+        [this](const epoll_event *e) noexcept { this->handle_ep_event(e); }, 0
+    );
+#endif
 }
 
-inline bool worker_meta::is_ring_need_enter() const noexcept {
-    return ring.is_cq_ring_need_enter();
-}
-
-inline void worker_meta::wait_uring() noexcept {
+inline uint32_t worker_meta::wait_and_poll_completion() noexcept {
+#ifdef USE_IO_URING
     [[maybe_unused]] const liburingcxx::cq_entry *_;
     ring.wait_cq_entry(_);
+    return poll_completion();
+#endif
+#ifdef USE_EPOLL
+    // TODO add timer
+    return poller.wait_and_for_each_event(
+        [this](const epoll_event *e) noexcept { this->handle_ep_event(e); }, -1
+    );
+#endif
 }
 
 } // namespace co_context::detail

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "co_context/config.hpp"
 #include "co_context/lazy_io.hpp"
 #include "co_context/net/inet_address.hpp"
 #include <netinet/in.h>
@@ -93,14 +94,21 @@ class socket {
 };
 
 inline socket socket::create_tcp(sa_family_t family) {
-    const int sockfd =
-        ::socket(family, SOCK_STREAM | SOCK_CLOEXEC, IPPROTO_TCP);
+    constexpr int blocking_flag =
+        config::is_socket_nonblocking ? SOCK_NONBLOCK : 0;
+    const int sockfd = ::socket(
+        family, SOCK_STREAM | SOCK_CLOEXEC | blocking_flag, IPPROTO_TCP
+    );
     assert(sockfd >= 0);
     return socket{sockfd};
 }
 
 inline socket socket::create_udp(sa_family_t family) {
-    const int sockfd = ::socket(family, SOCK_DGRAM | SOCK_CLOEXEC, IPPROTO_UDP);
+    constexpr int blocking_flag =
+        config::is_socket_nonblocking ? SOCK_NONBLOCK : 0;
+    const int sockfd = ::socket(
+        family, SOCK_DGRAM | SOCK_CLOEXEC | blocking_flag, IPPROTO_UDP
+    );
     assert(sockfd >= 0);
     return socket{sockfd};
 }
