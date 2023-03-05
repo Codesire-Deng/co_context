@@ -642,27 +642,6 @@ inline namespace lazy {
     }
 #endif
 
-    [[CO_CONTEXT_AWAIT_HINT]]
-    inline detail::lazy_yield yield() noexcept {
-        return {};
-    }
-
-    [[CO_CONTEXT_AWAIT_HINT]]
-    inline detail::lazy_who_am_i who_am_i() noexcept {
-        return {};
-    }
-
-    [[CO_CONTEXT_AWAIT_HINT]]
-    inline detail::lazy_forget forget() noexcept {
-        return {};
-    }
-
-    [[CO_CONTEXT_AWAIT_HINT]]
-    inline detail::lazy_resume_on
-    resume_on(co_context::io_context &resume_context) noexcept {
-        return detail::lazy_resume_on{resume_context};
-    }
-
 } // namespace lazy
 
 } // namespace co_context

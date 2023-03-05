@@ -161,3 +161,5 @@ inline auto &this_io_context() noexcept {
 }
 
 } // namespace co_context
+
+#include "co_context/detail/lazy_utils.hpp"

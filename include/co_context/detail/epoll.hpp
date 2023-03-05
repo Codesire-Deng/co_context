@@ -167,9 +167,10 @@ class epoll final {
 
     auto &make_fd_data(int fd) noexcept {
         assert(fd >= 0);
-        if (size_t(fd) >= fd_data.size()) {
+        if (size_t(fd) >= fd_data.size()) [[unlikely]] {
             fd_data.resize(size_t(fd) * 2);
         }
+        // PERF do not zero_memset the fd_data[fd]
         return fd_data[fd];
     }
 };
