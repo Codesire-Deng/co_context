@@ -136,6 +136,13 @@ inline namespace lazy {
     }
 
     [[CO_CONTEXT_AWAIT_HINT]]
+    inline detail::lazy_fsync fsync(
+        int fd, uint32_t fsync_flags, uint64_t offset, uint32_t len
+    ) noexcept {
+        return detail::lazy_fsync{fd, fsync_flags, offset, len};
+    }
+
+    [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_uring_nop uring_nop() noexcept {
         return detail::lazy_uring_nop{};
     }
