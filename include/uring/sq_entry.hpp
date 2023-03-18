@@ -678,6 +678,7 @@ class sq_entry final : private io_uring_sqe {
     }
 #endif
 
+// NOTE unconfirmed
 #if LIBURINGCXX_IS_KERNEL_REACH(6, 2)
     inline sq_entry &prep_msg_ring_cqe_flags(
         int fd,
@@ -690,6 +691,30 @@ class sq_entry final : private io_uring_sqe {
         this->msg_ring_flags = IORING_MSG_RING_FLAGS_PASS | flags;
         this->file_index = cqe_flags;
         return *this;
+    }
+#endif
+
+// NOTE unconfirmed
+#if LIBURINGCXX_IS_KERNEL_REACH(6, 3)
+    inline sq_entry &prep_msg_ring_fd(
+        int fd, int source_fd, int target_fd, uint64_t data, uint32_t flags
+    ) {
+        prep_rw(
+            IORING_OP_MSG_RING, fd, (void *)(uintptr_t)IORING_MSG_SEND_FD, 0,
+            data
+        );
+        msg_ring_flags = flags;
+        set_target_fixed_file(target_fd);
+        addr3 = source_fd;
+        return *this;
+    }
+
+    inline sq_entry &prep_msg_ring_fd_alloc(
+        int fd, int source_fd, uint64_t data, uint32_t flags
+    ) {
+        return prep_msg_ring_fd(
+            fd, source_fd, IORING_FILE_INDEX_ALLOC - 1, data, flags
+        );
     }
 #endif
 
