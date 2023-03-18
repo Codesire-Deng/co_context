@@ -259,6 +259,12 @@ struct lazy_fsync : lazy_awaiter {
     inline lazy_fsync(int fd, uint32_t fsync_flags) noexcept {
         sqe->prep_fsync(fd, fsync_flags);
     }
+
+    inline lazy_fsync(
+        int fd, uint32_t fsync_flags, uint64_t offset, uint32_t len
+    ) noexcept {
+        sqe->prep_fsync(fd, fsync_flags, offset, len);
+    }
 };
 
 struct lazy_uring_nop : lazy_awaiter {

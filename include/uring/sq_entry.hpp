@@ -289,6 +289,14 @@ class sq_entry final : private io_uring_sqe {
         return *this;
     }
 
+    inline sq_entry &prep_fsync(
+        int fd, uint32_t fsync_flags, uint64_t offset, uint32_t len
+    ) noexcept {
+        prep_rw(IORING_OP_FSYNC, fd, nullptr, len, offset);
+        this->fsync_flags = fsync_flags;
+        return *this;
+    }
+
     inline sq_entry &prep_nop() noexcept {
         return prep_rw(IORING_OP_NOP, -1, nullptr, 0, 0);
     }
