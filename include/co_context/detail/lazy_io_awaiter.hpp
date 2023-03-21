@@ -314,18 +314,17 @@ struct lazy_timeout_base : lazy_awaiter {
     }
 };
 
-inline constexpr uint32_t pure_timer_flag = IORING_TIMEOUT_ETIME_SUCCESS;
+inline constexpr uint32_t pure_timer_flag =
+    liburingcxx::is_kernel_reach(6, 0) ? IORING_TIMEOUT_ETIME_SUCCESS : 0;
 
-inline constexpr uint32_t timeout_relative_flag = 0
-#if LIBURINGCXX_IS_KERNEL_REACH(5, 15)
-                                                  | IORING_TIMEOUT_BOOTTIME
-#endif
-    ;
+inline constexpr uint32_t timeout_relative_flag =
+    liburingcxx::is_kernel_reach(5, 15) ? IORING_TIMEOUT_BOOTTIME : 0;
 
 inline constexpr uint32_t timeout_absolute_steady_flag = IORING_TIMEOUT_ABS;
 
 inline constexpr uint32_t timeout_absolute_realtime_flag =
-    IORING_TIMEOUT_ABS | IORING_TIMEOUT_REALTIME;
+    IORING_TIMEOUT_ABS
+    | (liburingcxx::is_kernel_reach(5, 15) ? IORING_TIMEOUT_REALTIME : 0);
 
 struct lazy_timeout : lazy_timeout_base {
     template<class Rep, class Period>
