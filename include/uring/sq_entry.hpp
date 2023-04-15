@@ -345,8 +345,17 @@ class sq_entry final : private io_uring_sqe {
         int flags,
         uint32_t file_index
     ) noexcept {
-        return prep_accept(fd, addr, addrlen, flags)
-            .set_target_fixed_file(file_index);
+        prep_accept(fd, addr, addrlen, flags);
+        set_target_fixed_file(file_index);
+        return *this;
+    }
+
+    inline sq_entry &prep_accept_direct_alloc(
+        int fd, sockaddr *addr, socklen_t *addrlen, int flags
+    ) noexcept {
+        return prep_accept_direct(
+            fd, addr, addrlen, flags, IORING_FILE_INDEX_ALLOC - 1
+        );
     }
 
 #if LIBURINGCXX_IS_KERNEL_REACH(5, 19)
@@ -424,8 +433,18 @@ class sq_entry final : private io_uring_sqe {
     inline sq_entry &prep_openat_direct(
         int dfd, const char *path, int flags, mode_t mode, unsigned file_index
     ) noexcept {
-        return prep_openat(dfd, path, flags, mode)
-            .set_target_fixed_file(file_index);
+        prep_openat(dfd, path, flags, mode);
+        set_target_fixed_file(file_index);
+        return *this;
+    }
+
+    /* open directly into the fixed file table */
+    inline sq_entry &prep_openat_direct_alloc(
+        int dfd, const char *path, int flags, mode_t mode
+    ) noexcept {
+        return prep_openat_direct(
+            dfd, path, flags, mode, IORING_FILE_INDEX_ALLOC - 1
+        );
     }
 
     inline sq_entry &prep_close(int fd) noexcept {
@@ -551,7 +570,16 @@ class sq_entry final : private io_uring_sqe {
     inline sq_entry &prep_openat2_direct(
         int dfd, const char *path, struct open_how *how, unsigned file_index
     ) noexcept {
-        return prep_openat2(dfd, path, how).set_target_fixed_file(file_index);
+        prep_openat2(dfd, path, how);
+        set_target_fixed_file(file_index);
+        return *this;
+    }
+
+    /* open directly into the fixed file table */
+    inline sq_entry &prep_openat2_direct_alloc(
+        int dfd, const char *path, struct open_how *how
+    ) noexcept {
+        return prep_openat2_direct(dfd, path, how, IORING_FILE_INDEX_ALLOC - 1);
     }
 
     inline sq_entry &
@@ -784,15 +812,16 @@ class sq_entry final : private io_uring_sqe {
     ) {
         prep_rw(IORING_OP_SOCKET, domain, nullptr, protocol, type);
         this->rw_flags = static_cast<int>(flags);
-        return set_target_fixed_file(file_index);
+        set_target_fixed_file(file_index);
+        return *this;
     }
 
     inline sq_entry &prep_socket_direct_alloc(
         int domain, int type, int protocol, unsigned int flags
     ) {
-        prep_rw(IORING_OP_SOCKET, domain, nullptr, protocol, type);
-        this->rw_flags = static_cast<int>(flags);
-        return set_target_fixed_file(IORING_FILE_INDEX_ALLOC - 1);
+        return prep_socket_direct(
+            domain, type, protocol, IORING_FILE_INDEX_ALLOC - 1, flags
+        );
     }
 };
 
