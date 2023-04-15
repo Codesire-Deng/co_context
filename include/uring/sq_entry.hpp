@@ -415,7 +415,7 @@ class sq_entry final : private io_uring_sqe {
     }
 
     inline sq_entry &
-    prep_fallocate(int fd, int mode, off_t offset, off_t len) noexcept {
+    prep_fallocate(int fd, int mode, uint64_t offset, uint64_t len) noexcept {
         return prep_rw(
             IORING_OP_FALLOCATE, fd, reinterpret_cast<void *>(uintptr_t(len)),
             (uint32_t)mode, (uint64_t)offset
