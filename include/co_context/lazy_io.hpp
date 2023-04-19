@@ -311,7 +311,7 @@ inline namespace lazy {
 
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_fallocate
-    fallocate(int fd, int mode, off_t offset, off_t len) noexcept {
+    fallocate(int fd, int mode, uint64_t offset, uint64_t len) noexcept {
         return detail::lazy_fallocate{fd, mode, offset, len};
     }
 

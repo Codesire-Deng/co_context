@@ -513,7 +513,9 @@ struct lazy_files_update : lazy_awaiter {
 };
 
 struct lazy_fallocate : lazy_awaiter {
-    inline lazy_fallocate(int fd, int mode, off_t offset, off_t len) noexcept {
+    inline lazy_fallocate(
+        int fd, int mode, uint64_t offset, uint64_t len
+    ) noexcept {
         sqe->prep_fallocate(fd, mode, offset, len);
     }
 };
