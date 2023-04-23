@@ -19,7 +19,7 @@ consteval bool is_kernel_reach(int major, int minor) noexcept {
 
 } // namespace liburingcxx
 
-#define LIBURINGCXX_IS_KERNEL_REACH(major, minor) \
-    ((LIBURINGCXX_KERNEL_VERSION_MAJOR > (major))      \
-     || (LIBURINGCXX_KERNEL_VERSION_MAJOR == (major)   \
+#define LIBURINGCXX_IS_KERNEL_REACH(major, minor)    \
+    ((LIBURINGCXX_KERNEL_VERSION_MAJOR > (major))    \
+     || (LIBURINGCXX_KERNEL_VERSION_MAJOR == (major) \
          && LIBURINGCXX_KERNEL_VERSION_MINOR >= (minor)))

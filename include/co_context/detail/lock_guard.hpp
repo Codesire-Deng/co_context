@@ -21,11 +21,9 @@ class [[nodiscard("Remember to hold the lock_guard.")]] lock_guard final {
     static_assert(unlockable<mutex_t>);
 
   public:
-    explicit lock_guard(mutex_t & mtx) noexcept : mtx(mtx) {
-    }
-    ~lock_guard() noexcept {
-        mtx.unlock();
-    }
+    explicit lock_guard(mutex_t &mtx) noexcept : mtx(mtx) {}
+
+    ~lock_guard() noexcept { mtx.unlock(); }
 
     lock_guard(const lock_guard &) = delete;
 #ifdef __INTELLISENSE__
@@ -35,12 +33,12 @@ class [[nodiscard("Remember to hold the lock_guard.")]] lock_guard final {
         "who doesn't sense RVO. "
         "You should NEVER use this explicitly or implicitly.")]]
     // clang-format on
-    lock_guard(lock_guard && other) noexcept
+    lock_guard(lock_guard &&other) noexcept
         : mtx(other.mtx) {
         assert(false && "Mandatory copy elision failed!");
     };
 #else
-    lock_guard(lock_guard && other) = delete;
+    lock_guard(lock_guard &&other) = delete;
 #endif
 
     lock_guard &operator=(const lock_guard &) = delete;
