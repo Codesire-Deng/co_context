@@ -75,8 +75,7 @@ class lazy_awaiter {
 
     friend void set_link_awaiter(lazy_awaiter &awaiter) noexcept;
 
-    lazy_awaiter() noexcept {
-        sqe = this_thread.worker->get_free_sqe();
+    lazy_awaiter() noexcept : sqe(this_thread.worker->get_free_sqe()) {
         sqe->set_data(
             io_info.as_user_data() | uint64_t(user_data_type::task_info_ptr)
         );
