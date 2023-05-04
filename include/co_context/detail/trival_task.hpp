@@ -16,7 +16,7 @@ class trival_task {
 
     struct final_awaiter {
         [[nodiscard]]
-        static consteval bool await_ready() noexcept {
+        static constexpr bool await_ready() noexcept {
             return false;
         }
 
@@ -46,9 +46,9 @@ class trival_task {
                 std::coroutine_handle<promise_type>::from_promise(*this)};
         }
 
-        consteval void unhandled_exception() noexcept {};
+        constexpr void unhandled_exception() noexcept {}
 
-        consteval void return_void() noexcept {}
+        constexpr void return_void() noexcept {}
     };
 
     static constexpr bool await_ready() noexcept { return false; }

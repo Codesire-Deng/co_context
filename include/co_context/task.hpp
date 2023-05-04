@@ -29,10 +29,7 @@ namespace detail {
      */
     template<typename T>
     struct task_final_awaiter {
-        [[nodiscard]]
-        consteval bool await_ready() const noexcept {
-            return false;
-        }
+        static constexpr bool await_ready() noexcept { return false; }
 
         template<std::derived_from<task_promise_base<T>> Promise>
         std::coroutine_handle<>
@@ -49,7 +46,7 @@ namespace detail {
      */
     template<>
     struct task_final_awaiter<void> {
-        static consteval bool await_ready() noexcept { return false; }
+        static constexpr bool await_ready() noexcept { return false; }
 
         template<std::derived_from<task_promise_base<void>> Promise>
         std::coroutine_handle<>
@@ -81,11 +78,11 @@ namespace detail {
       public:
         task_promise_base() noexcept = default;
 
-        inline consteval std::suspend_always initial_suspend() noexcept {
+        inline constexpr std::suspend_always initial_suspend() noexcept {
             return {};
         }
 
-        inline consteval task_final_awaiter<T> final_suspend() noexcept {
+        inline constexpr task_final_awaiter<T> final_suspend() noexcept {
             return {};
         }
 
@@ -184,7 +181,7 @@ namespace detail {
 
         task<void> get_return_object() noexcept;
 
-        consteval void return_void() noexcept {}
+        constexpr void return_void() noexcept {}
 
         void unhandled_exception() {
             if (is_detached_flag == is_detached) {
