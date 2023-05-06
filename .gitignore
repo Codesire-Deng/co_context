@@ -52,6 +52,8 @@ _deps
 !.vscode/launch.json
 !.vscode/extensions.json
 !.vscode/*.code-snippets
+# Visual Studio Code
+.idea
 
 # Local History for Visual Studio Code
 .history/
