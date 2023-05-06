@@ -1,0 +1,10 @@
+root = true
+
+[{*cpp,*.hpp,*.h，*.c}]
+end_of_line = lf                 # 设置换行符，值为lf、cr和crlf
+indent_style = space             # 设置缩进为 tab 或 space
+tab_width = 4                    # 设置 tab 所占列数。默认是indent_size
+indent_size = 4                  # 设置缩进所占列数，如果 indent_style 为 tab，则以 tab_width 值作为缩进宽度
+charset = utf-8                  # 设置编码，值为latin1、utf-8、utf-8-bom、utf-16be和utf-16le，不建议使用utf-8-bom
+insert_final_newline = true      # 设为 true 表示使文件以一个空白行结尾 - posix 标准
+trim_trailing_whitespace = false # 设为 true 表示会去除行尾的空白字符
