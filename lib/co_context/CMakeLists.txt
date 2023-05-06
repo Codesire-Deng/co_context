@@ -7,6 +7,6 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 target_link_libraries(co_context PUBLIC Threads::Threads)
 
-if (mi_version)
+if (WITH_MIMALLOC)
     target_link_libraries(co_context PUBLIC mimalloc)
 endif()
