@@ -12,3 +12,10 @@ foreach(v ${all_examples})
     endif()
     # target_link_libraries(${target_name} PUBLIC uring) # link axboe/liburing
 endforeach()
+
+if(BUILD_CUDA)
+    add_executable(cuda cuda.cu $<TARGET_OBJECTS:co_context>)
+    if (mi_version)
+        target_link_libraries(cuda PUBLIC mimalloc)
+    endif()
+endif()

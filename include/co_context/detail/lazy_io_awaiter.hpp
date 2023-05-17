@@ -11,6 +11,9 @@
 #include <cstdint>
 #include <span>
 #include <type_traits>
+#ifdef CO_CONTEXT_ENABLE_CUDA
+#include <cuda_runtime.h>
+#endif
 
 namespace co_context::detail {
 
@@ -898,6 +901,37 @@ class lazy_resume_on {
   private:
     co_context::io_context &resume_ctx;
 };
+
+#ifdef CO_CONTEXT_ENABLE_CUDA
+class lazy_cuda_stream_synchronize {
+  public:
+    static constexpr bool await_ready() noexcept { return false; }
+
+    void await_suspend(std::coroutine_handle<> current) noexcept {
+        worker = detail::this_thread.worker;
+        handle = current;
+        cudaLaunchHostFunc(
+            stream,
+            [](void *user_data) noexcept {
+                auto *awaiter =
+                    reinterpret_cast<lazy_cuda_stream_synchronize *>(user_data);
+                awaiter->worker->co_spawn_auto(awaiter->handle);
+            },
+            this
+        );
+    }
+
+    constexpr void await_resume() const noexcept {}
+
+    explicit lazy_cuda_stream_synchronize(cudaStream_t stream) noexcept
+        : stream(stream) {}
+
+  private:
+    worker_meta *worker;
+    std::coroutine_handle<> handle;
+    cudaStream_t stream;
+};
+#endif
 
 /****************************
  *    Helper for link_io    *

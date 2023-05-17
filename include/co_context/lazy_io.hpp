@@ -631,6 +631,13 @@ inline namespace lazy {
         return detail::lazy_resume_on{resume_context};
     }
 
+#ifdef CO_CONTEXT_ENABLE_CUDA
+    [[CO_CONTEXT_AWAIT_HINT]]
+    inline detail::lazy_cuda_stream_synchronize
+    cuda_stream_synchronize(cudaStream_t stream) noexcept {
+        return detail::lazy_cuda_stream_synchronize{stream};
+    }
+#endif
 } // namespace lazy
 
 } // namespace co_context
