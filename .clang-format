@@ -6,10 +6,10 @@ Language: Cpp
 # AlignAfterOpenBracket: AlwaysBreak # BlockIndent
 AlignAfterOpenBracket: BlockIndent # BlockIndent
 AlignArrayOfStructures: Right
-AlignConsecutiveBitFields: true
-AlignConsecutiveMacros: true
+AlignConsecutiveBitFields: "Consecutive"
+AlignConsecutiveMacros: "Consecutive"
 AlignEscapedNewlines: Left
-AlignOperands: true
+AlignOperands: "Align"
 AlignTrailingComments: true
 AllowAllArgumentsOnNextLine: true
 AllowAllConstructorInitializersOnNextLine: true
@@ -60,7 +60,7 @@ ReflowComments: true
 RequiresClausePosition: OwnLine # clang-format 15
 SeparateDefinitionBlocks: Always
 ShortNamespaceLines: 5
-SortIncludes:    false
+SortIncludes: "Never"
 SortUsingDeclarations: false
 SpaceAfterCStyleCast: false
 SpaceAfterLogicalNot: false
@@ -75,13 +75,13 @@ SpaceBeforeSquareBrackets: false
 SpaceInEmptyBlock: false
 SpaceInEmptyParentheses: false
 SpacesBeforeTrailingComments: 1
-SpacesInAngles:  false
+SpacesInAngles: "Never"
 SpacesInCStyleCastParentheses: false
 SpacesInConditionalStatement: false
 SpacesInContainerLiterals: true
 SpacesInParentheses: false
 SpacesInSquareBrackets: false
 Standard: Latest
-UseCRLF:         false
-UseTab:          Never
----
+UseCRLF: false
+UseTab: Never
+...

@@ -228,7 +228,7 @@ class stop_token {
             do {
                 if (old & stop_requested_bit) // stop request already made
                 {
-                    cb->run();                // run synchronously
+                    cb->run(); // run synchronously
                     return false;
                 }
 
