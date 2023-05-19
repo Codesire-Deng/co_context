@@ -7,7 +7,7 @@ foreach(v ${all_tests})
     string(REGEX REPLACE ".cpp" "" target_name ${target_name})
 
     add_executable(${target_name} ${v} $<TARGET_OBJECTS:co_context>)
-    if (mi_version)
+    if (USE_MIMALLOC)
         target_link_libraries(${target_name} PUBLIC mimalloc)
     endif()
     # target_link_libraries(${target_name} PUBLIC uring) // link axboe/liburing

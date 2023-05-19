@@ -1,5 +1,4 @@
-
-#ifdef USE_MIMALLOC
+#ifdef CO_CONTEXT_USE_MIMALLOC
 #include <mimalloc-new-delete.h>
 #endif
 #include "co_context/config.hpp"
