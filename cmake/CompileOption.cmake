@@ -1,8 +1,8 @@
 # ----------------------------------------------------------------------------
 #   check options
 # ----------------------------------------------------------------------------
-include(${PROJECT_SOURCE_DIR}/cmake/check_compile.cmake)
-include(${PROJECT_SOURCE_DIR}/cmake/check_system.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/check/check_compile.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/check/check_system.cmake)
 
 # ----------------------------------------------------------------------------
 #   compile options
@@ -12,6 +12,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
+    message(NOTICE "Setting default CMAKE_BUILD_TYPE to Release")
 endif()
 
 set(CMAKE_CXX_FLAGS_RELEASE)
@@ -43,9 +44,15 @@ endif()
 # Optional mimalloc.
 if(WITH_MIMALLOC)
     find_package(mimalloc 2.0 REQUIRED)
-    add_compile_definitions(USE_MIMALLOC)
-    message(NOTICE "mimalloc ${WITH_MIMALLOC} enabled")
 else()
     find_package(mimalloc QUIET)
+endif()
+
+if (mi_version)
+    add_compile_definitions(CO_CONTEXT_USE_MIMALLOC)
+    set(USE_MIMALLOC ON)
+    message(NOTICE "mimalloc ${mi_version} enabled")
+else()
+    set(USE_MIMALLOC OFF)
     message(WARNING "mimalloc disabled")
 endif()

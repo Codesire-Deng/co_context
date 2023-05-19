@@ -24,12 +24,12 @@ if(ENABLE_COVERAGE_TEST)
     endif()
 endif()
 
-if(BUILD_TESTS)
+if(BUILD_TEST)
     enable_testing()
     add_subdirectory(${PROJECT_SOURCE_DIR}/test)
 endif()
 
-if(BUILD_PERF_TESTS)
+if(BUILD_PERF_TEST)
     enable_testing()
 endif()
 
