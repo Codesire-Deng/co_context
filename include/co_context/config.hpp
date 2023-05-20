@@ -103,7 +103,7 @@ namespace config {
      * to or slightly grater than the threshold.
      */
     inline constexpr uint32_t submission_threshold = 32;
-    // inline constexpr uint32_t submission_threshold = -1;
+    // inline constexpr uint32_t submission_threshold = -1U;
     // ========================================================================
 
     // ========================== net configuration ===========================

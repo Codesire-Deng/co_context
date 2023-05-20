@@ -71,7 +71,7 @@ namespace config {
 
 }; // namespace config
 
-constexpr uint64_t LIBURING_UDATA_TIMEOUT = -1;
+constexpr uint64_t LIBURING_UDATA_TIMEOUT = -1ULL;
 
 struct uring_params final : io_uring_params {
     /**

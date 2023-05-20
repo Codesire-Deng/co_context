@@ -741,7 +741,7 @@ class sq_entry final : private io_uring_sqe {
         int fd, int source_fd, uint64_t data, uint32_t flags
     ) {
         return prep_msg_ring_fd(
-            fd, source_fd, IORING_FILE_INDEX_ALLOC - 1, data, flags
+            fd, source_fd, int(IORING_FILE_INDEX_ALLOC - 1), data, flags
         );
     }
 #endif

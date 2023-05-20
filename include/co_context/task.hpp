@@ -198,7 +198,7 @@ namespace detail {
         }
 
       private:
-        inline static constexpr uintptr_t is_detached = -1;
+        inline static constexpr uintptr_t is_detached = -1ULL;
 
         union {
             uintptr_t is_detached_flag; // set to `is_detached` if is detached.
