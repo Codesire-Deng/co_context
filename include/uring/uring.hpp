@@ -544,6 +544,7 @@ int uring<uring_flags>::register_ring_fd() {
 
     struct io_uring_rsrc_update up = {
         .offset = -1U,
+        .resv = 0,
         .data = (uint64_t)this->ring_fd,
     };
 
