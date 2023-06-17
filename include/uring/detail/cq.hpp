@@ -1,6 +1,6 @@
 #pragma once
 
-#include "uring/cq_entry.hpp"
+#include <uring/cq_entry.hpp>
 
 namespace liburingcxx {
 

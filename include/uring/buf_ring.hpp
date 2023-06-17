@@ -1,7 +1,8 @@
 #pragma once
 
-#include "uring/barrier.h"
-#include "uring/io_uring.h"
+#include <uring/barrier.h>
+#include <uring/io_uring.h>
+
 #include <cstdint>
 
 namespace liburingcxx {

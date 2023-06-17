@@ -1,8 +1,9 @@
 #pragma once
 
-#include "uring/barrier.h"
-#include "uring/sq_entry.hpp"
-#include "uring/uring_define.hpp"
+#include <uring/barrier.h>
+#include <uring/sq_entry.hpp>
+#include <uring/uring_define.hpp>
+
 #include <cassert>
 #include <numeric>
 
