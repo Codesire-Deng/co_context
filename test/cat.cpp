@@ -2,7 +2,7 @@
  *  Concatenate files and print on the standard output, using co_context.
  */
 
-#include "co_context/lazy_io.hpp"
+#include <co_context/lazy_io.hpp>
 #include <filesystem>
 #include <iostream>
 #include <vector>
