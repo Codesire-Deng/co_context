@@ -1,7 +1,4 @@
-#include "co_context/all.hpp"
-#include "co_context/co/stop_token.hpp"
-#include "co_context/io_context.hpp"
-#include "co_context/lazy_io.hpp"
+#include <co_context/all.hpp>
 using namespace co_context;
 using namespace std::chrono_literals;
 
