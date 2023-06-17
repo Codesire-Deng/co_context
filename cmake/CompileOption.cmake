@@ -7,8 +7,7 @@ include(${PROJECT_SOURCE_DIR}/cmake/check/check_system.cmake)
 # ----------------------------------------------------------------------------
 #   compile options
 # ----------------------------------------------------------------------------
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+target_compile_features(co_context PUBLIC cxx_std_20)
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
@@ -36,7 +35,7 @@ unset(kernel_version)
 include(CheckIPOSupported)
 check_ipo_supported(RESULT is_support_IPO OUTPUT output_support_IPO)
 if(is_support_IPO)
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+    set_target_properties(co_context PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
 else()
     message(WARNING "IPO is not supported: ${output_support_IPO}")
 endif()
@@ -49,10 +48,18 @@ else()
 endif()
 
 if (mi_version)
-    add_compile_definitions(CO_CONTEXT_USE_MIMALLOC)
+    target_compile_definitions(co_context PRIVATE CO_CONTEXT_USE_MIMALLOC)
     set(USE_MIMALLOC ON)
     message(NOTICE "mimalloc ${mi_version} enabled")
 else()
     set(USE_MIMALLOC OFF)
     message(WARNING "mimalloc disabled")
+endif()
+
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+target_link_libraries(co_context PRIVATE Threads::Threads)
+
+if (USE_MIMALLOC)
+    target_link_libraries(co_context PRIVATE mimalloc)
 endif()

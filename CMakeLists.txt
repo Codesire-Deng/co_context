@@ -1,10 +1,13 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.12)
 
 project(co_context
-        VERSION 0.8.3
+        VERSION 0.9.0
         LANGUAGES CXX)
 
-include_directories(./include)
+include(cmake/Policy.cmake NO_POLICY_SCOPE)
+
+add_library(co_context OBJECT)
+target_include_directories(co_context PUBLIC ./include)
 
 include(cmake/Option.cmake)
 include(cmake/CompileOption.cmake)
