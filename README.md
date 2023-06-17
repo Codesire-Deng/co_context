@@ -11,16 +11,6 @@
 co_context 是一个**协程**并发框架，提供可靠的**性能**和强**易用性**，让 C++ 初学者也能轻松写出高并发程序。
 co_context 基于 Linux [io_uring](https://github.com/axboe/liburing)，其性能通常优于 epoll。
 
-## 特性
-
-1. 采用 POSIX 接口：不熟的查 `man` 就行。
-2. 极简 taskflow：
-   - 拒绝回调
-   - 用 `all(A, B, C...)` 等待所有并发任务完成 [*demo*](example/when_all.cpp)
-   - 用 `any(A, B, C...)` 等待一个并发任务完成 [*demo*](example/when_any.cpp)
-   - 用 `timeout(time)` 一行代码做定时器 [*demo*](#一秒触发器)
-   - 用 `timeout(io, time)` 做限时 IO [*demo*](#网络超时)
-
 ## 已有功能
 
 1. 支持 `read` `write` `accept` `timeout` 等 io_uring 提供的所有系统调用，总计 74 个功能。
@@ -171,7 +161,7 @@ void log_error(int err) {
 
 #### Generator
 
-炫到没朋友的生成器，可配合`std::range`。 *需要 g++*
+同步执行的生成器，可配合`std::range`。 *需要 g++*
 
 ```cpp
 co_context::generator<int> gen_iota(int x) {
