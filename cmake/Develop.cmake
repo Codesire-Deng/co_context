@@ -11,8 +11,9 @@ if(ENABLE_SANITIZER AND NOT MSVC)
         include(${CMAKE_CURRENT_LIST_DIR}/check/check_asan.cmake)
         check_asan(HAS_ASAN)
         if(HAS_ASAN)
-            add_compile_options(-fsanitize=undefined,address,leak
-                                -fno-omit-frame-pointer)
+            target_compile_options(co_context
+                PUBLIC -fsanitize=undefined,address,leak
+                PUBLIC -fno-omit-frame-pointer)
         else()
             message(WARNING "sanitizer is no supported with current tool-chains")
         endif()
@@ -22,8 +23,9 @@ if(ENABLE_SANITIZER AND NOT MSVC)
 endif()
 
 if(ENABLE_WARNING)
-    add_compile_options(-Wall
-                        -Wextra
+    target_compile_options(co_context
+                        PRIVATE -Wall
+                        PRIVATE -Wextra
                         # -Wconversion
                         # -pedantic
                         # -Werror

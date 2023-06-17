@@ -18,9 +18,14 @@
 # ----------------------------------------------------------------------------
 if(ENABLE_COVERAGE_TEST)
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-        add_compile_options(-fprofile-arcs -ftest-coverage --coverage)
+        target_compile_options(co_context
+            PUBLIC -fprofile-arcs
+            PUBLIC -ftest-coverage
+            PUBLIC --coverage)
     else()
-        add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
+        target_compile_options(co_context
+            PUBLIC -fprofile-instr-generate
+            PUBLIC -fcoverage-mapping)
     endif()
 endif()
 
