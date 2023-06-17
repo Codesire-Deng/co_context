@@ -14,9 +14,8 @@ if(NOT CMAKE_BUILD_TYPE)
     message(NOTICE "Setting default CMAKE_BUILD_TYPE to Release")
 endif()
 
-set(CMAKE_CXX_FLAGS_RELEASE)
 if(CMAKE_BUILD_TYPE MATCHES Release)
-    add_compile_options(-march=native)
+    target_compile_options(co_context PUBLIC -march=native)
 endif()
 
 # Get the linux kernel version to liburingcxx
@@ -62,5 +61,5 @@ find_package(Threads REQUIRED)
 target_link_libraries(co_context PRIVATE Threads::Threads)
 
 if (USE_MIMALLOC)
-    target_link_libraries(co_context PRIVATE mimalloc)
+    target_link_libraries(co_context PUBLIC mimalloc)
 endif()
