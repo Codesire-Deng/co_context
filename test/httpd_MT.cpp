@@ -262,7 +262,7 @@ task<> session(const int sockfd) {
 }
 
 task<> server(acceptor &ac, int id) {
-    log::i("ZeroHTTPd listening on port: %d\n", DEFAULT_SERVER_PORT);
+    log::i("ZeroHTTPd[%d] listening on port: %d\n", id, DEFAULT_SERVER_PORT);
 
     for (int sockfd; (sockfd = co_await ac.accept()) >= 0;) {
         co_spawn(session(sockfd));
