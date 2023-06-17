@@ -17,7 +17,7 @@ option(ENABLE_COVERAGE_TEST "Build test with coverage" OFF)
 # ----------------------------------------------------------------------------
 option(CMAKE_EXPORT_COMPILE_COMMANDS "Generate compile commands" ON)
 option(BUILD_EXAMPLE "Build examples" ON)
-option(BUILD_TEST "Build tests" ON)
+option(BUILD_TEST "Build tests" OFF)
 option(BUILD_PERF_TEST "Build benchmark" OFF)
 
 
