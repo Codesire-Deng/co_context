@@ -36,7 +36,8 @@ stop_callback(stop_token, Callback) -> stop_callback<Callback>;
 
 #else
 
-#include "co_context/detail/compat.hpp"
+#include <co_context/detail/compat.hpp>
+
 #include <atomic>
 #include <concepts>
 #include <semaphore>
