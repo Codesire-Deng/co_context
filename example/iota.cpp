@@ -1,6 +1,7 @@
 #if defined(__GNUG__) && !defined(__clang__)
 
-#include "co_context/generator.hpp"
+#include <co_context/generator.hpp>
+
 #include <iostream>
 #include <ranges>
 
