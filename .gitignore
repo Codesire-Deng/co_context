@@ -73,11 +73,11 @@ draft/
 
 
 # log for perf
-log
-tmp
+/log
+/tmp
 *.rdb
 *.svg
-perf/
+/perf/
 perf.data*
 *.data
 *.perf
