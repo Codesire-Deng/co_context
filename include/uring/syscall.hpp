@@ -3,12 +3,12 @@
 
 #include <cerrno>
 #include <csignal>
-#include <cstdint>
-#include <unistd.h>
 #include <cstdbool>
+#include <cstdint>
 #include <sys/mman.h>
-#include <sys/syscall.h>
 #include <sys/resource.h>
+#include <sys/syscall.h>
+#include <unistd.h>
 
 /*
  * Don't put this below the #include "arch/$arch/syscall.h", that
