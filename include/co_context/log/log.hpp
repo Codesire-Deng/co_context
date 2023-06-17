@@ -1,6 +1,7 @@
 #pragma once
 
-#include "co_context/config.hpp"
+#include <co_context/config.hpp>
+
 #include <cstdio>
 
 namespace co_context {

@@ -1,16 +1,13 @@
 #ifdef CO_CONTEXT_USE_MIMALLOC
 #include <mimalloc-new-delete.h>
 #endif
-#include "co_context/config.hpp"
-#include "co_context/co/condition_variable.hpp"
-#include "co_context/co/semaphore.hpp"
-#include "co_context/detail/compat.hpp"
-#include "co_context/detail/io_context_meta.hpp"
-#include "co_context/detail/thread_meta.hpp"
-#include "co_context/io_context.hpp"
-#include "co_context/log/log.hpp"
-#include "co_context/utility/set_cpu_affinity.hpp"
-#include "uring/uring_define.hpp"
+#include <co_context/co/semaphore.hpp>
+#include <co_context/config.hpp>
+#include <co_context/detail/io_context_meta.hpp>
+#include <co_context/detail/thread_meta.hpp>
+#include <co_context/io_context.hpp>
+#include <co_context/log/log.hpp>
+
 #include <atomic>
 #include <cassert>
 #include <cstdint>

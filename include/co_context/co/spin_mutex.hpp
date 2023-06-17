@@ -1,6 +1,7 @@
 #pragma once
 
-#include "co_context/detail/trival_task.hpp"
+#include <co_context/detail/trival_task.hpp>
+
 #include <atomic>
 
 namespace co_context {
