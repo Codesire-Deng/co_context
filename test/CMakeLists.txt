@@ -1,14 +1,8 @@
-# for each "test/x.cpp", generate target "x"
+# for each "test/x.cpp", generate "x"
 file(GLOB_RECURSE all_tests *.cpp)
-foreach(v ${all_tests})
-    string(REGEX MATCH "test/.*" relative_path ${v})
-    # message(${relative_path})
-    string(REGEX REPLACE "test/" "" target_name ${relative_path})
-    string(REGEX REPLACE ".cpp" "" target_name ${target_name})
+foreach(test ${all_tests})
+    get_filename_component(target_name ${test} NAME_WE)
 
-    add_executable(${target_name} ${v} $<TARGET_OBJECTS:co_context>)
-    if (USE_MIMALLOC)
-        target_link_libraries(${target_name} PUBLIC mimalloc)
-    endif()
-    # target_link_libraries(${target_name} PUBLIC uring) // link axboe/liburing
+    add_executable(${target_name} ${test})
+    target_link_libraries(${target_name} PRIVATE co_context)
 endforeach()
