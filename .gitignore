@@ -46,12 +46,7 @@ CTestTestfile.cmake
 _deps
 
 # Visual Studio Code
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-!.vscode/*.code-snippets
+.vscode/
 
 # IntelliJ IDEA
 .idea/
