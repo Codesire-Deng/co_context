@@ -6,13 +6,19 @@ project(co_context
 
 include(cmake/Policy.cmake NO_POLICY_SCOPE)
 
-add_library(co_context OBJECT)
-target_include_directories(co_context PUBLIC include)
+add_library(co_context STATIC)
+add_library(co_context::co_context ALIAS co_context)
+target_include_directories(co_context
+                           PUBLIC
+                           "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+                           "$<INSTALL_INTERFACE:include>"
+)
 
 include(cmake/Option.cmake)
 include(cmake/CompileOption.cmake)
 include(cmake/Platform.cmake)
 include(cmake/Develop.cmake)
 include(cmake/Extra.cmake)
+include(cmake/Install.cmake)
 
 add_subdirectory(lib)

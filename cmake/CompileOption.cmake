@@ -26,8 +26,10 @@ string(REGEX MATCH "^([0-9]+)" kernel_version_major ${kernel_version})
 string(REGEX REPLACE "^([0-9]+)\\." "" kernel_version_minor ${kernel_version})
 message(STATUS "kernel_version_major = ${kernel_version_major}")
 message(STATUS "kernel_version_minor = ${kernel_version_minor}")
-add_compile_definitions(LIBURINGCXX_KERNEL_VERSION_MAJOR=${kernel_version_major})
-add_compile_definitions(LIBURINGCXX_KERNEL_VERSION_MINOR=${kernel_version_minor})
+target_compile_definitions(co_context
+    PUBLIC "$<BUILD_INTERFACE:LIBURINGCXX_KERNEL_VERSION_MAJOR=${kernel_version_major}>"
+    PUBLIC "$<BUILD_INTERFACE:LIBURINGCXX_KERNEL_VERSION_MINOR=${kernel_version_minor}>"
+)
 unset(kernel_version)
 
 # Optional IPO/LTO.
@@ -58,7 +60,7 @@ endif()
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
-target_link_libraries(co_context PRIVATE Threads::Threads)
+target_link_libraries(co_context PUBLIC Threads::Threads)
 
 if (USE_MIMALLOC)
     target_link_libraries(co_context PUBLIC mimalloc)
