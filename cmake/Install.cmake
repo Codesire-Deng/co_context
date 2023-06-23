@@ -38,3 +38,14 @@ install(FILES
         "${CMAKE_CURRENT_BINARY_DIR}/co_context-config-version.cmake"
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/co_context
 )
+
+# uninstall target
+if(NOT TARGET uninstall)
+  configure_file(
+    "${co_context_SOURCE_DIR}/cmake/templates/cmake_uninstall.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+    IMMEDIATE @ONLY)
+
+  add_custom_target(uninstall
+    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
+endif()
