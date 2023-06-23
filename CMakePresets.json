@@ -2,6 +2,13 @@
     "version": 3,
     "configurePresets": [
         {
+            "name": "Base",
+            "hidden": true,
+            "cacheVariables": {
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            }
+        },
+        {
             "name": "GCC",
             "hidden": true,
             "cacheVariables": {
@@ -19,6 +26,9 @@
         },
         {
             "name": "Debug",
+            "inherits": [
+                "Base"
+            ],
             "binaryDir": "${sourceDir}/build/debug",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
@@ -29,6 +39,9 @@
         {
             "name": "Release",
             "description": "Build static library only",
+            "inherits": [
+                "Base"
+            ],
             "binaryDir": "${sourceDir}/build/release",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
@@ -38,6 +51,9 @@
         },
         {
             "name": "Benchmark",
+            "inherits": [
+                "Base"
+            ],
             "binaryDir": "${sourceDir}/build/release",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
@@ -48,6 +64,9 @@
         {
             "name": "Test",
             "binaryDir": "${sourceDir}/build/debug",
+            "inherits": [
+                "Base"
+            ],
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "BUILD_EXAMPLE": "ON",
@@ -59,6 +78,7 @@
             "displayName": "Test (clang)",
             "description": "Use clang++",
             "inherits": [
+                "Base",
                 "Clang"
             ],
             "binaryDir": "${sourceDir}/build/debug",
