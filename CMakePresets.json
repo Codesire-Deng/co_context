@@ -1,0 +1,72 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "GCC",
+            "hidden": true,
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "gcc",
+                "CMAKE_CXX_COMPILER": "g++"
+            }
+        },
+        {
+            "name": "Clang",
+            "hidden": true,
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang",
+                "CMAKE_CXX_COMPILER": "clang++"
+            }
+        },
+        {
+            "name": "Debug",
+            "binaryDir": "${sourceDir}/build/debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "BUILD_EXAMPLE": "ON",
+                "BUILD_TEST": "OFF"
+            }
+        },
+        {
+            "name": "Release",
+            "description": "Build static library only",
+            "binaryDir": "${sourceDir}/build/release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "BUILD_EXAMPLE": "OFF",
+                "BUILD_TEST": "OFF"
+            }
+        },
+        {
+            "name": "Benchmark",
+            "binaryDir": "${sourceDir}/build/release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "BUILD_EXAMPLE": "ON",
+                "BUILD_TEST": "ON"
+            }
+        },
+        {
+            "name": "Test",
+            "binaryDir": "${sourceDir}/build/debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "BUILD_EXAMPLE": "ON",
+                "BUILD_TEST": "ON"
+            }
+        },
+        {
+            "name": "Test",
+            "displayName": "Test (clang)",
+            "description": "Use clang++",
+            "inherits": [
+                "Clang"
+            ],
+            "binaryDir": "${sourceDir}/build/debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "BUILD_EXAMPLE": "ON",
+                "BUILD_TEST": "ON"
+            }
+        }
+    ]
+}
