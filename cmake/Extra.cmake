@@ -36,6 +36,7 @@ endif()
 
 if(BUILD_PERF_TEST)
     enable_testing()
+    add_subdirectory(${PROJECT_SOURCE_DIR}/test/benchmark)
 endif()
 
 # ----------------------------------------------------------------------------

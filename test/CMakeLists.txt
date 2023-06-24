@@ -1,5 +1,5 @@
 # for each "test/x.cpp", generate "x"
-file(GLOB_RECURSE all_tests *.cpp)
+file(GLOB all_tests CONFIGURE_DEPENDS *.cpp)
 foreach(test ${all_tests})
     get_filename_component(target_name ${test} NAME_WE)
 

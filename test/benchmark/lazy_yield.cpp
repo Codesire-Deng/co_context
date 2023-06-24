@@ -1,3 +1,4 @@
+#include <benchmark/benchmark.h>
 #include <co_context/io_context.hpp>
 #include <co_context/lazy_io.hpp>
 #include <co_context/utility/timing.hpp>
@@ -5,12 +6,13 @@
 using namespace co_context;
 
 constexpr uint32_t total_switch = 2e8;
-uint32_t count = 0;
+uint32_t count;
 
 std::chrono::steady_clock::time_point start;
 
 task<> first() {
     start = std::chrono::steady_clock::now();
+    count = 0;
     co_return;
 }
 
@@ -31,16 +33,20 @@ task<> run() {
     }
 }
 
-int main() {
-    io_context ctx;
-    ctx.co_spawn(first());
+void perf_lazy_yield(benchmark::State &state) {
+    for (auto _ : state) {
+        io_context ctx;
+        ctx.co_spawn(first());
 
-    for (int i = 0; i < config::swap_capacity / 2; ++i) {
-        ctx.co_spawn(run());
+        for (int i = 0; i < config::swap_capacity / 2; ++i) {
+            ctx.co_spawn(run());
+        }
+
+        ctx.start();
+        ctx.join();
     }
-
-    ctx.start();
-    ctx.join();
-
-    return 0;
 }
+
+BENCHMARK(perf_lazy_yield);
+
+BENCHMARK_MAIN();
