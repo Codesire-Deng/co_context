@@ -76,6 +76,8 @@ class [[nodiscard]] io_context final {
   private:
     void init();
 
+    void deinit() noexcept;
+
     // run on the current thread.
     void run();
 

@@ -78,6 +78,11 @@ void worker_meta::init(unsigned io_uring_entries) {
     log::i("io_context[%u] init a worker\n", detail::this_thread.ctx_id);
 }
 
+void worker_meta::deinit() noexcept {
+    (void)this;
+    this_thread.worker = nullptr;
+}
+
 bool worker_meta::check_init(unsigned expect_sqring_size) const noexcept {
     const unsigned actual_sqring_size = ring.get_sq_ring_entries();
 

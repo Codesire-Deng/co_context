@@ -31,6 +31,23 @@ void io_context::init() {
     this->worker.init(config::default_io_uring_entries);
 }
 
+// Must be called by corresponding thread.
+void io_context::deinit() noexcept {
+    detail::this_thread.ctx = nullptr;
+    detail::this_thread.ctx_id = static_cast<config::ctx_id_t>(-1);
+
+    this->worker.deinit();
+
+    auto &meta = detail::io_context_meta;
+    std::lock_guard lg{meta.mtx};
+    --meta.ready_count;
+    --meta.create_count;
+    log::d(
+        "io_context::deinit(): &meta.create_count = %lx  value = %u\n",
+        &meta.create_count, meta.create_count
+    );
+}
+
 void io_context::start() {
     host_thread = std::thread{[this] {
         this->init();
@@ -125,6 +142,8 @@ void io_context::run() {
     }
 
     log::d("io_context[%u] stopped\n", this->id);
+
+    deinit();
 }
 
 } // namespace co_context

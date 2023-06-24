@@ -121,6 +121,8 @@ struct worker_meta final {
 
     void init(unsigned io_uring_entries);
 
+    void deinit() noexcept;
+
     void co_spawn_unsafe(std::coroutine_handle<> handle) noexcept;
 
 #if CO_CONTEXT_IS_USING_MSG_RING
