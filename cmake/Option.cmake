@@ -15,8 +15,17 @@ option(ENABLE_COVERAGE_TEST "Build test with coverage" OFF)
 # ----------------------------------------------------------------------------
 #   Extra options
 # ----------------------------------------------------------------------------
+if(CMAKE_VERSION VERSION_LESS 3.21)
+    get_property(not_top DIRECTORY PROPERTY PARENT_DIRECTORY)
+    if(NOT not_top)
+        set(PROJECT_IS_TOP_LEVEL true)
+    endif()
+    unset(not_top)
+endif()
+include(CMakeDependentOption)
+
 option(CMAKE_EXPORT_COMPILE_COMMANDS "Generate compile commands" ON)
-option(BUILD_EXAMPLE "Build examples" ON)
+cmake_dependent_option(BUILD_EXAMPLE "Build examples" ON "PROJECT_IS_TOP_LEVEL" OFF)
 option(BUILD_TEST "Build tests" OFF)
 option(BUILD_PERF_TEST "Build benchmark" OFF)
 
