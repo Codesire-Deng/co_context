@@ -74,9 +74,10 @@ task<> session(
     std::vector<char> buf;
     buf.resize(payload.size());
 
-    auto start_time = std::chrono::steady_clock::now();
     for (int round = 0; round < repeat; ++round) {
+        auto start_time = std::chrono::steady_clock::now();
         int nr = co_await (sock.send(payload) && sock.recv(buf));
+        auto now = std::chrono::steady_clock::now();
         if (size_t(nr) != payload.size()) [[unlikely]] {
             log::e(
                 "recv length mismatch: %d (%lu expected)", nr, payload.size()
@@ -84,14 +85,11 @@ task<> session(
             sock.close().detach();
             co_return;
         }
+        round_trips.push_back(
+            std::chrono::duration_cast<duration_type>(now - start_time)
+        );
     }
-    auto now = std::chrono::steady_clock::now();
 
-    for (int i = 0; i < repeat; ++i) {
-        round_trips.push_back(std::chrono::duration_cast<duration_type>(
-            (now - start_time) / repeat
-        ));
-    }
     sock.close().detach();
     co_return;
 }
@@ -119,7 +117,6 @@ task<> perf_client(const uint16_t port) {
     std::vector<duration_type> round_trips;
     std::vector<char> payload;
     for (auto len : payload_lengths) {
-        log::i("perf_client payload=%lu\n", len);
         payload.resize(len);
         std::fill_n(payload.begin(), len, '.');
         round_trips.clear();
@@ -127,7 +124,6 @@ task<> perf_client(const uint16_t port) {
         co_await client(port, payload, round_trips);
         collect(round_trips, len);
     }
-    log::i("end\n");
 }
 
 } // namespace client
