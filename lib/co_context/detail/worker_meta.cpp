@@ -158,7 +158,7 @@ void worker_meta::check_submission_threshold() noexcept {
 void worker_meta::poll_submission() noexcept {
     // submit sqes
     if (requests_to_submit) [[likely]] {
-        bool will_wait = !has_task_ready();
+        bool will_wait = !has_task_ready() && requests_to_reap > 0;
         [[maybe_unused]] int res = ring.submit_and_wait(will_wait);
         assert(res >= 0 && "exception at uring::submit_and_wait");
         requests_to_submit = 0;
@@ -233,6 +233,12 @@ void worker_meta::handle_cq_entry(const liburingcxx::cq_entry *const cqe
             // if link_io_result is not enabled, we can skip the
             // lazy_link_sqe.
             break;
+        case mux::msg_ring:
+            forward_task(std::coroutine_handle<>::from_address(
+                reinterpret_cast<void *>(user_data) /*NOLINT*/
+            ));
+            ++requests_to_reap;
+            break;
         [[unlikely]] case mux::none:
             assert(false && "handle_cq_entry(): unknown case");
     }
@@ -248,7 +254,6 @@ void worker_meta::handle_reserved_user_data(const uint64_t user_data) noexcept {
             break;
 #endif
         case mux::nop:
-            ++requests_to_reap; // compensate this number. see handle_cqe()
             break;
         [[unlikely]] case mux::none:
             break;

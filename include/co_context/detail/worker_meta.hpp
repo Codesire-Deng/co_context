@@ -108,7 +108,7 @@ struct worker_meta final {
 #endif
 
     void wait_uring() noexcept;
-    
+
     void peek_uring() noexcept;
 
     [[nodiscard]]
@@ -210,7 +210,7 @@ inline void worker_meta::co_spawn_safe_msg_ring(std::coroutine_handle<> handle
     );
     auto *const sqe = from.get_free_sqe();
     auto user_data = reinterpret_cast<uint64_t>(handle.address())
-                     | uint8_t(user_data_type::coroutine_handle);
+                     | uint8_t(user_data_type::msg_ring);
     sqe->prep_msg_ring(ring_fd, 0, user_data, 0);
     sqe->set_data(uint64_t(reserved_user_data::nop));
 #if LIBURINGCXX_IS_KERNEL_REACH(5, 17)
