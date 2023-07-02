@@ -131,7 +131,7 @@ namespace config {
      * missed than to ensure accuracy, it is recommended to set bias to 0.
      */
     // inline constexpr int64_t timeout_bias_nanosecond = 0;
-    inline constexpr int64_t timeout_bias_nanosecond = -60'000;
+    inline constexpr int64_t timeout_bias_nanosecond = -17'000;
     // ========================================================================
 
 } // namespace config
@@ -143,8 +143,8 @@ namespace config {
 
     // inline constexpr level log_level = level::verbose;
     // inline constexpr level log_level = level::debug;
-    // inline constexpr level log_level = level::info;
-    inline constexpr level log_level = level::warning;
+    inline constexpr level log_level = level::info;
+    // inline constexpr level log_level = level::warning;
     // inline constexpr level log_level = level::error;
     // inline constexpr level log_level = level::no_log;
 

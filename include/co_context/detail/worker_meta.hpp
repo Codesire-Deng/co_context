@@ -108,6 +108,8 @@ struct worker_meta final {
 #endif
 
     void wait_uring() noexcept;
+    
+    void peek_uring() noexcept;
 
     [[nodiscard]]
     cur_t number_to_schedule() const noexcept {
@@ -251,6 +253,11 @@ inline bool worker_meta::is_ring_need_enter() const noexcept {
 inline void worker_meta::wait_uring() noexcept {
     [[maybe_unused]] const liburingcxx::cq_entry *_;
     ring.wait_cq_entry(_);
+}
+
+inline void worker_meta::peek_uring() noexcept {
+    [[maybe_unused]] const liburingcxx::cq_entry *_;
+    ring.peek_cq_entry(_);
 }
 
 } // namespace co_context::detail
