@@ -121,6 +121,19 @@ class unique {
 template<TL in>
 using unique_t = typename unique<in>::type;
 
+template<TL in>
+struct reverse;
+
+template<>
+struct reverse<type_list<>> : type_list<> {};
+
+template<typename T, typename... Ts>
+struct reverse<type_list<T, Ts...>>
+    : reverse<type_list<Ts...>>::template append<T> {};
+
+template<TL in>
+using reverse_t = typename reverse<in>::type;
+
 template<TL in, typename E>
 struct count {};
 
