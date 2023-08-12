@@ -257,3 +257,33 @@ using clear_void_t =
     typename mpl::filter<mpl::type_list<Ts...>, is_not_void>::type;
 
 } // namespace co_context::detail
+
+namespace co_context::mpl {
+
+template<typename T>
+struct reverse_sequence;
+
+template<typename T>
+struct reverse_sequence<std::integer_sequence<T>> {
+    template<T... app>
+    using append = std::integer_sequence<T, app...>;
+    using type = std::integer_sequence<T>;
+};
+
+template<typename T, T idx, T... idxs>
+struct reverse_sequence<std::integer_sequence<T, idx, idxs...>> {
+    template<T... app>
+    using append = reverse_sequence<
+        std::integer_sequence<T, idxs...>>::template append<idx, app...>;
+    using type = reverse_sequence<
+        std::integer_sequence<T, idxs...>>::template append<idx>;
+};
+
+template<typename T>
+using reverse_sequence_t = reverse_sequence<T>::type;
+
+static_assert(std::is_same_v<
+              reverse_sequence_t<std::integer_sequence<int, 0, 10, 3, 7>>,
+              std::integer_sequence<int, 7, 3, 10, 0>>);
+
+} // namespace co_context::mpl
