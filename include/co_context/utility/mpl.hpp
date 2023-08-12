@@ -5,6 +5,18 @@
 #include <type_traits>
 #include <utility>
 
+namespace co_context::mpl::detail {
+
+template<size_t lhs, size_t rhs>
+struct is_less {
+    static constexpr bool value = lhs < rhs;
+};
+
+template<size_t lhs, size_t rhs>
+inline constexpr bool is_less_v = is_less<lhs, rhs>::value;
+
+}
+
 namespace co_context::mpl {
 
 template<typename... Ts>
@@ -168,7 +180,10 @@ struct first_N;
 
 template<std::size_t N, class... Ts, std::size_t... Is>
 struct first_N<type_list<Ts...>, N, std::index_sequence<Is...>>
-    : concat_t<std::conditional_t<(Is < N), type_list<Ts>, type_list<>>...> {};
+    : concat_t<std::conditional_t<
+          detail::is_less_v<Is, N>,
+          type_list<Ts>,
+          type_list<>>...> {};
 
 template<TL in, size_t N>
 using first_N_t = typename first_N<in, N>::type;
