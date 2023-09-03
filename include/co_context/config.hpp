@@ -131,7 +131,7 @@ namespace config {
      * missed than to ensure accuracy, it is recommended to set bias to 0.
      */
     // inline constexpr int64_t timeout_bias_nanosecond = 0;
-    inline constexpr int64_t timeout_bias_nanosecond = -60'000;
+    inline constexpr int64_t timeout_bias_nanosecond = -30'000;
     // ========================================================================
 
 } // namespace config
