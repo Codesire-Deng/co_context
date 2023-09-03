@@ -21,7 +21,8 @@ constexpr auto time_tick{10ms};
 
 unsigned rnd() {
     static std::uniform_int_distribution<unsigned> distribution{
-        2U, 9U}; // [delays]
+        2U, 9U
+    }; // [delays]
     static std::random_device engine;
     static std::mt19937 noise{engine()};
     return distribution(noise);

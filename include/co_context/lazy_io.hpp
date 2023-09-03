@@ -127,7 +127,8 @@ inline namespace lazy {
         unsigned flags
     ) noexcept {
         return detail::lazy_poll_update{
-            old_user_data, new_user_data, poll_mask, flags};
+            old_user_data, new_user_data, poll_mask, flags
+        };
     }
 
     [[CO_CONTEXT_AWAIT_HINT]]
@@ -400,7 +401,8 @@ inline namespace lazy {
         unsigned buf_index
     ) noexcept {
         return detail::lazy_send_zc_fixed{
-            sockfd, buf, flags, zc_flags, buf_index};
+            sockfd, buf, flags, zc_flags, buf_index
+        };
     }
 
     [[CO_CONTEXT_AWAIT_HINT]]
@@ -553,7 +555,8 @@ inline namespace lazy {
         uint32_t cqe_flags
     ) noexcept {
         return detail::lazy_msg_ring_cqe_flags{
-            fd, cqe_res, cqe_user_data, flags, cqe_flags};
+            fd, cqe_res, cqe_user_data, flags, cqe_flags
+        };
     }
 #endif
 
@@ -600,7 +603,8 @@ inline namespace lazy {
         unsigned int flags
     ) noexcept {
         return detail::lazy_socket_direct{
-            domain, type, protocol, file_index, flags};
+            domain, type, protocol, file_index, flags
+        };
     }
 
     [[CO_CONTEXT_AWAIT_HINT]]

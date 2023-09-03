@@ -108,7 +108,8 @@ class stop_token {
         bool *m_destroyed = nullptr;
         std::binary_semaphore m_done{0};
 
-        [[__gnu__::__nonnull__]] explicit stop_cb(cb_type *cb)
+        [[__gnu__::__nonnull__]]
+        explicit stop_cb(cb_type *cb)
             : m_callback(cb) {}
 
         void run() noexcept { m_callback(this); }
@@ -352,8 +353,8 @@ class stop_token {
             other.m_ptr = nullptr;
         }
 
-        stop_state_ref &operator= /*NOLINT*/ (const stop_state_ref &other
-        ) noexcept {
+        stop_state_ref &operator= /*NOLINT*/ (const stop_state_ref
+                                              & other) noexcept {
             if (auto *ptr = other.m_ptr; ptr != m_ptr) {
                 if (ptr) {
                     ptr->add_owner();

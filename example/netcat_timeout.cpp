@@ -7,12 +7,8 @@ using Socket = co_context::socket;
 
 void log_error(int err) {
     switch (err) {
-        case ECANCELED:
-            log::e("timeout\n");
-            break;
-        default:
-            log::e("%s\n", strerror(err));
-            break;
+        case ECANCELED: log::e("timeout\n"); break;
+        default:        log::e("%s\n", strerror(err)); break;
     }
 }
 

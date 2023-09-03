@@ -44,7 +44,8 @@ class trival_task {
 
         trival_task get_return_object() noexcept {
             return trival_task{
-                std::coroutine_handle<promise_type>::from_promise(*this)};
+                std::coroutine_handle<promise_type>::from_promise(*this)
+            };
         }
 
         constexpr void unhandled_exception() noexcept {}

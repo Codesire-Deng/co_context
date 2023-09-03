@@ -303,14 +303,16 @@ inline int uring<uring_flags>::submit_and_wait_timeout(
     io_uring_getevents_arg arg = {
         .sigmask = (uint64_t)sigmask,
         .sigmask_sz = _NSIG / 8,
-        .ts = (uint64_t)(&ts)};
+        .ts = (uint64_t)(&ts)
+    };
 
     detail::cq_entry_getter data = {
         .submit = sq.template flush<uring_flags>(),
         .wait_num = wait_num,
         .get_flags = IORING_ENTER_EXT_ARG,
         .sz = sizeof(arg),
-        .arg = &arg};
+        .arg = &arg
+    };
 
     return _get_cq_entry<true>(cqe, data);
 }
@@ -414,8 +416,8 @@ inline int uring<uring_flags>::wait_sq_ring() {
 
     if (result < 0) [[unlikely]] {
         throw std::system_error{
-            -result, std::system_category(),
-            "wait_sq_ring __sys_io_uring_enter"};
+            -result, std::system_category(), "wait_sq_ring __sys_io_uring_enter"
+        };
     }
     return result;
 }
@@ -558,7 +560,8 @@ int uring<uring_flags>::register_ring_fd() {
         this->int_flags |= INT_FLAG_REG_RING;
     } else if (ret < 0) {
         throw std::system_error{
-            -ret, std::system_category(), "uring::register_ring_fd"};
+            -ret, std::system_category(), "uring::register_ring_fd"
+        };
     }
 
     return ret;
@@ -581,7 +584,8 @@ int uring<uring_flags>::unregister_ring_fd() {
         this->int_flags &= ~INT_FLAG_REG_RING;
     } else if (ret < 0) {
         throw std::system_error{
-            -ret, std::system_category(), "uring::unregister_ring_fd"};
+            -ret, std::system_category(), "uring::unregister_ring_fd"
+        };
     }
 
     return ret;
@@ -597,7 +601,8 @@ void uring<uring_flags>::init(unsigned entries, params &params) {
     const int fd = __sys_io_uring_setup(entries, &params);
     if (fd < 0) [[unlikely]] {
         throw std::system_error{
-            -fd, std::system_category(), "uring()::__sys_io_uring_setup"};
+            -fd, std::system_category(), "uring()::__sys_io_uring_setup"
+        };
     }
 
     std::memset(this, 0, sizeof(*this)); // NOLINT
@@ -689,7 +694,8 @@ void uring<uring_flags>::mmap_queue(int fd, params &p) {
     );
     if (sq.ring_ptr == MAP_FAILED) /*NOLINT*/ [[unlikely]] {
         throw std::system_error{
-            errno, std::system_category(), "sq.ring MAP_FAILED"};
+            errno, std::system_category(), "sq.ring MAP_FAILED"
+        };
     }
 
     if (p.features & IORING_FEAT_SINGLE_MMAP) {
@@ -704,7 +710,8 @@ void uring<uring_flags>::mmap_queue(int fd, params &p) {
             cq.ring_ptr = nullptr;
             unmap_rings();
             throw std::system_error{
-                errno, std::system_category(), "cq.ring MAP_FAILED"};
+                errno, std::system_category(), "cq.ring MAP_FAILED"
+            };
         }
     }
 
@@ -718,7 +725,8 @@ void uring<uring_flags>::mmap_queue(int fd, params &p) {
     if (sq.sqes == MAP_FAILED) /*NOLINT*/ [[unlikely]] {
         unmap_rings();
         throw std::system_error{
-            errno, std::system_category(), "sq.sqes MAP_FAILED"};
+            errno, std::system_category(), "sq.sqes MAP_FAILED"
+        };
     }
 
     cq.set_offset(p.cq_off);
@@ -927,7 +935,8 @@ inline int uring<uring_flags>::__get_cq_entry(
         .wait_num = wait_num,
         .get_flags = 0,
         .size = _NSIG / 8,
-        .arg = sigmask};
+        .arg = sigmask
+    };
     return _get_cq_entry<false>(cqe_ptr, data);
 }
 
@@ -946,13 +955,15 @@ inline int uring<uring_flags>::wait_cq_entries_new(
     io_uring_getevents_arg arg = {
         .sigmask = (uint64_t)sigmask,
         .sigmask_sz = _NSIG / 8,
-        .ts = (uint64_t)(&ts)};
+        .ts = (uint64_t)(&ts)
+    };
 
     detail::cq_entry_getter data = {
         .wait_num = wait_num,
         .get_flags = IORING_ENTER_EXT_ARG,
         .size = sizeof(arg),
-        .arg = &arg};
+        .arg = &arg
+    };
 
     return _get_cq_entry<true>(cqe_ptr, data);
 }

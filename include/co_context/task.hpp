@@ -118,8 +118,7 @@ namespace detail {
                 case value_state::exception:
                     exception_ptr.~exception_ptr();
                     break;
-                default:
-                    break;
+                default: break;
             }
         };
 
@@ -372,19 +371,20 @@ class [[CO_CONTEXT_AWAIT_HINT]] task {
 namespace detail {
     template<typename T>
     inline task<T> task_promise<T>::get_return_object() noexcept {
-        return task<T>{
-            std::coroutine_handle<task_promise>::from_promise(*this)};
+        return task<T>{std::coroutine_handle<task_promise>::from_promise(*this)
+        };
     }
 
     inline task<void> task_promise<void>::get_return_object() noexcept {
         return task<void>{
-            std::coroutine_handle<task_promise>::from_promise(*this)};
+            std::coroutine_handle<task_promise>::from_promise(*this)
+        };
     }
 
     template<typename T>
     inline task<T &> task_promise<T &>::get_return_object() noexcept {
-        return task<T &>{
-            std::coroutine_handle<task_promise>::from_promise(*this)};
+        return task<T &>{std::coroutine_handle<task_promise>::from_promise(*this
+        )};
     }
 
     template<typename T>

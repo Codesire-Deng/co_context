@@ -20,7 +20,8 @@ namespace detail {
         int ret = sched_setaffinity(gettid(), sizeof(cpu_set_t), &cpu_set);
         if (ret != 0) [[unlikely]] {
             throw std::system_error{
-                errno, std::system_category(), "sched_setaffinity"};
+                errno, std::system_category(), "sched_setaffinity"
+            };
         }
     }
 
