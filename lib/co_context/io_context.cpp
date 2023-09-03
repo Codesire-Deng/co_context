@@ -96,25 +96,24 @@ void io_context::do_completion_part() noexcept {
 
     auto &meta = detail::io_context_meta;
 
-    bool need_check_ring =
-        (meta.ready_count > 1) | (worker.requests_to_reap > 0);
-
-    if (need_check_ring) [[likely]] {
-        uint32_t num = worker.poll_completion();
-
-        // io_context will block itself here
-        uint32_t will_not_wait =
-            num | worker.has_task_ready() | worker.requests_to_submit;
-        if (will_not_wait == 0) [[unlikely]] {
+    uint32_t handled_num = worker.peek_uring() ? worker.poll_completion() : 0;
+    bool is_fast_path =
+        worker.requests_to_submit | worker.has_task_ready() | handled_num;
+    if (is_fast_path) [[likely]] {
+        return;
+    } else {
+        log::v("do_completion_part(): bad path\n");
+        if (!worker.peek_uring() && worker.requests_to_reap > 0) {
+            log::v("do_completion_part(): wait_uring()\n");
             worker.wait_uring();
-            num = worker.poll_completion();
-            if constexpr (config::is_log_i) {
-                if (num == 0) [[unlikely]] {
-                    log::i("wait_cq_entry() gets 0 cqe.\n");
-                }
-            }
         }
-    } else if (!worker.has_task_ready()) [[unlikely]] {
+        handled_num = worker.poll_completion();
+    }
+
+    bool is_not_over =
+        handled_num | (meta.ready_count > 1) | worker.requests_to_reap;
+
+    if (!is_not_over) [[unlikely]] {
         will_stop = true;
     }
 }

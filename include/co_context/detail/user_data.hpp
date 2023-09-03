@@ -15,6 +15,7 @@ enum class user_data_type : uint8_t {
     task_info_ptr,
     coroutine_handle,
     task_info_ptr__link_sqe,
+    msg_ring,
     none
 };
 
