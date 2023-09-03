@@ -338,7 +338,8 @@ class _Gen_promise_base {
                 }
             }(std::allocator_arg, _Elem.allocator,
               ::std::ranges::begin(_Elem.range),
-              ::std::ranges::end(_Elem.range))};
+              ::std::ranges::end(_Elem.range))
+        };
     }
 
 #pragma GCC diagnostic pop
@@ -567,7 +568,8 @@ class generator
         generator get_return_object() noexcept {
             return generator{
                 _Gen_secret_tag{},
-                std::coroutine_handle<promise_type>::from_promise(*this)};
+                std::coroutine_handle<promise_type>::from_promise(*this)
+            };
         }
     };
 
@@ -600,7 +602,8 @@ class generator
         return _Gen_iter<_Value, _Ref>{
             _Gen_secret_tag{},
             std::coroutine_handle<_Gen_promise_base<_Gen_yield_t<_Ref>>>::
-                from_address(_Coro.address())};
+                from_address(_Coro.address())
+        };
     }
 
     [[nodiscard]]

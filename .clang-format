@@ -3,7 +3,6 @@ BasedOnStyle: LLVM
 IndentWidth: 4
 TabWidth: 4
 Language: Cpp
-# AlignAfterOpenBracket: AlwaysBreak # BlockIndent
 AlignAfterOpenBracket: BlockIndent # BlockIndent
 AlignArrayOfStructures: Right
 AlignConsecutiveBitFields: "Consecutive"
@@ -14,8 +13,13 @@ AlignTrailingComments: true
 AllowAllArgumentsOnNextLine: true
 AllowAllConstructorInitializersOnNextLine: true
 AllowAllParametersOfDeclarationOnNextLine: true
+AlignConsecutiveShortCaseStatements: # clang-format 17
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: true
+  AlignCaseColons: false
 AllowShortBlocksOnASingleLine: Empty
-AllowShortCaseLabelsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: true
 AllowShortEnumsOnASingleLine: true
 AllowShortFunctionsOnASingleLine: InlineOnly
 AllowShortIfStatementsOnASingleLine: WithoutElse
@@ -49,7 +53,14 @@ IndentRequires: true # clang-format 14
 IndentWrappedFunctionNames: false
 InsertBraces: true # clang-format 15
 InsertNewlineAtEOF: true # clang-format 16
+IntegerLiteralSeparator: # clang-format 16
+  Binary: 8
+  Decimal: 0
+  Hex: 2
+  HexMinDigits: 8
 LambdaBodyIndentation: Signature
+LineEnding: LF # clang-format 16
+KeepEmptyLinesAtEOF: false # clang-format 17
 KeepEmptyLinesAtTheStartOfBlocks: false
 MaxEmptyLinesToKeep: 1
 NamespaceIndentation: Inner
@@ -58,6 +69,7 @@ PointerAlignment: Right
 QualifierAlignment: Left
 ReflowComments: true
 RequiresClausePosition: OwnLine # clang-format 15
+RequiresExpressionIndentation: OuterScope # clang-format 16
 SeparateDefinitionBlocks: Always
 ShortNamespaceLines: 5
 SortIncludes: "CaseSensitive"

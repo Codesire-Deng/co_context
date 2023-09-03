@@ -157,7 +157,8 @@ task<detail::any_return_type<Ts...>> any(task<Ts> &&...node) {
         co_return meta_ptr->idx;
     } else {
         co_return detail::any_tuple<Ts...>{
-            meta_ptr->idx, std::move(meta_ptr->buffer)};
+            meta_ptr->idx, std::move(meta_ptr->buffer)
+        };
     }
 }
 

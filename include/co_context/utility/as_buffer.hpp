@@ -16,7 +16,8 @@ template<typename T>
     requires std::is_standard_layout_v<T>
 inline constexpr auto as_buf(const T *ptr) {
     return std::span<const char, sizeof(T)>{
-        reinterpret_cast<const char *>(ptr), sizeof(T)};
+        reinterpret_cast<const char *>(ptr), sizeof(T)
+    };
 }
 
 } // namespace co_context

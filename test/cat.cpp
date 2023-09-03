@@ -42,7 +42,8 @@ file_info make_file_info(const size_t file_size) {
         iov.iov_len = to_read;
         if (posix_memalign(&iov.iov_base, BLOCK_SZ, BLOCK_SZ) != 0) {
             throw std::system_error{
-                errno, std::system_category(), "posix_memalign"};
+                errno, std::system_category(), "posix_memalign"
+            };
         }
         rest -= to_read;
         fi.push_back(iov);
