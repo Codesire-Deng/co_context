@@ -26,10 +26,10 @@ task<void> f2() {
 task<> run() {
     // var : std::variant<std::monostate, int, const char *>;
     auto [idx, var] = co_await any(f0(), f1(), f2());
-    std::cout << idx << " finished!\n";
+    std::cout << "get the result of f" << idx << ": ";
     std::visit(
-        overloaded{
-            [](std::monostate) { std::cout << "impossible\n"; },
+        overload{
+            [](std::monostate) { std::cout << "(void)\n"; },
             [](int x) { std::cout << x << " : int\n"; },
             [](const char *s) { std::cout << s << " : string\n"; },
         },
@@ -37,10 +37,10 @@ task<> run() {
     );
 
     {
-        std::cout << "--------------\n";
+        std::cout << "\n===============\n\n";
         std::cout << "3 * f2 start!\n";
         uint32_t idx = co_await any<unsafe>(f2(), f2(), f2());
-        std::cout << idx << " finished!\n";
+        std::cout << "get the result of f" << idx << ".\n";
     }
 }
 
