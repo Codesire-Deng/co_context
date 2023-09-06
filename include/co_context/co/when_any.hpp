@@ -264,6 +264,7 @@ some(uint32_t min_complete, task<Ts> &&...node) {
     constexpr uint32_t n = sizeof...(Ts);
     static_assert(n >= 2, "too few tasks for `some(...)`");
     assert(n >= min_complete && "too few tasks for `some(...)`");
+    assert(min_complete >= 1 && "min_complete should be at least 1");
 
     using meta_type = detail::some_meta<Ts...>;
     auto meta_ptr =
