@@ -4,12 +4,12 @@ namespace co_context {
 
 // Overload pattern
 template<typename... F>
-struct overloaded : F... {
+struct overload : F... {
     using F::operator()...;
 };
 
 template<typename... F>
-overloaded(F...) -> overloaded<F...>;
+overload(F...) -> overload<F...>;
 
 // CRTP
 template<typename T, template<typename> class Interface>
