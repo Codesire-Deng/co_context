@@ -230,7 +230,7 @@ task<void> some_evaluate_to(
         const uint32_t rank = preempt();
         if (rank < min_complete) {
             std::get<0>(meta_ptr->buffer[rank]) = idx;
-            if (rank == min_complete) {
+            if (rank + 1 == min_complete) {
                 if constexpr (is_thread_safe) {
                     std::atomic_thread_fence(std::memory_order_release);
                 }
