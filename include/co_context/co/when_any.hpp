@@ -138,7 +138,7 @@ task<void> any_evaluate_to(
 namespace co_context {
 
 template<safety is_thread_safe = safety::safe, typename... Ts>
-task<detail::any_return_type<Ts...>> any(task<Ts> &&...node) {
+task<detail::any_return_type<Ts...>> any(task<Ts>... node) {
     constexpr uint32_t n = sizeof...(Ts);
     static_assert(n >= 2, "too few tasks for `any(...)`");
 
@@ -266,7 +266,7 @@ namespace co_context {
 
 template<safety is_thread_safe = safety::safe, typename... Ts>
 task<detail::some_return_type<Ts...>>
-some(uint32_t min_complete, task<Ts> &&...node) {
+some(uint32_t min_complete, task<Ts>... node) {
     constexpr uint32_t n = sizeof...(Ts);
     static_assert(n >= 2, "too few tasks for `some(...)`");
     assert(n >= min_complete && "too few tasks for `some(...)`");

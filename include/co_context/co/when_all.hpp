@@ -67,7 +67,7 @@ template<typename... Ts>
 using to_all_meta_t = typename clear_void_t<Ts...>::template to<all_meta>;
 
 template<safety is_thread_safe, size_t idx, typename... Ts>
-task<void> evaluate_to(
+task<void> all_evaluate_to(
     to_all_meta_t<Ts...> &meta, task<mpl::select_t<idx, Ts...>> &&node
 ) {
     using node_return_type = mpl::select_t<idx, Ts...>;
@@ -107,7 +107,7 @@ task<void> evaluate_to(
 namespace co_context {
 
 template<safety is_thread_safe = safety::safe, typename... Ts>
-task<detail::tuple_or_void<Ts...>> all(task<Ts> &&...node) {
+task<detail::tuple_or_void<Ts...>> all(task<Ts>... node) {
     constexpr size_t n = sizeof...(Ts);
     static_assert(n >= 2, "too few tasks for `all(...)`");
 
@@ -115,9 +115,9 @@ task<detail::tuple_or_void<Ts...>> all(task<Ts> &&...node) {
     meta_type meta{co_await lazy::who_am_i(), n};
 
     auto spawn_all = [&]<size_t... idx>(std::index_sequence<idx...>) {
-        (...,
-         co_spawn(evaluate_to<is_thread_safe, idx, Ts...>(meta, std::move(node))
-         ));
+        (..., co_spawn(all_evaluate_to<is_thread_safe, idx, Ts...>(
+                  meta, std::move(node)
+              )));
     };
 
     if constexpr (is_thread_safe) {
