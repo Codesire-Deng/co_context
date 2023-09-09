@@ -15,7 +15,7 @@ struct is_less {
 template<size_t lhs, size_t rhs>
 inline constexpr bool is_less_v = is_less<lhs, rhs>::value;
 
-}
+} // namespace co_context::mpl::detail
 
 namespace co_context::mpl {
 
@@ -256,6 +256,24 @@ template<typename... Ts>
 using clear_void_t =
     typename mpl::filter<mpl::type_list<Ts...>, is_not_void>::type;
 
+template<typename F, int begin, int... idx>
+constexpr void static_for_impl(
+    F &&f, std::integer_sequence<int, idx...> /*unused*/
+) {
+    static_assert(sizeof...(idx) > 0);
+    (..., std::forward<F>(f)(std::integral_constant<int, begin + idx>{}));
+}
+
+template<typename F, int begin, int... idx>
+constexpr void static_rfor_impl(
+    F &&f, std::integer_sequence<int, idx...> /*unused*/
+) {
+    static_assert(sizeof...(idx) > 0);
+    (..., std::forward<F>(f)(
+              std::integral_constant<int, begin + (sizeof...(idx) - idx - 1)>{}
+          ));
+}
+
 } // namespace co_context::detail
 
 namespace co_context::mpl {
@@ -285,5 +303,23 @@ using reverse_sequence_t = reverse_sequence<T>::type;
 static_assert(std::is_same_v<
               reverse_sequence_t<std::integer_sequence<int, 0, 10, 3, 7>>,
               std::integer_sequence<int, 7, 3, 10, 0>>);
+
+template<int begin, int end, typename F>
+constexpr void static_for(F &&f) {
+    if constexpr (begin < end) {
+        co_context::detail::static_for_impl<F, begin>(
+            std::forward<F>(f), std::make_integer_sequence<int, end - begin>()
+        );
+    }
+}
+
+template<int begin, int end, typename F>
+constexpr void static_rfor(F &&f) {
+    if constexpr (begin < end) {
+        co_context::detail::static_rfor_impl<F, begin>(
+            std::forward<F>(f), std::make_integer_sequence<int, end - begin>()
+        );
+    }
+}
 
 } // namespace co_context::mpl
