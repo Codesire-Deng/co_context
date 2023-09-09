@@ -29,11 +29,15 @@
 #include <uring/uring.hpp>
 
 #include <cstdint>
-#include <queue>
 #include <sys/types.h>
 #include <thread>
 
 namespace co_context {
+
+namespace detail {
+    class lazy_resume_on;
+    class shared_task_promise_base;
+} // namespace detail
 
 using config::cache_line_size;
 
@@ -135,6 +139,7 @@ class [[nodiscard]] io_context final {
     friend class co_context::condition_variable;
     friend class co_context::counting_semaphore;
     friend class co_context::detail::lazy_resume_on;
+    friend class co_context::detail::shared_task_promise_base;
 }; // class io_context
 
 inline void io_context::co_spawn(task<void> &&entrance) noexcept {
