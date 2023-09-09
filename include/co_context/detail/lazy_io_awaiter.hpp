@@ -877,16 +877,16 @@ class lazy_resume_on {
     static constexpr bool await_ready() noexcept { return false; }
 
     void await_suspend(std::coroutine_handle<> current) noexcept {
-        resume_ctx.worker.co_spawn_auto(current);
+        resume_ctx->worker.co_spawn_auto(current);
     }
 
     constexpr void await_resume() const noexcept {}
 
     explicit lazy_resume_on(co_context::io_context &resume_context) noexcept
-        : resume_ctx(resume_context) {}
+        : resume_ctx(&resume_context) {}
 
   private:
-    co_context::io_context &resume_ctx;
+    co_context::io_context *resume_ctx;
 };
 
 /****************************
