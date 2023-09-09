@@ -1,13 +1,13 @@
 #pragma once
 
 #include <co_context/detail/hint.hpp>
+#include <co_context/detail/type_traits.hpp>
 
 #include <cassert>
 #include <concepts>
 #include <coroutine>
 #include <exception>
 #include <memory>
-#include <type_traits>
 
 namespace co_context {
 
@@ -369,6 +369,7 @@ class [[CO_CONTEXT_AWAIT_HINT]] task {
 };
 
 namespace detail {
+
     template<typename T>
     inline task<T> task_promise<T>::get_return_object() noexcept {
         return task<T>{std::coroutine_handle<task_promise>::from_promise(*this)
@@ -386,23 +387,6 @@ namespace detail {
         return task<T &>{std::coroutine_handle<task_promise>::from_promise(*this
         )};
     }
-
-    template<typename T>
-    struct remove_rvalue_reference {
-        using type = T;
-    };
-
-    template<typename T>
-    struct remove_rvalue_reference<T &&> {
-        using type = T;
-    };
-
-    template<typename T>
-    using remove_rvalue_reference_t = typename remove_rvalue_reference<T>::type;
-
-    template<typename Awaiter>
-    using get_awaiter_result_t =
-        decltype(std::declval<Awaiter>().await_resume());
 
 } // namespace detail
 
