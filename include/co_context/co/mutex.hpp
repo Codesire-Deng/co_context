@@ -23,7 +23,11 @@ class mutex final {
       public:
         explicit lock_awaiter(mutex &mtx) noexcept
             : mtx(mtx)
-            , resume_ctx(detail::this_thread.ctx) {}
+            , resume_ctx(detail::this_thread.ctx) {
+            assert(
+                resume_ctx != nullptr && "locking mutex without an io_context"
+            );
+        }
 
         static constexpr bool await_ready() noexcept { return false; }
 
