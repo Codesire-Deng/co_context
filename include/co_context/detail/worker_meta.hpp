@@ -10,9 +10,10 @@
 
 #include <coroutine>
 #include <cstdint>
+#if CO_CONTEXT_IS_USING_EVENTFD
 #include <mutex>
 #include <queue>
-#include <thread>
+#endif
 
 #if CO_CONTEXT_IS_USING_EVENTFD
 #include <sys/eventfd.h>
