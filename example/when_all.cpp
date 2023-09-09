@@ -3,24 +3,31 @@
 #include <iostream>
 using namespace co_context;
 
-task<int> f1() {
+task<int> f0() {
+    printf("f0 start.\n");
+    co_await timeout(std::chrono::seconds{1});
+    printf("f0 done.\n");
     co_return 1;
 }
 
-task<const char *> f2() {
-    co_return "f2 Great!";
+task<const char *> f1() {
+    printf("f1 start.\n");
+    printf("f1 done.\n");
+    co_return "f1 Great!";
 }
 
-task<void> f3() {
-    printf("f3 ok!\n");
+task<void> f2() {
+    printf("f2 start.\n");
+    co_await timeout(std::chrono::seconds{2});
+    printf("f2 done.\n");
     co_return;
 }
 
 task<> run() {
     // co_spawn f1 & f2 & f3, and wait for them
-    auto [a, b] = co_await all(f1(), f2(), f3());
-    std::cout << "a = " << a << std::endl;
-    std::cout << "b = " << b << std::endl;
+    auto [r0, r1] = co_await all(f0(), f1(), f2());
+    std::cout << "get the result of f0: " << r0 << "\n";
+    std::cout << "get the result of f1: " << r1 << "\n";
 }
 
 int main() {

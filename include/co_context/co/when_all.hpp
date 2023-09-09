@@ -95,6 +95,9 @@ task<void> evaluate_to(
         wakeup = (--meta.count_down == 0);
     }
     if (wakeup) {
+        if constexpr (is_thread_safe) {
+            std::atomic_thread_fence(std::memory_order_release);
+        }
         detail::co_spawn_handle(meta.await_handle);
     }
 }

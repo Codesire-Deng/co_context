@@ -34,12 +34,18 @@ template<typename... Ts>
 using variant_or_uint =
     std::conditional_t<is_all_void_v<Ts...>, uint32_t, to_any_variant_t<Ts...>>;
 
+template<typename T>
+struct index_value {
+    uint32_t index;
+    T value;
+};
+
 template<typename... Ts>
-using any_tuple = std::tuple<uint32_t, to_any_variant_t<Ts...>>;
+using any_index_value = index_value<to_any_variant_t<Ts...>>;
 
 template<typename... Ts>
 using any_return_type =
-    std::conditional_t<is_all_void_v<Ts...>, uint32_t, any_tuple<Ts...>>;
+    std::conditional_t<is_all_void_v<Ts...>, uint32_t, any_index_value<Ts...>>;
 
 template<typename Variant>
 struct any_meta {
@@ -160,7 +166,7 @@ task<detail::any_return_type<Ts...>> any(task<Ts> &&...node) {
     if constexpr (detail::is_all_void_v<Ts...>) {
         co_return meta_ptr->idx;
     } else {
-        co_return detail::any_tuple<Ts...>{
+        co_return detail::any_index_value<Ts...>{
             meta_ptr->idx, std::move(meta_ptr->buffer)
         };
     }
@@ -229,7 +235,7 @@ task<void> some_evaluate_to(
         co_await node;
         const uint32_t rank = preempt();
         if (rank < min_complete) {
-            std::get<0>(meta_ptr->buffer[rank]) = idx;
+            meta_ptr->buffer[rank].index = idx;
             if (rank + 1 == min_complete) {
                 if constexpr (is_thread_safe) {
                     std::atomic_thread_fence(std::memory_order_release);
@@ -242,8 +248,8 @@ task<void> some_evaluate_to(
         const uint32_t rank = preempt();
         if (rank < min_complete) {
             auto &any_tuple = meta_ptr->buffer[rank];
-            std::get<0>(any_tuple) = idx;
-            std::get<1>(any_tuple) = std::move(result);
+            any_tuple.index = idx;
+            any_tuple.value = std::move(result);
             if (rank + 1 == min_complete) {
                 if constexpr (is_thread_safe) {
                     std::atomic_thread_fence(std::memory_order_release);
