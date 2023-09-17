@@ -1,6 +1,6 @@
 #pragma once
 
-#include <uring/compat.h>
+#include <uring/compat.hpp>
 #include <uring/io_uring.h>
 #include <uring/utility/io_helper.hpp>
 #include <uring/utility/kernel_version.hpp>
@@ -559,6 +559,7 @@ class sq_entry final : private io_uring_sqe {
     }
 #endif
 
+#ifdef LIBURINGCXX_HAS_OPENAT2
     inline sq_entry &
     prep_openat2(int dfd, const char *path, struct open_how *how) noexcept {
         prep_rw(
@@ -566,7 +567,9 @@ class sq_entry final : private io_uring_sqe {
         );
         return *this;
     }
+#endif
 
+#ifdef LIBURINGCXX_HAS_OPENAT2
     /* open directly into the fixed file table */
     inline sq_entry &prep_openat2_direct(
         int dfd, const char *path, struct open_how *how, unsigned file_index
@@ -575,13 +578,16 @@ class sq_entry final : private io_uring_sqe {
         set_target_fixed_file(file_index);
         return *this;
     }
+#endif
 
+#ifdef LIBURINGCXX_HAS_OPENAT2
     /* open directly into the fixed file table */
     inline sq_entry &prep_openat2_direct_alloc(
         int dfd, const char *path, struct open_how *how
     ) noexcept {
         return prep_openat2_direct(dfd, path, how, IORING_FILE_INDEX_ALLOC - 1);
     }
+#endif
 
     inline sq_entry &
     prep_epoll_ctl(int epfd, int fd, int op, epoll_event *ev) noexcept {

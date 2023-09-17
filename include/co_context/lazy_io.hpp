@@ -425,18 +425,22 @@ inline namespace lazy {
     }
 #endif
 
+#ifdef LIBURINGCXX_HAS_OPENAT2
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_openat2
     openat2(int dfd, const char *path, open_how *how) noexcept {
         return detail::lazy_openat2{dfd, path, how};
     }
+#endif
 
+#ifdef LIBURINGCXX_HAS_OPENAT2
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_openat2_direct openat2_direct(
         int dfd, const char *path, open_how *how, unsigned int file_index
     ) noexcept {
         return detail::lazy_openat2_direct{dfd, path, how, file_index};
     }
+#endif
 
     [[CO_CONTEXT_AWAIT_HINT]]
     inline detail::lazy_epoll_ctl

@@ -630,12 +630,15 @@ struct lazy_recv_multishot : lazy_awaiter {
 };
 #endif
 
+#ifdef LIBURINGCXX_HAS_OPENAT2
 struct lazy_openat2 : lazy_awaiter {
     inline lazy_openat2(int dfd, const char *path, open_how *how) noexcept {
         sqe->prep_openat2(dfd, path, how);
     }
 };
+#endif
 
+#ifdef LIBURINGCXX_HAS_OPENAT2
 /* open directly into the fixed file table */
 struct lazy_openat2_direct : lazy_awaiter {
     inline lazy_openat2_direct(
@@ -644,6 +647,7 @@ struct lazy_openat2_direct : lazy_awaiter {
         sqe->prep_openat2_direct(dfd, path, how, file_index);
     }
 };
+#endif
 
 struct lazy_epoll_ctl : lazy_awaiter {
     inline lazy_epoll_ctl(int epfd, int fd, int op, epoll_event *ev) noexcept {

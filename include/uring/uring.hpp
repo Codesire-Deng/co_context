@@ -27,7 +27,7 @@
 
 #include <uring/barrier.h>
 #include <uring/buf_ring.hpp>
-#include <uring/compat.h>
+#include <uring/compat.hpp>
 #include <uring/cq_entry.hpp>
 #include <uring/detail/cq.hpp>
 #include <uring/detail/int_flags.h>
