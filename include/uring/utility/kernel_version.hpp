@@ -1,11 +1,11 @@
 #pragma once
 
 #ifndef LIBURINGCXX_KERNEL_VERSION_MAJOR
-#error Fail to detect kernel version. Please check CMakeLists.txt (at root level).
+#error Fail to detect kernel version. Please check cmake/Platform.cmake .
 #endif
 
 #ifndef LIBURINGCXX_KERNEL_VERSION_MINOR
-#error Fail to detect kernel version. Please check CMakeLists.txt (at root level).
+#error Fail to detect kernel version. Please check cmake/Platform.cmake .
 #endif
 
 namespace liburingcxx {
