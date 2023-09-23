@@ -1,6 +1,6 @@
 #pragma once
 
-#include <co_context/detail/hint.hpp>
+#include <co_context/detail/attributes.hpp>
 #include <co_context/detail/io_context_meta.hpp>
 #include <co_context/detail/lock_guard.hpp>
 #include <co_context/detail/thread_meta.hpp>

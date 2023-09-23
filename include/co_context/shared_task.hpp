@@ -5,7 +5,7 @@
 //
 #pragma once
 
-#include <co_context/detail/hint.hpp>
+#include <co_context/detail/attributes.hpp>
 #include <co_context/detail/type_traits.hpp>
 #include <co_context/io_context.hpp>
 

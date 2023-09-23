@@ -1,7 +1,7 @@
 #pragma once
 
 #include <co_context/co/mutex.hpp>
-#include <co_context/detail/hint.hpp>
+#include <co_context/detail/attributes.hpp>
 #include <co_context/detail/spinlock.hpp>
 #include <co_context/detail/thread_meta.hpp>
 #include <co_context/detail/trival_task.hpp>
