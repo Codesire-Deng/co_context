@@ -1,6 +1,6 @@
 #pragma once
 
-#include <co_context/detail/hint.hpp>
+#include <co_context/detail/attributes.hpp>
 #include <co_context/detail/lazy_io_awaiter.hpp>
 
 namespace co_context {
