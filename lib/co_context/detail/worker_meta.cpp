@@ -28,7 +28,7 @@
 
 namespace co_context::detail {
 
-thread_local thread_meta this_thread;
+thread_local thread_meta this_thread; // NOLINT(*global-variables)
 
 #if CO_CONTEXT_IS_USING_EVENTFD
 worker_meta::worker_meta() noexcept {

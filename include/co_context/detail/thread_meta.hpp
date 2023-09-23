@@ -21,6 +21,6 @@ struct alignas(config::cache_line_size) thread_meta {
     config::ctx_id_t ctx_id = static_cast<config::ctx_id_t>(-1);
 };
 
-extern thread_local thread_meta this_thread;
+extern thread_local thread_meta this_thread; // NOLINT(*global-variables)
 
 } // namespace co_context::detail
