@@ -19,6 +19,7 @@
 #pragma once
 
 #include <co_context/config.hpp>
+#include <co_context/detail/attributes.hpp>
 #include <co_context/detail/io_context_meta.hpp>
 #include <co_context/detail/task_info.hpp>
 #include <co_context/detail/thread_meta.hpp>
@@ -28,7 +29,6 @@
 #include <co_context/task.hpp>
 #include <uring/uring.hpp>
 
-#include <cstdint>
 #include <sys/types.h>
 #include <thread>
 
@@ -92,6 +92,9 @@ class [[nodiscard]] io_context final {
     void do_submission_part() noexcept;
 
     void do_completion_part() noexcept;
+
+    [[CO_CONTEXT_NOINLINE]]
+    void do_completion_part_bad_path() noexcept;
 
     void do_worker_part();
 

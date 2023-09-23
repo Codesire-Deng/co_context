@@ -90,25 +90,15 @@ void io_context::do_submission_part() noexcept {
     worker.poll_submission();
 }
 
-void io_context::do_completion_part() noexcept {
-    // NOTE in the future: if an IO generates multiple requests_to_reap，
-    // it must be counted carefully
-
-    auto &meta = detail::io_context_meta;
-
-    uint32_t handled_num = worker.peek_uring() ? worker.poll_completion() : 0;
-    bool is_fast_path =
-        worker.requests_to_submit | worker.has_task_ready() | handled_num;
-    if (is_fast_path) [[likely]] {
-        return;
-    } else {
-        log::v("do_completion_part(): bad path\n");
-        if (!worker.peek_uring() && worker.requests_to_reap > 0) {
-            log::v("do_completion_part(): wait_uring()\n");
-            worker.wait_uring();
-        }
-        handled_num = worker.poll_completion();
+void io_context::do_completion_part_bad_path() noexcept {
+    log::v("do_completion_part_bad_path(): bad path\n");
+    const auto &meta = detail::io_context_meta;
+    if (!worker.peek_uring()
+        && (worker.requests_to_reap > 0 || meta.ready_count > 1)) {
+        log::v("do_completion_part_bad_path(): block on worker.wait_uring()\n");
+        worker.wait_uring();
     }
+    const uint32_t handled_num = worker.poll_completion();
 
     bool is_not_over =
         handled_num | (meta.ready_count > 1) | worker.requests_to_reap;
@@ -116,6 +106,21 @@ void io_context::do_completion_part() noexcept {
     if (!is_not_over) [[unlikely]] {
         will_stop = true;
     }
+}
+
+void io_context::do_completion_part() noexcept {
+    // NOTE in the future: if an IO generates multiple requests_to_reap，
+    // it must be counted carefully
+
+    const uint32_t handled_num =
+        worker.peek_uring() ? worker.poll_completion() : 0;
+    bool is_fast_path =
+        worker.requests_to_submit | worker.has_task_ready() | handled_num;
+    if (is_fast_path) [[likely]] {
+        return;
+    }
+
+    do_completion_part_bad_path();
 }
 
 void io_context::run() {
