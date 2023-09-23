@@ -876,12 +876,16 @@ struct lazy_who_am_i {
 
 using lazy_forget = std::suspend_always;
 
-class lazy_resume_on {
+struct lazy_resume_on {
   public:
     static constexpr bool await_ready() noexcept { return false; }
 
-    void await_suspend(std::coroutine_handle<> current) noexcept {
-        resume_ctx->worker.co_spawn_auto(current);
+    bool await_suspend(std::coroutine_handle<> current) const noexcept {
+        if (resume_ctx != detail::this_thread.ctx) [[likely]] {
+            resume_ctx->worker.co_spawn_auto(current);
+            return true;
+        }
+        return false;
     }
 
     constexpr void await_resume() const noexcept {}
