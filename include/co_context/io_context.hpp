@@ -21,13 +21,15 @@
 #include <co_context/config.hpp>
 #include <co_context/detail/attributes.hpp>
 #include <co_context/detail/io_context_meta.hpp>
+#include <co_context/detail/poller_type.hpp>
 #include <co_context/detail/task_info.hpp>
 #include <co_context/detail/thread_meta.hpp>
 #include <co_context/detail/thread_safety.hpp>
-#include <co_context/detail/uring_type.hpp>
 #include <co_context/detail/worker_meta.hpp>
 #include <co_context/task.hpp>
+#ifdef CO_CONTEXT_USE_IO_URING
 #include <uring/uring.hpp>
+#endif
 
 #include <sys/types.h>
 #include <thread>
@@ -43,7 +45,12 @@ using config::cache_line_size;
 
 class [[nodiscard]] io_context final {
   public:
+#ifdef CO_CONTEXT_USE_EPOLL
+    using epoll = detail::epoll;
+#else
     using uring = detail::uring;
+#endif
+    using poller_type = detail::poller_type;
 
   private:
     using task_info = detail::task_info;
@@ -112,7 +119,7 @@ class [[nodiscard]] io_context final {
     void co_spawn(task<void> &&entrance) noexcept;
 
     template<safety is_thread_safe>
-    void co_spawn(task<void> &&entrance) noexcept;
+    void co_spawn(task<void> &&entrance) noexcept; // NOLINT(*not-moved)
 
     void can_stop() noexcept { will_stop = true; }
 
@@ -125,7 +132,13 @@ class [[nodiscard]] io_context final {
         }
     }
 
-    inline uring &ring() noexcept { return worker.ring; }
+    inline poller_type &poller() noexcept {
+#ifdef CO_CONTEXT_USE_IO_URING
+        return worker.ring;
+#else
+        return worker.poller;
+#endif
+    }
 
     ~io_context() noexcept = default;
 
@@ -150,6 +163,7 @@ inline void io_context::co_spawn(task<void> &&entrance) noexcept {
 }
 
 template<safety is_thread_safe>
+// NOLINTNEXTLINE(*not-moved)
 inline void io_context::co_spawn(task<void> &&entrance) noexcept {
     auto handle = entrance.get_handle();
     entrance.detach();
@@ -160,6 +174,7 @@ inline void io_context::co_spawn(task<void> &&entrance) noexcept {
     }
 }
 
+// NOLINTNEXTLINE(*not-moved)
 inline void co_spawn(task<void> &&entrance) noexcept {
     assert(
         detail::this_thread.ctx != nullptr

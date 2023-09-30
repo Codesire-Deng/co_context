@@ -15,8 +15,8 @@ target_include_directories(co_context
 )
 
 include(cmake/Option.cmake)
-include(cmake/CompileOption.cmake)
 include(cmake/Platform.cmake)
+include(cmake/CompileOption.cmake)
 include(cmake/Develop.cmake)
 include(cmake/Extra.cmake)
 include(cmake/Install.cmake)

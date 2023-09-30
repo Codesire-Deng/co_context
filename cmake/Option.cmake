@@ -1,6 +1,7 @@
 # ----------------------------------------------------------------------------
 #   Build options
 # ----------------------------------------------------------------------------
+option(WITH_EPOLL "Force the use of epoll as the poller although io_uring is available." ON)
 option(WITH_LIBCXX "Force to build with LLVM libc++. Clang only" OFF)
 option(WITH_MIMALLOC "Force to build with mimalloc version >= 2.0" OFF)
 

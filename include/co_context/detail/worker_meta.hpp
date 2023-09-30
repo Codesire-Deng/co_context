@@ -2,9 +2,9 @@
 
 #include <co_context/config.hpp>
 #include <co_context/detail/io_context_meta.hpp>
+#include <co_context/detail/poller_type.hpp>
 #include <co_context/detail/spsc_cursor.hpp>
 #include <co_context/detail/thread_meta.hpp>
-#include <co_context/detail/uring_type.hpp>
 #include <co_context/detail/user_data.hpp>
 #include <co_context/log/log.hpp>
 
@@ -35,8 +35,17 @@ struct worker_meta final {
      * Data sharing with the ring
      * ---------------------------------------------------
      */
+
+#ifdef CO_CONTEXT_USE_IO_URING
     // An instant of io_uring
     alignas(cache_line_size) uring ring;
+#endif
+
+#ifdef CO_CONTEXT_USE_EPOLL
+    alignas(cache_line_size) epoll poller;
+    using epoll_event = epoll::epoll_event;
+    using epoll_data_t = epoll::epoll_data_t;
+#endif
 
 #if CO_CONTEXT_IS_USING_EVENTFD
     uint64_t co_spawn_event_buf = 0;
@@ -48,11 +57,10 @@ struct worker_meta final {
      * ---------------------------------------------------
      */
 
-    alignas(cache_line_size)
 #if CO_CONTEXT_IS_USING_EVENTFD
-        int co_spawn_event_fd = -1;
+    alignas(cache_line_size) int co_spawn_event_fd = -1;
 #else
-        int ring_fd;
+    alignas(cache_line_size) int ring_fd;
 #endif
 
     config::ctx_id_t ctx_id;
@@ -99,18 +107,9 @@ struct worker_meta final {
         return !reap_cur.is_empty();
     }
 
-    liburingcxx::sq_entry *get_free_sqe() noexcept;
-
-    [[nodiscard]]
-    bool is_ring_need_enter() const noexcept;
-
 #if CO_CONTEXT_IS_USING_EVENTFD
     void listen_on_co_spawn() noexcept;
 #endif
-
-    void wait_uring() noexcept;
-
-    bool peek_uring() noexcept;
 
     [[nodiscard]]
     cur_t number_to_schedule() const noexcept {
@@ -158,10 +157,21 @@ struct worker_meta final {
      */
     void forward_task(std::coroutine_handle<> handle) noexcept;
 
+#ifdef CO_CONTEXT_USE_IO_URING
+    liburingcxx::sq_entry *get_free_sqe() noexcept;
+
+    [[nodiscard]]
+    bool is_ring_need_enter() const noexcept;
+
+    void wait_uring() noexcept;
+
+    bool peek_uring() noexcept;
+
     /**
      * @brief handle an non-null cq_entry from the cq of io_uring
      */
     void handle_cq_entry(const liburingcxx::cq_entry *) noexcept;
+#endif
 
     void handle_reserved_user_data(uint64_t user_data) noexcept;
 

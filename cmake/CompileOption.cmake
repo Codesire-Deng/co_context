@@ -28,6 +28,14 @@ else()
     message(WARNING "IPO is not supported: ${output_support_IPO}")
 endif()
 
+# Optional epoll.
+if (WITH_EPOLL OR kernel_version VERSION_LESS "5.6")
+    target_compile_definitions(co_context PUBLIC CO_CONTEXT_USE_EPOLL)
+    message(NOTICE "epoll enabled, io_uring disabled")
+else()
+    target_compile_definitions(co_context PUBLIC CO_CONTEXT_USE_IO_URING)
+endif()
+
 # Optional mimalloc.
 if(WITH_MIMALLOC)
     find_package(mimalloc 2.0 REQUIRED)

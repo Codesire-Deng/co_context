@@ -12,14 +12,11 @@
 #include <uring/cq_entry.hpp>
 #include <uring/uring_define.hpp>
 
-#include <atomic>
 #include <cerrno>
 #include <coroutine>
 #include <cstdint>
 #include <exception>
-#include <memory>
 #include <mutex>
-#include <thread>
 #include <unistd.h>
 
 #if CO_CONTEXT_IS_USING_EVENTFD
@@ -31,8 +28,7 @@ namespace co_context::detail {
 thread_local thread_meta this_thread; // NOLINT(*global-variables)
 
 #if CO_CONTEXT_IS_USING_EVENTFD
-worker_meta::worker_meta() noexcept {
-    co_spawn_event_fd = ::eventfd(0, 0);
+worker_meta::worker_meta() noexcept : co_spawn_event_fd(::eventfd(0, 0)) {
     if (co_spawn_event_fd == -1) [[unlikely]] {
         log::e("Errors on eventfd(). errno = %d\n", errno);
         std::terminate();
@@ -46,17 +42,21 @@ worker_meta::~worker_meta() noexcept {
 }
 #endif
 
-void worker_meta::init(unsigned io_uring_entries) {
+void worker_meta::init(unsigned max_io_entries) {
     this->ctx_id = this_thread.ctx_id;
     this_thread.worker = this;
 
-    ring.init(io_uring_entries);
+#ifdef CO_CONTEXT_USE_IO_URING
+    ring.init(max_io_entries);
+#else
+
+#endif
 
 #if CO_CONTEXT_IS_USING_MSG_RING
     this->ring_fd = ring.fd();
 #endif
 
-    if (!check_init(io_uring_entries)) {
+    if (!check_init(max_io_entries)) {
         std::terminate();
     }
 
@@ -84,6 +84,7 @@ void worker_meta::deinit() noexcept {
 }
 
 bool worker_meta::check_init(unsigned expect_sqring_size) const noexcept {
+#ifdef CO_CONTEXT_USE_IO_URING
     const unsigned actual_sqring_size = ring.get_sq_ring_entries();
 
     if (actual_sqring_size < expect_sqring_size) {
@@ -103,7 +104,7 @@ bool worker_meta::check_init(unsigned expect_sqring_size) const noexcept {
             actual_sqring_size, expect_sqring_size
         );
     }
-
+#endif
     return true;
 }
 
