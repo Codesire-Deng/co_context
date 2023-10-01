@@ -240,6 +240,7 @@ class [[CO_CONTEXT_AWAIT_HINT]] task {
   public:
     using promise_type = detail::task_promise<T>;
     using value_type = T;
+    struct is_tasklike{};
 
   private:
     struct awaiter_base {
