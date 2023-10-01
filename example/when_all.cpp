@@ -10,7 +10,7 @@ task<int> f0() {
     co_return 1;
 }
 
-task<const char *> f1() {
+shared_task<std::string> f1() {
     printf("f1 start.\n");
     printf("f1 done.\n");
     co_return "f1 Great!";
