@@ -9,6 +9,7 @@ set(co_context_tests
         recv_perf
         timer_accuracy
         liburingcxx_netcat
+        move_shared_task
 )
 
 foreach(test_target ${co_context_tests})
