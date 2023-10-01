@@ -251,8 +251,11 @@ template<typename T = void>
 class [[nodiscard]] shared_task {
   public:
     using promise_type = detail::shared_task_promise<T>;
-
     using value_type = T;
+
+    struct is_tasklike {};
+
+    struct is_shared_task {};
 
   private:
     struct awaitable_base {
