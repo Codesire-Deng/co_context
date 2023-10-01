@@ -165,6 +165,10 @@ void log_error(int err) {
 
 [示例：echo_server_MT.cpp](./example/echo_server_MT.cpp)
 
+借助 `resume_on()`，可以在运行时任意切换线程。
+
+[示例：resume_on.cpp](./example/resume_on.cpp)
+
 #### Generator
 
 同步执行的生成器，可配合`std::range`。 *需要 g++*
@@ -230,8 +234,8 @@ co_context 在开发过程中表现出惊人的性能。早期测试见[我的�
 2. **co_context** 的数据结构保证「可能频繁读写」的 cacheline 最多被两个线程访问，无论并发强度有多大。这个保证本身也不经过互斥锁或原子变量。（若使用原子变量，高竞争下性能损失约 33%～70%）
 3. 对于可能被多于两个线程读写的 cacheline，**co_context** 保证乒乓缓存问题最多发生常数次。
 4. 在 AMD-5800X，3200 Mhz-ddr4 环境下，若绕过 io_uring，**co_context** 的线程交互频率可达 1.25 GHz。
-5. 在一个本地测试中（I7-8550U 移动端），**单线程**的协程切换的平均延迟为 9.4 ns，代码于 [test/ctx_swtch.cpp](test/ctx_swtch.cpp)。
-5. 在一个本地测试中（R7-5800X 桌面端），**跨线程**的协程切换的平均延迟为 37 ns，代码于 [test/ctx_swtch.cpp](test/ctx_swtch.cpp)。
+5. 在一个本地测试中（I7-8550U 移动端），**单线程**的协程切换的平均延迟为 4.6 ns，代码于 [test/benchmark/lazy_yield](test/benchmark/lazy_yield.cpp)。
+5. 在一个本地测试中（R7-5800X 桌面端），**跨线程**的协程切换的平均延迟为 37 ns，~~代码于 [test/ctx_swtch.cpp](test/ctx_swtch.cpp)。~~
 6. 协程自身的缓存不友好问题（主要由 `operator new` 引起），需要借助其他工具来解决，例如 [mimalloc](https://github.com/microsoft/mimalloc)。
 
 ---
