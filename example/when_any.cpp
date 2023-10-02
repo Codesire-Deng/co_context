@@ -11,7 +11,7 @@ task<int> f0() {
     co_return 1;
 }
 
-task<const char *> f1() {
+shared_task<std::string> f1() {
     printf("f1 start.\n");
     printf("f1 done.\n");
     co_return "f1 Great!";
@@ -32,7 +32,7 @@ task<> run() {
         overload{
             [](std::monostate) { std::cout << "(void)\n"; },
             [](int x) { std::cout << x << " : int\n"; },
-            [](const char *s) { std::cout << s << " : string\n"; },
+            [](const std::string &s) { std::cout << s << " : string\n"; },
         },
         var
     );
