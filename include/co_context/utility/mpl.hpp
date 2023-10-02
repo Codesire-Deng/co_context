@@ -242,8 +242,17 @@ using remove_t = tuple_cat_t<std::conditional_t<
     std::tuple<From>>...>;
 
 template<typename T>
-using uninitialized = std::
-    conditional_t<std::is_void_v<T>, void, detail::uninitialized_buffer<T>>;
+struct uninitialized {
+    using type = detail::uninitialized_buffer<T>;
+};
+
+template<>
+struct uninitialized<void> {
+    using type = void;
+};
+
+template<typename T>
+using uninitialized_t = uninitialized<T>;
 
 } // namespace co_context::mpl
 

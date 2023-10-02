@@ -1,11 +1,8 @@
 #pragma once
 
-#include <co_context/config.hpp>
 #include <co_context/detail/tasklike.hpp>
 #include <co_context/io_context.hpp>
 #include <co_context/lazy_io.hpp>
-#include <co_context/shared_task.hpp>
-#include <co_context/task.hpp>
 #include <co_context/utility/as_atomic.hpp>
 #include <co_context/utility/mpl.hpp>
 
@@ -16,12 +13,6 @@
 #include <utility>
 
 namespace co_context::detail {
-
-template<typename... Ts>
-using tuple_or_void = std::conditional_t<
-    std::is_same_v<std::tuple<>, mpl::remove_t<void, Ts...>>,
-    void,
-    mpl::remove_t<void, Ts...>>;
 
 struct all_meta_base {
     std::coroutine_handle<> await_handle;
@@ -54,14 +45,13 @@ struct all_meta_base {
     }
 };
 
-template<typename... Ts>
+template<mpl::TL tuple_list>
 struct all_meta : all_meta_base {
-    using result_type = std::tuple<Ts...>;
-    using buffer_type = std::tuple<mpl::uninitialized<Ts>...>;
-    using result_type_list = mpl::type_list<Ts...>;
+    static_assert(mpl::count_v<tuple_list, void> == 0);
 
-    static_assert(sizeof...(Ts) != 0);
-    static_assert(mpl::count_v<result_type_list, void> == 0);
+    using value_type = tuple_list::template to<std::tuple>;
+    using buffer_type =
+        mpl::map_t<tuple_list, mpl::uninitialized>::template to<std::tuple>;
 
     buffer_type buffer;
 
@@ -73,43 +63,42 @@ struct all_meta : all_meta_base {
     all_meta &operator=(const all_meta &) = delete;
     all_meta &operator=(all_meta &&) = delete;
 
-    ~all_meta() noexcept(noexcept(std::destroy_at(&as_result()))) {
+    ~all_meta() noexcept(std::is_nothrow_destructible_v<value_type>) {
         std::destroy_at(&as_result());
     }
 
-    result_type &as_result() & noexcept {
-        return *reinterpret_cast<result_type *>(&buffer);
+    value_type &as_result() & noexcept {
+        return *reinterpret_cast<value_type *>(&buffer);
     }
 };
 
 template<>
-struct all_meta<> : all_meta_base {
+struct all_meta<mpl::type_list<>> : all_meta_base {
     using all_meta_base::all_meta_base;
+    using value_type = void;
 };
 
-template<typename... Ts>
-using to_all_meta_t = typename clear_void_t<Ts...>::template to<all_meta>;
-
-template<size_t idx, typename... Ts>
-struct get_buffer_offset {
+template<tasklike... task_types>
+struct all_trait {
   private:
-    static constexpr bool is_void_v =
-        std::is_same_v<void, mpl::select<mpl::type_list<Ts...>, idx>>;
-    using list = mpl::first_N_t<mpl::type_list<Ts...>, idx + 1>;
+    using type_list = mpl::type_list<typename task_types::value_type...>;
+
+    using tuple_list = typename type_list::template to<clear_void_t>;
 
   public:
-    static constexpr size_t value =
-        is_void_v ? -1 : (idx - mpl::count_v<list, void>);
-};
+    using meta_type = all_meta<tuple_list>;
 
-template<size_t idx, typename... Ts>
-inline constexpr size_t get_buffer_offset_v =
-    get_buffer_offset<idx, Ts...>::value;
+    using value_type = meta_type::value_type;
+
+    template<size_t idx>
+    static constexpr size_t buffer_offset_v =
+        idx - mpl::count_v<mpl::first_N_t<type_list, idx + 1>, void>;
+};
 
 template<
     safety is_thread_safe,
     typename all_meta_type,
-    size_t pos,
+    size_t buffer_offset,
     tasklike task_type>
     requires std::is_base_of_v<all_meta_base, all_meta_type>
 task<void> all_evaluate_to(all_meta_type &meta, task_type &&node) {
@@ -122,9 +111,9 @@ task<void> all_evaluate_to(all_meta_type &meta, task_type &&node) {
     if constexpr (std::is_void_v<node_value_type>) {
         co_await node;
     } else {
-        auto *const location =
-            reinterpret_cast<node_value_type *>(std::get<pos>(meta.buffer).data
-            );
+        auto *const location = reinterpret_cast<node_value_type *>(
+            std::get<buffer_offset>(meta.buffer).data
+        );
 
         if constexpr (requires { typename task_type::is_shared_task; }) {
             std::construct_at(location, co_await std::forward<task_type>(node));
@@ -142,29 +131,31 @@ task<void> all_evaluate_to(all_meta_type &meta, task_type &&node) {
 
 namespace co_context {
 
-template<safety is_thread_safe = safety::safe, tasklike... tasklikes>
-task<detail::tuple_or_void<typename tasklikes::value_type...>>
-all(tasklikes... node) {
-    constexpr size_t n = sizeof...(tasklikes);
+template<safety is_thread_safe = safety::safe, tasklike... task_types>
+task<typename detail::all_trait<task_types...>::value_type>
+all(task_types... node) {
+    constexpr size_t n = sizeof...(task_types);
     static_assert(n >= 2, "too few tasks for `all(...)`");
 
-    using all_meta_type =
-        detail::to_all_meta_t<typename tasklikes::value_type...>;
+    using trait = detail::all_trait<task_types...>;
+
+    using all_meta_type = trait::meta_type;
+
     all_meta_type meta{co_await lazy::who_am_i(), n};
 
     auto spawn_all = [&]<size_t... idx>(std::index_sequence<idx...>) {
         (..., co_spawn(detail::all_evaluate_to<
                        is_thread_safe, all_meta_type,
-                       detail::get_buffer_offset_v<
-                           idx, typename tasklikes::value_type...>,
-                       tasklikes>(meta, std::move(node))));
+                       trait::template buffer_offset_v<idx>, task_types>(
+                  meta, std::move(node)
+              )));
     };
 
     if constexpr (is_thread_safe) {
         std::atomic_thread_fence(std::memory_order_release);
     }
 
-    spawn_all(std::index_sequence_for<tasklikes...>{});
+    spawn_all(std::index_sequence_for<task_types...>{});
 
     co_await lazy::forget();
 
@@ -172,8 +163,7 @@ all(tasklikes... node) {
         std::atomic_thread_fence(std::memory_order_acquire);
     }
 
-    if constexpr (std::is_void_v<detail::tuple_or_void<
-                      typename tasklikes::value_type...>>) {
+    if constexpr (std::is_void_v<typename trait::value_type>) {
         co_return;
     } else {
         co_return std::move(meta.as_result());
