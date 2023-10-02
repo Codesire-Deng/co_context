@@ -1,9 +1,8 @@
 #pragma once
 
-#include <co_context/config.hpp>
+#include <co_context/detail/tasklike.hpp>
 #include <co_context/io_context.hpp>
 #include <co_context/lazy_io.hpp>
-#include <co_context/task.hpp>
 #include <co_context/utility/as_atomic.hpp>
 #include <co_context/utility/mpl.hpp>
 
@@ -16,23 +15,7 @@
 #include <utility>
 #include <variant>
 
-namespace co_context::detail {
-
-template<typename... Ts>
-constexpr bool is_all_void_v =
-    (mpl::count_v<mpl::type_list<Ts...>, void> == sizeof...(Ts));
-
-template<typename... Ts>
-using variant_list =
-    typename clear_void_t<Ts...>::template prepend<std::monostate>;
-
-template<typename... Ts>
-using to_any_variant_t =
-    typename variant_list<Ts...>::template to<std::variant>;
-
-template<typename... Ts>
-using variant_or_uint =
-    std::conditional_t<is_all_void_v<Ts...>, uint32_t, to_any_variant_t<Ts...>>;
+namespace co_context {
 
 template<typename T>
 struct index_value {
@@ -40,18 +23,11 @@ struct index_value {
     T value;
 };
 
-template<typename... Ts>
-using any_index_value = index_value<to_any_variant_t<Ts...>>;
+} // namespace co_context
 
-template<typename... Ts>
-using any_return_type =
-    std::conditional_t<is_all_void_v<Ts...>, uint32_t, any_index_value<Ts...>>;
+namespace co_context::detail {
 
-template<typename Variant>
-struct any_meta {
-    using result_type = Variant;
-
-    result_type buffer;
+struct any_meta_base {
     std::coroutine_handle<> await_handle;
 
     // NOTE NOT thread-safe!  If `resume_on` is used, race condition may
@@ -59,76 +35,107 @@ struct any_meta {
     uint32_t idx{-1U};
     uint32_t finish_count{0};
 
-    explicit any_meta(std::coroutine_handle<> await_handle) noexcept
+    explicit any_meta_base(std::coroutine_handle<> await_handle) noexcept
         : await_handle(await_handle) {}
 
-    result_type &as_result() & noexcept { return buffer; }
-};
-
-template<>
-struct any_meta<uint32_t> {
-    std::coroutine_handle<> await_handle;
-
-    // NOTE NOT thread-safe!  If `resume_on` is used, race condition may
-    // happen!
-    uint32_t idx{-1U};
-    uint32_t finish_count{0};
-
-    explicit any_meta(std::coroutine_handle<> await_handle) noexcept
-        : await_handle(await_handle) {}
-};
-
-template<typename... Ts>
-using any_meta_type = any_meta<variant_or_uint<Ts...>>;
-
-template<safety is_thread_safe, size_t idx, typename... Ts>
-task<void> any_evaluate_to(
-    std::shared_ptr<any_meta_type<Ts...>> meta_ptr,
-    task<mpl::select_t<idx, Ts...>> node // take the ownership
-) {
-    constexpr uint32_t n = sizeof...(Ts);
-    using node_return_type = mpl::select_t<idx, Ts...>;
-
-    bool is_cancelled;
-    if constexpr (is_thread_safe) {
-        is_cancelled =
-            (as_atomic(meta_ptr->finish_count).load(std::memory_order_relaxed)
-             != 0);
-    } else {
-        is_cancelled = (meta_ptr->finish_count != 0);
-    }
-    if (is_cancelled) {
-        co_return;
-    }
-
-    auto preempt = [meta_ptr = meta_ptr.get()]() -> bool {
+    template<bool is_thread_safe>
+    [[nodiscard]]
+    bool is_cancelled() const noexcept {
         if constexpr (is_thread_safe) {
-            return as_atomic(meta_ptr->finish_count)
+            return as_c_atomic(this->finish_count)
+                       .load(std::memory_order_acquire)
+                   != 0;
+        } else {
+            return this->finish_count != 0;
+        }
+    }
+
+    template<bool is_thread_safe>
+    [[nodiscard]]
+    bool preempt() noexcept {
+        if constexpr (is_thread_safe) {
+            return as_atomic(this->finish_count)
                        .fetch_add(1, std::memory_order_acquire)
                    == 0;
         } else {
-            return meta_ptr->finish_count++ == 0;
+            return this->finish_count++ == 0;
         }
-    };
+    }
+
+    template<bool is_thread_safe>
+    void co_spawn() const noexcept {
+        if constexpr (is_thread_safe) {
+            std::atomic_thread_fence(std::memory_order_release);
+        }
+        detail::co_spawn_handle(this->await_handle);
+    }
+};
+
+template<typename Variant>
+struct any_meta : any_meta_base {
+    Variant buffer;
+
+    using any_meta_base::any_meta_base;
+
+    Variant &as_result() & noexcept { return buffer; }
+};
+
+template<>
+struct any_meta<uint32_t> : any_meta_base {};
+
+template<tasklike... task_types>
+struct any_trait {
+  private:
+    using type_list = mpl::type_list<typename task_types::value_type...>;
+
+    using variant_list = typename type_list::template to<
+        clear_void_t>::template prepend<std::monostate>;
+
+    using variant_type = variant_list::template to<std::variant>;
+
+  public:
+    static constexpr bool is_all_void =
+        (mpl::count_v<type_list, void> == sizeof...(task_types));
+
+    using index_type = uint32_t;
+
+    using value_type =
+        std::conditional_t<is_all_void, index_type, index_value<variant_type>>;
+
+    using meta_type = any_meta<variant_type>;
+};
+
+template<
+    safety is_thread_safe,
+    typename any_meta_type,
+    size_t idx,
+    tasklike task_type>
+task<void> any_evaluate_to(
+    std::shared_ptr<any_meta_type> meta_ptr,
+    task_type node // take the ownership
+) {
+    using node_return_type = typename task_type::value_type;
+
+    if (meta_ptr->template is_cancelled<is_thread_safe>()) {
+        co_return;
+    }
 
     if constexpr (std::is_void_v<node_return_type>) {
         co_await node;
-        if (preempt()) {
+        if (meta_ptr->template preempt<is_thread_safe>()) {
             meta_ptr->idx = idx;
-            if constexpr (is_thread_safe) {
-                std::atomic_thread_fence(std::memory_order_release);
-            }
-            detail::co_spawn_handle(meta_ptr->await_handle);
+            meta_ptr->template co_spawn<is_thread_safe>();
         }
     } else {
         auto &&result = co_await node;
-        if (preempt()) {
-            meta_ptr->buffer = std::move(result);
-            meta_ptr->idx = idx;
-            if constexpr (is_thread_safe) {
-                std::atomic_thread_fence(std::memory_order_release);
+        if (meta_ptr->template preempt<is_thread_safe>()) {
+            if constexpr (requires { typename task_type::is_shared_task; }) {
+                meta_ptr->buffer = result;
+            } else {
+                meta_ptr->buffer = std::move(result);
             }
-            detail::co_spawn_handle(meta_ptr->await_handle);
+            meta_ptr->idx = idx;
+            meta_ptr->template co_spawn<is_thread_safe>();
         }
     }
 }
@@ -137,25 +144,28 @@ task<void> any_evaluate_to(
 
 namespace co_context {
 
-template<safety is_thread_safe = safety::safe, typename... Ts>
-task<detail::any_return_type<Ts...>> any(task<Ts>... node) {
-    constexpr uint32_t n = sizeof...(Ts);
+template<safety is_thread_safe = safety::safe, tasklike... task_types>
+task<typename detail::any_trait<task_types...>::value_type>
+any(task_types... node) {
+    constexpr uint32_t n = sizeof...(task_types);
     static_assert(n >= 2, "too few tasks for `any(...)`");
 
-    using meta_type = detail::any_meta_type<Ts...>;
+    using trait = detail::any_trait<task_types...>;
+    using meta_type = trait::meta_type;
     auto meta_ptr = std::make_shared<meta_type>(co_await lazy::who_am_i());
 
     auto spawn_all = [&]<size_t... idx>(std::index_sequence<idx...>) {
-        (..., co_spawn(any_evaluate_to<is_thread_safe, idx, Ts...>(
-                  meta_ptr, std::move(node)
-              )));
+        (...,
+         co_spawn(any_evaluate_to<is_thread_safe, meta_type, idx, task_types>(
+             meta_ptr, std::move(node)
+         )));
     };
 
     if constexpr (is_thread_safe) {
         std::atomic_thread_fence(std::memory_order_release);
     }
 
-    spawn_all(std::index_sequence_for<Ts...>{});
+    spawn_all(std::index_sequence_for<task_types...>{});
 
     co_await lazy::forget();
 
@@ -163,26 +173,20 @@ task<detail::any_return_type<Ts...>> any(task<Ts>... node) {
         std::atomic_thread_fence(std::memory_order_acquire);
     }
 
-    if constexpr (detail::is_all_void_v<Ts...>) {
+    if constexpr (trait::is_all_void) {
         co_return meta_ptr->idx;
     } else {
-        co_return detail::any_index_value<Ts...>{
-            meta_ptr->idx, std::move(meta_ptr->buffer)
-        };
+        using value_type = trait::value_type;
+        co_return value_type{meta_ptr->idx, std::move(meta_ptr->buffer)};
     }
 }
 } // namespace co_context
 
 namespace co_context::detail {
 
-template<typename... Ts>
-using some_return_type = std::vector<any_return_type<Ts...>>;
-
-template<typename... Ts>
+template<typename Vector>
 struct some_meta {
-    using result_type = some_return_type<Ts...>;
-
-    result_type buffer;
+    Vector buffer;
     std::coroutine_handle<> await_handle;
 
     // NOTE NOT thread-safe!  If `resume_on` is used, race condition may
@@ -198,63 +202,85 @@ struct some_meta {
         buffer.resize(min_complete);
     }
 
-    result_type &as_result() & noexcept { return buffer; }
+    Vector &as_result() & noexcept { return buffer; }
+
+    template<bool is_thread_safe>
+    [[nodiscard]]
+    bool is_cancelled(uint32_t min_complete) const noexcept {
+        if constexpr (is_thread_safe) {
+            return as_c_atomic(this->idx).load(std::memory_order_acquire)
+                   >= min_complete;
+        } else {
+            return this->idx >= min_complete;
+        }
+    }
+
+    template<bool is_thread_safe>
+    [[nodiscard]]
+    uint32_t preempt() noexcept {
+        if constexpr (is_thread_safe) {
+            return as_atomic(this->idx).fetch_add(1, std::memory_order_acquire);
+        } else {
+            return this->idx++;
+        }
+    }
+
+    template<bool is_thread_safe>
+    void co_spawn() const noexcept {
+        if constexpr (is_thread_safe) {
+            std::atomic_thread_fence(std::memory_order_release);
+        }
+        detail::co_spawn_handle(this->await_handle);
+    }
 };
 
-template<safety is_thread_safe, size_t idx, typename... Ts>
+template<tasklike... task_types>
+struct some_trait {
+  private:
+    using type_list = mpl::type_list<typename task_types::value_type...>;
+
+    using element_type = any_trait<task_types...>::value_type;
+
+  public:
+    using value_type = std::vector<element_type>;
+
+    using meta_type = some_meta<value_type>;
+};
+
+template<
+    safety is_thread_safe,
+    typename some_meta_type,
+    size_t idx,
+    tasklike task_type>
 task<void> some_evaluate_to(
     const uint32_t min_complete,
-    std::shared_ptr<some_meta<Ts...>> meta_ptr,
-    task<mpl::select_t<idx, Ts...>> node // take the ownership
+    std::shared_ptr<some_meta_type> meta_ptr,
+    task_type node // take the ownership
 ) {
-    constexpr uint32_t n = sizeof...(Ts);
-    using node_return_type = mpl::select_t<idx, Ts...>;
+    using node_return_type = typename task_type::value_type;
 
-    bool is_cancelled;
-    if constexpr (is_thread_safe) {
-        is_cancelled =
-            (as_atomic(meta_ptr->idx).load(std::memory_order_relaxed)
-             >= min_complete);
-    } else {
-        is_cancelled = (meta_ptr->idx >= min_complete);
-    }
-    if (is_cancelled) {
+    if (meta_ptr->template is_cancelled<is_thread_safe>(min_complete)) {
         co_return;
     }
 
-    auto preempt = [meta_ptr = meta_ptr.get()]() -> uint32_t {
-        if constexpr (is_thread_safe) {
-            return as_atomic(meta_ptr->idx)
-                .fetch_add(1, std::memory_order_acquire);
-        } else {
-            return meta_ptr->idx++;
-        }
-    };
-
     if constexpr (std::is_void_v<node_return_type>) {
         co_await node;
-        const uint32_t rank = preempt();
+        const uint32_t rank = meta_ptr->template preempt<is_thread_safe>();
         if (rank < min_complete) {
             meta_ptr->buffer[rank].index = idx;
             if (rank + 1 == min_complete) {
-                if constexpr (is_thread_safe) {
-                    std::atomic_thread_fence(std::memory_order_release);
-                }
-                detail::co_spawn_handle(meta_ptr->await_handle);
+                meta_ptr->template co_spawn<is_thread_safe>();
             }
         }
     } else {
         auto &&result = co_await node;
-        const uint32_t rank = preempt();
+        const uint32_t rank = meta_ptr->template preempt<is_thread_safe>();
         if (rank < min_complete) {
             auto &any_tuple = meta_ptr->buffer[rank];
             any_tuple.index = idx;
             any_tuple.value = std::move(result);
             if (rank + 1 == min_complete) {
-                if constexpr (is_thread_safe) {
-                    std::atomic_thread_fence(std::memory_order_release);
-                }
-                detail::co_spawn_handle(meta_ptr->await_handle);
+                meta_ptr->template co_spawn<is_thread_safe>();
             }
         }
     }
@@ -264,29 +290,31 @@ task<void> some_evaluate_to(
 
 namespace co_context {
 
-template<safety is_thread_safe = safety::safe, typename... Ts>
-task<detail::some_return_type<Ts...>>
-some(uint32_t min_complete, task<Ts>... node) {
-    constexpr uint32_t n = sizeof...(Ts);
+template<safety is_thread_safe = safety::safe, tasklike... task_types>
+task<typename detail::some_trait<task_types...>::value_type>
+some(uint32_t min_complete, task_types... node) {
+    constexpr uint32_t n = sizeof...(task_types);
     static_assert(n >= 2, "too few tasks for `some(...)`");
     assert(n >= min_complete && "too few tasks for `some(...)`");
     assert(min_complete >= 1 && "min_complete should be at least 1");
 
-    using meta_type = detail::some_meta<Ts...>;
+    using trait = detail::some_trait<task_types...>;
+    using meta_type = trait::meta_type;
     auto meta_ptr =
         std::make_shared<meta_type>(co_await lazy::who_am_i(), min_complete);
 
     auto spawn_all = [&]<size_t... idx>(std::index_sequence<idx...>) {
-        (..., co_spawn(some_evaluate_to<is_thread_safe, idx, Ts...>(
-                  min_complete, meta_ptr, std::move(node)
-              )));
+        (...,
+         co_spawn(some_evaluate_to<is_thread_safe, meta_type, idx, task_types>(
+             min_complete, meta_ptr, std::move(node)
+         )));
     };
 
     if constexpr (is_thread_safe) {
         std::atomic_thread_fence(std::memory_order_release);
     }
 
-    spawn_all(std::index_sequence_for<Ts...>{});
+    spawn_all(std::index_sequence_for<task_types...>{});
 
     co_await lazy::forget();
 
