@@ -27,6 +27,11 @@ struct lazy_link_io {
 
 class lazy_awaiter {
   public:
+    [[nodiscard]]
+    int32_t result() const noexcept {
+        return io_info.result;
+    }
+
     static constexpr bool await_ready() noexcept { return false; }
 
     void await_suspend(std::coroutine_handle<> current) noexcept {
@@ -43,7 +48,7 @@ class lazy_awaiter {
         return std::move(*this);
     }
 
-    /*NOLINT*/ int32_t await_resume() const noexcept { return io_info.result; }
+    /*NOLINT*/ int32_t await_resume() const noexcept { return result(); }
 
     std::suspend_never detach() noexcept {
 #if LIBURINGCXX_IS_KERNEL_REACH(5, 17)
