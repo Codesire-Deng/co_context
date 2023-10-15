@@ -35,6 +35,11 @@ class sq_entry final : private io_uring_sqe {
         return *this;
     }
 
+    [[nodiscard]]
+    inline uint64_t get_data() const noexcept {
+        return user_data;
+    }
+
     inline __u64 &fetch_data() noexcept { return this->user_data; }
 
     inline sq_entry &reset_flags(uint8_t flags) noexcept {

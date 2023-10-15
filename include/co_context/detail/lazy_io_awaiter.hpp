@@ -56,6 +56,11 @@ class lazy_awaiter {
         return {};
     }
 
+    [[nodiscard]]
+    uint64_t user_data() const noexcept {
+        return sqe->get_data();
+    }
+
   protected:
     friend struct lazy_link_io;
     friend struct lazy_link_timeout;
@@ -411,6 +416,7 @@ struct lazy_multishot_accept_direct : lazy_awaiter {
 };
 #endif
 
+// Available since Linux 5.5
 struct lazy_cancel : lazy_awaiter {
     inline lazy_cancel(uint64_t user_data, int flags) noexcept {
         sqe->prep_cancle(user_data, flags);
