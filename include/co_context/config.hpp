@@ -117,10 +117,6 @@ namespace config {
     using condition_variable_counting_t = std::uintptr_t;
     // ========================================================================
 
-    // ======================== lazy_io configuration =========================
-    inline constexpr bool enable_link_io_result = false;
-    // ========================================================================
-
     // ========================= timer configuration ==========================
     /**
      * @brief Fix the timer expiring time point, to improve accuracy.

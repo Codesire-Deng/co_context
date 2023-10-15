@@ -231,11 +231,9 @@ void worker_meta::handle_cq_entry(const liburingcxx::cq_entry *const cqe
             ));
             break;
         case mux::task_info_ptr__link_sqe:
-            if constexpr (config::enable_link_io_result) {
-                io_info->result = result;
-            }
-            // if link_io_result is not enabled, we can skip the
-            // lazy_link_sqe.
+            // transfer the result of io, but do not resume the task
+            io_info->result = result;
+            // io_info->flags = flags;
             break;
         case mux::msg_ring:
             forward_task(std::coroutine_handle<>::from_address(
