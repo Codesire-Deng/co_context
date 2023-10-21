@@ -1,10 +1,11 @@
 #pragma once
 
 #include <co_context/detail/tasklike.hpp>
+#include <co_context/detail/uninitialize.hpp>
 #include <co_context/io_context.hpp>
 #include <co_context/lazy_io.hpp>
+#include <co_context/mpl/type_list.hpp>
 #include <co_context/utility/as_atomic.hpp>
-#include <co_context/utility/mpl.hpp>
 
 #include <coroutine>
 #include <cstddef>
@@ -45,13 +46,14 @@ struct all_meta_base {
     }
 };
 
-template<mpl::TL tuple_list>
+template<mpl::TL out_type_list>
 struct all_meta : all_meta_base {
-    static_assert(mpl::count_v<tuple_list, void> == 0);
+    static_assert(mpl::count_v<out_type_list, void> == 0);
 
-    using value_type = tuple_list::template to<std::tuple>;
+    using value_type = out_type_list::template to<std::tuple>;
     using buffer_type =
-        mpl::map_t<tuple_list, mpl::uninitialized>::template to<std::tuple>;
+        mpl::map_t<out_type_list, detail::uninitialize>::template to<
+            std::tuple>;
 
     buffer_type buffer;
 
@@ -81,18 +83,18 @@ struct all_meta<mpl::type_list<>> : all_meta_base {
 template<tasklike... task_types>
 struct all_trait {
   private:
-    using type_list = mpl::type_list<typename task_types::value_type...>;
+    using in_type_list = mpl::type_list<typename task_types::value_type...>;
 
-    using tuple_list = typename type_list::template to<clear_void_t>;
+    using out_type_list = mpl::remove_t<in_type_list, void>;
 
   public:
-    using meta_type = all_meta<tuple_list>;
+    using meta_type = all_meta<out_type_list>;
 
     using value_type = meta_type::value_type;
 
     template<size_t idx>
     static constexpr size_t buffer_offset_v =
-        idx - mpl::count_v<mpl::first_N_t<type_list, idx + 1>, void>;
+        idx - mpl::count_v<mpl::first_n_t<in_type_list, idx + 1>, void>;
 };
 
 template<

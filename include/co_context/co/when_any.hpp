@@ -3,8 +3,8 @@
 #include <co_context/detail/tasklike.hpp>
 #include <co_context/io_context.hpp>
 #include <co_context/lazy_io.hpp>
+#include <co_context/mpl/type_list.hpp>
 #include <co_context/utility/as_atomic.hpp>
-#include <co_context/utility/mpl.hpp>
 
 #include <atomic>
 #include <coroutine>
@@ -86,16 +86,16 @@ struct any_meta<uint32_t> : any_meta_base {};
 template<tasklike... task_types>
 struct any_trait {
   private:
-    using type_list = mpl::type_list<typename task_types::value_type...>;
+    using in_type_list = mpl::type_list<typename task_types::value_type...>;
 
-    using variant_list = typename type_list::template to<
-        clear_void_t>::template prepend<std::monostate>;
+    using out_type_list =
+        mpl::remove_t<in_type_list, void>::template prepend<std::monostate>;
 
-    using variant_type = variant_list::template to<std::variant>;
+    using variant_type = out_type_list::template to<std::variant>;
 
   public:
     static constexpr bool is_all_void =
-        (mpl::count_v<type_list, void> == sizeof...(task_types));
+        (mpl::count_v<in_type_list, void> == sizeof...(task_types));
 
     using index_type = uint32_t;
 
@@ -237,7 +237,7 @@ struct some_meta {
 template<tasklike... task_types>
 struct some_trait {
   private:
-    using type_list = mpl::type_list<typename task_types::value_type...>;
+    using in_type_list = mpl::type_list<typename task_types::value_type...>;
 
     using element_type = any_trait<task_types...>::value_type;
 

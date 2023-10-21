@@ -1,8 +1,9 @@
 #pragma once
 
 #include <co_context/co/condition_variable.hpp>
+#include <co_context/detail/uninitialize.hpp>
+#include <co_context/mpl/type_list.hpp>
 #include <co_context/task.hpp>
-#include <co_context/utility/mpl.hpp>
 
 #include <array>
 #include <concepts>
@@ -80,7 +81,7 @@ class channel {
     }
 
   private:
-    std::array<mpl::uninitialized<T>, capacity> m_buf;
+    std::array<detail::uninitialized_buffer<T>, capacity> m_buf;
     T *m_first{reinterpret_cast<T *>(m_buf.data())};
     T *m_last{reinterpret_cast<T *>(m_buf.data())};
     size_t m_size{0};
