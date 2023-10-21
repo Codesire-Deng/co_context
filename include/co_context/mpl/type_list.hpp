@@ -59,8 +59,6 @@ concept TL = requires {
     typename Type_list::type;
 };
 
-static_assert(TL<type_list<>>);
-
 template<TL in>
     requires(in::size > 0)
 struct head;
@@ -272,7 +270,18 @@ struct first_n<type_list<Ts...>, n, std::index_sequence<Is...>>
 template<TL in, size_t n>
 using first_n_t = typename first_n<in, n>::type;
 
-static_assert(std::is_same_v<first_n_t<type_list<int>, 1>, type_list<int>>);
+template<TL in, typename Old, typename New>
+struct replace {
+  private:
+    template<typename T>
+    using substitute = std::conditional<std::is_same_v<T, Old>, New, T>;
+
+  public:
+    using type = map_t<in, substitute>;
+};
+
+template<typename in, typename Old, typename New>
+using replace_t = typename replace<in, Old, New>::type;
 
 } // namespace co_context::mpl
 

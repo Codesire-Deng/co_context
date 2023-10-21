@@ -116,5 +116,11 @@ void first_n() {
     static_assert(std::is_same_v<mpl::first_n_t<list, 4>, list>);
 }
 
+void replace() {
+    using int_to_void_list = mpl::type_list<char, void, float, double>;
+    static_assert(std::is_same_v<
+                  mpl::replace_t<list, int, void>, int_to_void_list>);
+}
+
 int main() {
 }
