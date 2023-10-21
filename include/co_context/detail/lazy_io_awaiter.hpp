@@ -220,16 +220,18 @@ struct lazy_recvmsg : lazy_awaiter {
 
 #if LIBURINGCXX_IS_KERNEL_REACH(5, 20)
 struct lazy_recvmsg_multishot : lazy_awaiter {
-    inline
-    lazy_recvmsg_multishot(int fd, msghdr *msg, unsigned flags) noexcept {
+    inline lazy_recvmsg_multishot(
+        int fd, msghdr *msg, unsigned flags
+    ) noexcept {
         sqe->prep_recvmsg_multishot(fd, msg, flags);
     }
 };
 #endif
 
 struct lazy_sendmsg : lazy_awaiter {
-    inline
-    lazy_sendmsg(int fd, const msghdr *msg, unsigned int flags) noexcept {
+    inline lazy_sendmsg(
+        int fd, const msghdr *msg, unsigned int flags
+    ) noexcept {
         sqe->prep_sendmsg(fd, msg, flags);
     }
 };
@@ -508,8 +510,9 @@ struct lazy_link_timeout
 };
 
 struct lazy_connect : lazy_awaiter {
-    inline
-    lazy_connect(int sockfd, const sockaddr *addr, socklen_t addrlen) noexcept {
+    inline lazy_connect(
+        int sockfd, const sockaddr *addr, socklen_t addrlen
+    ) noexcept {
         sqe->prep_connect(sockfd, addr, addrlen);
     }
 };
@@ -521,15 +524,17 @@ struct lazy_files_update : lazy_awaiter {
 };
 
 struct lazy_fallocate : lazy_awaiter {
-    inline
-    lazy_fallocate(int fd, int mode, uint64_t offset, uint64_t len) noexcept {
+    inline lazy_fallocate(
+        int fd, int mode, uint64_t offset, uint64_t len
+    ) noexcept {
         sqe->prep_fallocate(fd, mode, offset, len);
     }
 };
 
 struct lazy_openat : lazy_awaiter {
-    inline
-    lazy_openat(int dfd, const char *path, int flags, mode_t mode) noexcept {
+    inline lazy_openat(
+        int dfd, const char *path, int flags, mode_t mode
+    ) noexcept {
         sqe->prep_openat(dfd, path, flags, mode);
     }
 };
@@ -560,8 +565,9 @@ struct lazy_read : lazy_awaiter {
 };
 
 struct lazy_write : lazy_awaiter {
-    inline
-    lazy_write(int fd, std::span<const char> buf, uint64_t offset) noexcept {
+    inline lazy_write(
+        int fd, std::span<const char> buf, uint64_t offset
+    ) noexcept {
         sqe->prep_write(fd, buf, offset);
     }
 };
@@ -579,8 +585,9 @@ struct lazy_statx : lazy_awaiter {
 };
 
 struct lazy_fadvise : lazy_awaiter {
-    inline
-    lazy_fadvise(int fd, uint64_t offset, off_t len, int advice) noexcept {
+    inline lazy_fadvise(
+        int fd, uint64_t offset, off_t len, int advice
+    ) noexcept {
         sqe->prep_fadvise(fd, offset, len, advice);
     }
 };
@@ -592,8 +599,9 @@ struct lazy_madvise : lazy_awaiter {
 };
 
 struct lazy_send : lazy_awaiter {
-    inline
-    lazy_send(int sockfd, std::span<const char> buf, int flags) noexcept {
+    inline lazy_send(
+        int sockfd, std::span<const char> buf, int flags
+    ) noexcept {
         sqe->prep_send(sockfd, buf, flags);
     }
 };
@@ -634,8 +642,9 @@ struct lazy_recv : lazy_awaiter {
 
 #if LIBURINGCXX_IS_KERNEL_REACH(5, 20)
 struct lazy_recv_multishot : lazy_awaiter {
-    inline
-    lazy_recv_multishot(int sockfd, std::span<char> buf, int flags) noexcept {
+    inline lazy_recv_multishot(
+        int sockfd, std::span<char> buf, int flags
+    ) noexcept {
         sqe->prep_recv_multishot(sockfd, buf, flags);
     }
 };
@@ -763,8 +772,9 @@ struct lazy_linkat : lazy_awaiter {
 };
 
 struct lazy_link : lazy_awaiter {
-    inline
-    lazy_link(const char *oldpath, const char *newpath, int flags) noexcept {
+    inline lazy_link(
+        const char *oldpath, const char *newpath, int flags
+    ) noexcept {
         sqe->prep_link(oldpath, newpath, flags);
     }
 };
@@ -812,8 +822,9 @@ struct lazy_setxattr : lazy_awaiter {
 };
 
 struct lazy_fgetxattr : lazy_awaiter {
-    inline
-    lazy_fgetxattr(int fd, const char *name, char *value, size_t len) noexcept {
+    inline lazy_fgetxattr(
+        int fd, const char *name, char *value, size_t len
+    ) noexcept {
         sqe->prep_fgetxattr(fd, name, value, len);
     }
 };

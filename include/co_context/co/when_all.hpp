@@ -22,8 +22,9 @@ struct all_meta_base {
     // happen!
     uint32_t wait_num;
 
-    explicit
-    all_meta_base(std::coroutine_handle<> await_handle, uint32_t n) noexcept
+    explicit all_meta_base(
+        std::coroutine_handle<> await_handle, uint32_t n
+    ) noexcept
         : await_handle(await_handle)
         , wait_num(n) {}
 
