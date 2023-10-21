@@ -36,12 +36,12 @@ template<Tuple... in>
 using tuple_cat_t = typename tuple_cat<in...>::type;
 
 template<Tuple in, size_t... idx>
-struct tuple_select {
+struct tuple_at {
     using type = std::tuple<std::tuple_element_t<idx, in>...>;
 };
 
 template<Tuple in, size_t... idx>
-using tuple_select_t = typename tuple_select<in, idx...>::type;
+using tuple_at_t = typename tuple_at<in, idx...>::type;
 
 template<Tuple in, typename E>
 struct tuple_remove {
