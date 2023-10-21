@@ -10,6 +10,7 @@ set(co_context_tests
         timer_accuracy
         liburingcxx_netcat
         move_shared_task
+        mpl_type_list
 )
 
 foreach(test_target ${co_context_tests})

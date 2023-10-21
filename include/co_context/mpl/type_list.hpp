@@ -120,6 +120,19 @@ struct remove {
 template<TL in, typename E>
 using remove_t = typename remove<in, E>::type;
 
+template<TL in, template<typename> typename P>
+struct remove_if {
+  private:
+    template<typename E>
+    using not_P = detail::negate<P>::template type<E>;
+
+  public:
+    using type = filter_t<in, not_P>;
+};
+
+template<TL in, template<typename> typename P>
+using remove_if_t = typename remove_if<in, P>::type;
+
 template<typename T>
 struct id {
     using type = T;
@@ -157,8 +170,6 @@ struct concat<in1, in2, Rest...>
 template<TL... in>
 using concat_t = typename concat<in...>::type;
 
-static_assert(std::is_same_v<concat_t<type_list<>>, type_list<>>);
-
 template<TL in, typename E>
 struct contain : std::false_type {};
 
@@ -194,7 +205,7 @@ template<TL in, typename E>
 using find_t = typename find<in, E>::type;
 
 template<TL in, typename E>
-constexpr int find_v = find<in, E>::value;
+constexpr size_t find_v = find<in, E>::value;
 
 template<TL in>
 class unique {
@@ -236,16 +247,16 @@ constexpr size_t count_v = count<in, E>::value;
 
 template<TL in, size_t idx>
     requires(idx < in::size)
-struct select;
-
-template<size_t idx, typename... Ts>
-using select_t = typename select<type_list<Ts...>, idx>::type;
+struct at;
 
 template<typename H, typename... Ts>
-struct select<type_list<H, Ts...>, 0> : id<H> {};
+struct at<type_list<H, Ts...>, 0> : id<H> {};
 
 template<size_t idx, typename H, typename... Ts>
-struct select<type_list<H, Ts...>, idx> : select<type_list<Ts...>, idx - 1> {};
+struct at<type_list<H, Ts...>, idx> : at<type_list<Ts...>, idx - 1> {};
+
+template<TL in, size_t idx>
+using at_t = typename at<in, idx>::type;
 
 template<TL in, size_t n, class = std::make_index_sequence<in::size>>
     requires(n <= in::size)
