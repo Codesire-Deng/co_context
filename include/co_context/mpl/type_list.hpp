@@ -14,8 +14,6 @@ struct is_less {
 template<size_t lhs, size_t rhs>
 inline constexpr bool is_less_v = is_less<lhs, rhs>::value;
 
-inline constexpr size_t npos = -1ULL;
-
 template<template<typename...> class P>
 struct negate {
     template<typename... Ts>
@@ -170,6 +168,33 @@ struct contain<type_list<Ts...>, E>
 
 template<TL in, typename E>
 constexpr bool contain_v = contain<in, E>::value;
+
+inline constexpr size_t npos = -1ULL;
+
+namespace detail {
+    template<TL in, typename E, size_t offset>
+    struct find_impl;
+
+    template<typename E, size_t offset>
+    struct find_impl<type_list<>, E, offset>
+        : std::integral_constant<size_t, npos> {};
+
+    template<typename E, typename H, typename... Ts, size_t offset>
+    struct find_impl<type_list<H, Ts...>, E, offset>
+        : std::conditional_t<
+              std::is_same_v<E, H>,
+              std::integral_constant<size_t, offset>,
+              find_impl<type_list<Ts...>, E, offset + 1>> {};
+} // namespace detail
+
+template<TL in, typename E>
+struct find : detail::find_impl<in, E, 0> {};
+
+template<TL in, typename E>
+using find_t = typename find<in, E>::type;
+
+template<TL in, typename E>
+constexpr int find_v = find<in, E>::value;
 
 template<TL in>
 class unique {
