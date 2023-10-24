@@ -83,6 +83,36 @@ struct tails<type_list<H, Ts...>> {
 template<TL in>
 using tails_t = typename tails<in>::type;
 
+template<TL in>
+    requires(in::size > 0)
+struct last;
+
+template<typename H>
+struct last<type_list<H>> {
+    using type = H;
+};
+
+template<typename H, typename H2, typename... Ts>
+struct last<type_list<H, H2, Ts...>> : last<type_list<H2, Ts...>> {};
+
+template<TL in>
+using last_t = typename last<in>::type;
+
+template<TL in, typename out = type_list<>>
+struct drop_last;
+
+template<typename L, typename out>
+struct drop_last<type_list<L>, out> {
+    using type = out;
+};
+
+template<typename H, typename H2, typename... Ts, typename out>
+struct drop_last<type_list<H, H2, Ts...>, out>
+    : drop_last<type_list<H2, Ts...>, typename out::template append<H>> {};
+
+template<TL in>
+using drop_last_t = typename drop_last<in>::type;
+
 template<TL in, template<typename> class F>
 struct map;
 
@@ -194,6 +224,25 @@ namespace detail {
               std::is_same_v<E, H>,
               std::integral_constant<size_t, offset>,
               find_impl<type_list<Ts...>, E, offset + 1>> {};
+
+    template<TL in, template<typename> typename P, size_t offset>
+    struct find_if_impl;
+
+    template<template<typename> typename P, size_t offset>
+    struct find_if_impl<type_list<>, P, offset>
+        : std::integral_constant<size_t, npos> {};
+
+    template<
+        template<typename>
+        typename P,
+        typename H,
+        typename... Ts,
+        size_t offset>
+    struct find_if_impl<type_list<H, Ts...>, P, offset>
+        : std::conditional_t<
+              P<H>::value,
+              std::integral_constant<size_t, offset>,
+              find_if_impl<type_list<Ts...>, P, offset + 1>> {};
 } // namespace detail
 
 template<TL in, typename E>
@@ -204,6 +253,15 @@ using find_t = typename find<in, E>::type;
 
 template<TL in, typename E>
 constexpr size_t find_v = find<in, E>::value;
+
+template<typename in, template<typename> typename P>
+struct find_if : detail::find_if_impl<in, P, 0> {};
+
+template<typename in, template<typename> typename P>
+using find_if_t = typename find_if<in, P>::type;
+
+template<TL in, template<typename> typename P>
+constexpr size_t find_if_v = find_if<in, P>::value;
 
 template<TL in>
 class unique {
@@ -282,6 +340,100 @@ struct replace {
 
 template<typename in, typename Old, typename New>
 using replace_t = typename replace<in, Old, New>::type;
+
+template<TL in1, TL in2>
+struct union_set {
+    using type = unique_t<concat_t<in1, in2>>;
+};
+
+template<TL in1, TL in2>
+using union_set_t = typename union_set<in1, in2>::type;
+
+template<TL in1, TL in2>
+class intersection_set {
+    template<typename E>
+    using in1_contain = contain<in1, E>;
+
+  public:
+    using type = filter_t<in2, in1_contain>;
+};
+
+template<TL in1, TL in2>
+using intersection_set_t = typename intersection_set<in1, in2>::type;
+
+template<TL in1, TL in2>
+class difference_set {
+    template<typename E>
+    struct in2_contain : contain<in2, E> {};
+
+  public:
+    using type = remove_if_t<in1, in2_contain>;
+};
+
+template<TL in1, TL in2>
+using difference_set_t = typename difference_set<in1, in2>::type;
+
+template<TL in1, TL in2>
+struct symmetric_difference_set {
+    using type =
+        concat_t<difference_set_t<in1, in2>, difference_set_t<in2, in1>>;
+};
+
+template<TL in1, TL in2>
+using symmetric_difference_set_t =
+    typename symmetric_difference_set<in1, in2>::type;
+
+template<
+    TL in,
+    template<typename>
+    typename P,
+    typename out = type_list<type_list<>>>
+struct split_if;
+
+template<template<typename> typename P, typename out>
+struct split_if<type_list<>, P, out> {
+  private:
+    using no_empty_t = remove_t<out, type_list<>>;
+    using reverse_outer_t = reverse_t<no_empty_t>;
+
+  public:
+    using type = reverse_outer_t;
+};
+
+template<
+    template<typename>
+    typename P,
+    typename H,
+    typename... Ts,
+    typename head_list,
+    typename... lists>
+struct split_if<type_list<H, Ts...>, P, type_list<head_list, lists...>>
+    : std::conditional_t<
+          P<H>::value,
+          split_if<
+              type_list<Ts...>,
+              P,
+              type_list<type_list<>, head_list, lists...>>,
+          split_if<
+              type_list<Ts...>,
+              P,
+              type_list<typename head_list::template append<H>, lists...>>> {};
+
+template<TL in, template<typename> typename P>
+using split_if_t = typename split_if<in, P>::type;
+
+template<TL in, typename delimiter>
+struct split {
+  private:
+    template<typename E>
+    struct is_delimiter : std::is_same<delimiter, E> {};
+
+  public:
+    using type = split_if_t<in, is_delimiter>;
+};
+
+template<TL in, typename delimiter>
+using split_t = typename split<in, delimiter>::type;
 
 } // namespace co_context::mpl
 
