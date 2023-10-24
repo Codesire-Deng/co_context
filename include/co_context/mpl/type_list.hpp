@@ -152,7 +152,7 @@ template<TL in, template<typename> typename P>
 struct remove_if {
   private:
     template<typename E>
-    using not_P = detail::negate<P>::template type<E>;
+    using not_P = typename detail::negate<P>::template type<E>;
 
   public:
     using type = filter_t<in, not_P>;
@@ -452,14 +452,14 @@ struct reverse_sequence<std::integer_sequence<T>> {
 template<typename T, T idx, T... idxs>
 struct reverse_sequence<std::integer_sequence<T, idx, idxs...>> {
     template<T... app>
-    using append = reverse_sequence<
+    using append = typename reverse_sequence<
         std::integer_sequence<T, idxs...>>::template append<idx, app...>;
-    using type = reverse_sequence<
+    using type = typename reverse_sequence<
         std::integer_sequence<T, idxs...>>::template append<idx>;
 };
 
 template<typename T>
-using reverse_sequence_t = reverse_sequence<T>::type;
+using reverse_sequence_t = typename reverse_sequence<T>::type;
 
 static_assert(std::is_same_v<
               reverse_sequence_t<std::integer_sequence<int, 0, 10, 3, 7>>,
