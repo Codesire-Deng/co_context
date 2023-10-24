@@ -8,10 +8,16 @@ struct s {};
 using list = mpl::type_list<char, int, float, double>;
 using empty = mpl::type_list<>;
 
-void head_tails() {
+void head_tails_last() {
     static_assert(std::is_same_v<mpl::head_t<list>, char>);
     static_assert(std::is_same_v<
                   mpl::tails_t<list>, mpl::type_list<int, float, double>>);
+    static_assert(std::is_same_v<mpl::last_t<list>, double>);
+}
+
+void drop_last() {
+    using no_last = mpl::type_list<char, int, float>;
+    static_assert(std::is_same_v<mpl::drop_last_t<list>, no_last>);
 }
 
 void from_to() {
@@ -81,6 +87,9 @@ void find() {
     static_assert(mpl::find_v<list, float> == 2);
     static_assert(mpl::find_v<list, double> == 3);
     static_assert(mpl::find_v<list, void> == mpl::npos);
+
+    static_assert(mpl::find_if_v<list, std::is_floating_point> == 2);
+    static_assert(mpl::find_if_v<list, std::is_void> == mpl::npos);
 }
 
 void reverse() {
@@ -120,6 +129,39 @@ void replace() {
     using int_to_void_list = mpl::type_list<char, void, float, double>;
     static_assert(std::is_same_v<
                   mpl::replace_t<list, int, void>, int_to_void_list>);
+}
+
+void set() {
+    using a = mpl::type_list<void, char, int>;
+    using b = mpl::type_list<char, int, float>;
+
+    static_assert(std::is_same_v<
+                  mpl::union_set_t<a, b>,
+                  mpl::type_list<void, char, int, float>>);
+
+    static_assert(std::is_same_v<
+                  mpl::intersection_set_t<a, b>, mpl::type_list<char, int>>);
+
+    static_assert(std::is_same_v<
+                  mpl::difference_set_t<a, b>, mpl::type_list<void>>);
+
+    static_assert(std::is_same_v<
+                  mpl::difference_set_t<a, b>, mpl::type_list<void>>);
+
+    static_assert(std::is_same_v<
+                  mpl::symmetric_difference_set_t<a, b>,
+                  mpl::type_list<void, float>>);
+}
+
+void split() {
+    using sp_list =
+        mpl::type_list<mpl::type_list<char, int>, mpl::type_list<double>>;
+    static_assert(std::is_same_v<mpl::split_t<list, float>, sp_list>);
+
+    using no_floating_list = mpl::type_list<mpl::type_list<char, int>>;
+    static_assert(std::is_same_v<
+                  mpl::split_if_t<list, std::is_floating_point>,
+                  no_floating_list>);
 }
 
 int main() {
