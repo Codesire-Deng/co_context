@@ -9,11 +9,15 @@
 #endif
 
 #if defined(__clang__) || defined(__GNUC__) || defined(__GNUG__)
-#define CO_CONTEXT_PAUSE __builtin_ia32_pause
+#if defined(__i386__) || defined(__x86_64__)
+#define CO_CONTEXT_PAUSE() __builtin_ia32_pause()
+#elif defined(__riscv)
+#define CO_CONTEXT_PAUSE() __asm__ volatile("fence iorw, iorw")
+#endif
 #elif defined(_MSC_VER)
-#define CO_CONTEXT_PAUSE _mm_pause
+#define CO_CONTEXT_PAUSE() _mm_pause()
 #else
-#define CO_CONTEXT_PAUSE __builtin_ia32_pause
+#define CO_CONTEXT_PAUSE() __builtin_ia32_pause()
 #endif
 
 #if (defined(__GNUC__) || defined(__GNUG__)) \
