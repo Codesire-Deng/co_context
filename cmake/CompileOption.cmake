@@ -14,7 +14,7 @@ if(NOT CMAKE_BUILD_TYPE)
     message(NOTICE "Setting default CMAKE_BUILD_TYPE to Release")
 endif()
 
-if(CMAKE_BUILD_TYPE MATCHES Release)
+if(CMAKE_BUILD_TYPE MATCHES Release AND NOT CMAKE_CROSSCOMPILING)
     target_compile_options(co_context PUBLIC -march=native)
 endif()
 
