@@ -108,8 +108,7 @@ namespace config {
     // ========================================================================
 
     // ========================== net configuration ===========================
-    inline constexpr bool is_loopback_only = true;
-    // inline constexpr bool is_loopback_only = false;
+    inline constexpr bool is_loopback_only = false;
     // ========================================================================
 
     // =========================== co configuration ===========================
