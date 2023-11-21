@@ -138,9 +138,9 @@ namespace config {
     enum class level : uint8_t { verbose, debug, info, warning, error, no_log };
 
     // inline constexpr level log_level = level::verbose;
-    inline constexpr level log_level = level::debug;
+    // inline constexpr level log_level = level::debug;
     // inline constexpr level log_level = level::info;
-    // inline constexpr level log_level = level::warning;
+    inline constexpr level log_level = level::warning;
     // inline constexpr level log_level = level::error;
     // inline constexpr level log_level = level::no_log;
 
