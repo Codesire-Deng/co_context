@@ -3,7 +3,6 @@
 #include <co_context/config.hpp>
 
 #include <chrono>
-#include <linux/time_types.h>
 
 namespace co_context {
 
