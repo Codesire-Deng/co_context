@@ -63,8 +63,6 @@ class [[nodiscard]] io_context final {
 
     std::thread host_thread;
 
-    __pid_t tid;
-
     // id among all io_contexts
     config::ctx_id_t id;
 
