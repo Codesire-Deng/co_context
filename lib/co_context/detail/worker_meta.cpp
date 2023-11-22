@@ -8,21 +8,17 @@
 #include <co_context/io_context.hpp>
 #include <co_context/log/log.hpp>
 #include <co_context/utility/as_buffer.hpp>
-#include <co_context/utility/set_cpu_affinity.hpp>
 #include <uring/cq_entry.hpp>
 #include <uring/uring_define.hpp>
 
-#include <atomic>
 #include <cerrno>
 #include <coroutine>
 #include <cstdint>
 #include <exception>
-#include <memory>
-#include <mutex>
-#include <thread>
 #include <unistd.h>
 
 #if CO_CONTEXT_IS_USING_EVENTFD
+#include <mutex>
 #include <sys/eventfd.h>
 #endif
 
@@ -60,21 +56,6 @@ void worker_meta::init(unsigned io_uring_entries) {
         std::terminate();
     }
 
-#ifdef CO_CONTEXT_USE_CPU_AFFINITY
-#error TODO: this part should be refactored.
-    if constexpr (config::worker_threads_number > 0) {
-        const unsigned logic_cores = std::thread::hardware_concurrency();
-        if constexpr (config::is_using_hyper_threading) {
-            if (thread_index * 2 < logic_cores) {
-                detail::set_cpu_affinity(thread_index * 2);
-            } else {
-                detail::set_cpu_affinity(thread_index * 2 % logic_cores + 1);
-            }
-        } else {
-            detail::set_cpu_affinity(thread_index);
-        }
-    }
-#endif
     log::i("io_context[%u] init a worker\n", detail::this_thread.ctx_id);
 }
 

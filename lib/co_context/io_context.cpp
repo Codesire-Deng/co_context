@@ -8,23 +8,17 @@
 #include <co_context/io_context.hpp>
 #include <co_context/log/log.hpp>
 
-#include <atomic>
 #include <cassert>
 #include <cstdint>
 #include <exception>
-#include <memory>
 #include <mutex>
 #include <thread>
 #include <unistd.h>
-
-// fold level = 3 (ctrl+a, ctrl+k, ctrl+3 in vscode)
-// unfold all (ctrl+a, ctrl+k, ctrl+j in vscode)
 
 namespace co_context {
 
 // Must be called by corresponding thread.
 void io_context::init() {
-    this->tid = ::gettid();
     detail::this_thread.ctx = this;
     detail::this_thread.ctx_id = this->id;
 
@@ -124,11 +118,10 @@ void io_context::do_completion_part() noexcept {
 }
 
 void io_context::run() {
-#ifdef CO_CONTEXT_USE_CPU_AFFINITY
-#error TODO
-    detail::set_cpu_affinity(detail::this_thread.ctx_id);
-#endif
-    log::i("io_context[%u] runs on %d\n", this->id, this->tid);
+    log::i(
+        "io_context[%u] runs on %lx\n", this->id,
+        static_cast<uintptr_t>(this->host_thread.native_handle())
+    );
 
 #if CO_CONTEXT_IS_USING_EVENTFD
     auto &meta = detail::io_context_meta;
