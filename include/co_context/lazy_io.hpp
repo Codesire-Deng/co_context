@@ -199,12 +199,14 @@ inline namespace lazy {
     inline detail::lazy_timeout timeout_at(
         std::chrono::time_point<std::chrono::system_clock, Duration> time_point
     ) noexcept {
-        static_assert(
-            liburingcxx::is_kernel_reach(5, 15)
-                || std::chrono::system_clock::is_steady,
-            "io_uring timeouts only use the CLOCK_MONOTONIC clock source "
-            "until 5.15. That means the clock must be steady."
-        );
+        if constexpr (!liburingcxx::is_kernel_reach(5, 15) && !std::chrono::system_clock::is_steady) {
+            static_assert(
+                detail::false_v<decltype(time_point)>,
+                "io_uring timeouts only use the CLOCK_MONOTONIC clock source "
+                "until 5.15. That means the clock must be steady. "
+                "Please consider std::chrono::steady_clock instead."
+            );
+        }
         return detail::lazy_timeout{time_point};
     }
 

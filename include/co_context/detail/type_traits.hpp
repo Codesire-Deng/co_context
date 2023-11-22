@@ -4,6 +4,9 @@
 
 namespace co_context::detail {
 
+template<typename...>
+inline constexpr bool false_v = false;
+
 template<typename T>
 struct remove_rvalue_reference {
     using type = T;
