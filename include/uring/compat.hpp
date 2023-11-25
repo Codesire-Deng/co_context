@@ -8,8 +8,8 @@
 #include <cstdint>
 
 struct __kernel_timespec {
-	int64_t		tv_sec;
-	long long	tv_nsec;
+    int64_t tv_sec;
+    long long tv_nsec;
 };
 
 /* <linux/time_types.h> is not available, so it can't be included */
