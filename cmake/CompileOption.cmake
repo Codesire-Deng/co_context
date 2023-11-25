@@ -51,3 +51,7 @@ target_link_libraries(co_context PUBLIC Threads::Threads)
 if (USE_MIMALLOC)
     target_link_libraries(co_context PUBLIC mimalloc)
 endif()
+
+if (co_context_no_generator) # set by check/check_compile.cmake
+    target_compile_definitions(co_context PRIVATE CO_CONTEXT_NO_GENERATOR)
+endif()
