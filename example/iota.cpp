@@ -1,4 +1,4 @@
-#if defined(__GNUG__) && !defined(__clang__)
+#ifndef CO_CONTEXT_NO_GENERATOR
 
 #include <co_context/generator.hpp>
 
@@ -22,13 +22,14 @@ int main() {
     return 0;
 }
 
-#else
+#else // ifndef CO_CONTEXT_NO_GENERATOR
 
 #include <iostream>
 
 int main() {
-    std::cout << "This program requires g++ as the compiler. exit..."
-              << std::endl;
+    std::cout
+        << "This program requires g++ 11.3 or clang 17 as the compiler. exit..."
+        << std::endl;
     return 0;
 }
 

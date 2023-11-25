@@ -11,6 +11,7 @@ set(co_context_tests
         liburingcxx_netcat
         move_shared_task
         mpl_type_list
+        generator_test
 )
 
 foreach(test_target ${co_context_tests})

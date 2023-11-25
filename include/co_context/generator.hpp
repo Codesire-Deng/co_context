@@ -3,12 +3,14 @@
 // Authors: Casey Carter, Lewis Baker, Corentin Jabot.
 // https://godbolt.org/z/5hcaPcfvP
 //
-// NOLINTBEGIN
 #pragma once
-#if !defined(__GNUG__) || defined(__clang__)
-#error Up to now this header can only be compiled by g++.
-#error PS: Clang 14/16 is known to be not happy with this header.
-#endif
+#ifdef CO_CONTEXT_STD_GENERATOR
+#include <generator>
+
+namespace co_context {
+using std::generator;
+}
+#elif !defined(CO_CONTEXT_NO_GENERATOR)
 #pragma GCC system_header
 #include <algorithm>
 #include <cassert>
@@ -34,7 +36,7 @@
 #define NO_UNIQUE_ADDRESS [[no_unique_address]]
 #endif
 
-// namespace std {
+// NOLINTBEGIN
 namespace co_context {
 
 struct alignas(__STDCPP_DEFAULT_NEW_ALIGNMENT__) _Aligned_block {
@@ -622,3 +624,4 @@ class generator
 } // namespace co_context
 
 // NOLINTEND
+#endif
