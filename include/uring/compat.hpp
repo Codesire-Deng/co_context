@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef CO_CONTEXT_OFFER_KERNEL_RWF_T
+typedef int __kernel_rwf_t;
+#endif
+
 #if __has_include(<linux/time_types.h>)
 #include <linux/time_types.h>
 /* <linux/time_types.h> is included above and not needed again */

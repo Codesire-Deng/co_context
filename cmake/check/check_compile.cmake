@@ -1,3 +1,5 @@
+include(CheckCXXSourceRuns)
+
 if(NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     message(FATAL_ERROR "[g++/clang] is required, but the compiler id is ${CMAKE_CXX_COMPILER_ID}.${CMAKE_CXX_COMPILER_ID} is not supported now")
 endif()
@@ -21,3 +23,16 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
         set(co_context_no_generator ON)
     endif()
 endif()
+
+check_cxx_source_runs(
+    [====[
+    #include <linux/fs.h>
+    int main(int argc, char **argv)
+    {
+      __kernel_rwf_t x;
+      x = 0;
+      return x;
+    }
+    ]====]
+    co_context_has_kernel_rwf_t
+)
