@@ -53,5 +53,5 @@ if (USE_MIMALLOC)
 endif()
 
 if (co_context_no_generator) # set by check/check_compile.cmake
-    target_compile_definitions(co_context PRIVATE CO_CONTEXT_NO_GENERATOR)
+    target_compile_definitions(co_context PUBLIC CO_CONTEXT_NO_GENERATOR)
 endif()
