@@ -90,9 +90,10 @@ struct any_trait {
     using in_type_list = mpl::type_list<typename task_types::value_type...>;
 
     using out_type_list =
-        mpl::remove_t<in_type_list, void>::template prepend<std::monostate>;
+        typename mpl::remove_t<in_type_list, void>::template prepend<
+            std::monostate>;
 
-    using variant_type = out_type_list::template to<std::variant>;
+    using variant_type = typename out_type_list::template to<std::variant>;
 
   public:
     static constexpr bool is_all_void =
@@ -152,7 +153,7 @@ any(task_types... node) {
     static_assert(n >= 2, "too few tasks for `any(...)`");
 
     using trait = detail::any_trait<task_types...>;
-    using meta_type = trait::meta_type;
+    using meta_type = typename trait::meta_type;
     auto meta_ptr = std::make_shared<meta_type>(co_await lazy::who_am_i());
 
     auto spawn_all = [&]<size_t... idx>(std::index_sequence<idx...>) {
@@ -177,7 +178,7 @@ any(task_types... node) {
     if constexpr (trait::is_all_void) {
         co_return meta_ptr->idx;
     } else {
-        using value_type = trait::value_type;
+        using value_type = typename trait::value_type;
         co_return value_type{meta_ptr->idx, std::move(meta_ptr->buffer)};
     }
 }
@@ -240,7 +241,7 @@ struct some_trait {
   private:
     using in_type_list = mpl::type_list<typename task_types::value_type...>;
 
-    using element_type = any_trait<task_types...>::value_type;
+    using element_type = typename any_trait<task_types...>::value_type;
 
   public:
     using value_type = std::vector<element_type>;
@@ -300,7 +301,7 @@ some(uint32_t min_complete, task_types... node) {
     assert(min_complete >= 1 && "min_complete should be at least 1");
 
     using trait = detail::some_trait<task_types...>;
-    using meta_type = trait::meta_type;
+    using meta_type = typename trait::meta_type;
     auto meta_ptr =
         std::make_shared<meta_type>(co_await lazy::who_am_i(), min_complete);
 

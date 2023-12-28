@@ -51,9 +51,9 @@ template<mpl::TL out_type_list>
 struct all_meta : all_meta_base {
     static_assert(mpl::count_v<out_type_list, void> == 0);
 
-    using value_type = out_type_list::template to<std::tuple>;
+    using value_type = typename out_type_list::template to<std::tuple>;
     using buffer_type =
-        mpl::map_t<out_type_list, detail::uninitialize>::template to<
+        typename mpl::map_t<out_type_list, detail::uninitialize>::template to<
             std::tuple>;
 
     buffer_type buffer;
@@ -91,7 +91,7 @@ struct all_trait {
   public:
     using meta_type = all_meta<out_type_list>;
 
-    using value_type = meta_type::value_type;
+    using value_type = typename meta_type::value_type;
 
     template<size_t idx>
     static constexpr size_t buffer_offset_v =
@@ -142,7 +142,7 @@ all(task_types... node) {
 
     using trait = detail::all_trait<task_types...>;
 
-    using all_meta_type = trait::meta_type;
+    using all_meta_type = typename trait::meta_type;
 
     all_meta_type meta{co_await lazy::who_am_i(), n};
 
