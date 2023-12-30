@@ -12,7 +12,6 @@
             "name": "gcc",
             "hidden": true,
             "cacheVariables": {
-                "CMAKE_C_COMPILER": "gcc",
                 "CMAKE_CXX_COMPILER": "g++"
             }
         },
@@ -20,7 +19,6 @@
             "name": "clang",
             "hidden": true,
             "cacheVariables": {
-                "CMAKE_C_COMPILER": "clang",
                 "CMAKE_CXX_COMPILER": "clang++"
             }
         },
@@ -56,6 +54,21 @@
             "inherits": [
                 "base"
             ],
+            "binaryDir": "${sourceDir}/build/release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "BUILD_EXAMPLE": "ON",
+                "BUILD_TEST": "ON",
+                "BUILD_PERF_TEST": "ON"
+            }
+        },
+        {
+            "name": "benchmark_clang",
+            "inherits": [
+                "base",
+                "clang"
+            ],
+            "displayName": "benchmark (clang)",
             "binaryDir": "${sourceDir}/build/release",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
@@ -106,6 +119,10 @@
         {
             "name": "benchmark",
             "configurePreset": "benchmark"
+        },
+        {
+            "name": "benchmark_clang",
+            "configurePreset": "benchmark_clang"
         },
         {
             "name": "test",
