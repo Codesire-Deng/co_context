@@ -466,3 +466,16 @@ static_assert(std::is_same_v<
               std::integer_sequence<int, 7, 3, 10, 0>>);
 
 } // namespace co_context::mpl::detail
+
+namespace std {
+
+template<typename... Ts>
+struct tuple_size<co_context::mpl::type_list<Ts...>>
+    : std::integral_constant<std::size_t, sizeof...(Ts)> {};
+
+template<std::size_t I, typename... Ts>
+struct tuple_element<I, co_context::mpl::type_list<Ts...>> {
+    using type = co_context::mpl::at_t<co_context::mpl::type_list<Ts...>, I>;
+};
+
+}
