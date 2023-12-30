@@ -898,7 +898,7 @@ struct lazy_who_am_i {
 
 using lazy_forget = std::suspend_always;
 
-struct lazy_resume_on {
+class lazy_resume_on {
   public:
     static constexpr bool await_ready() noexcept { return false; }
 
