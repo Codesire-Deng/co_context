@@ -14,6 +14,8 @@ if(ENABLE_SANITIZER AND NOT MSVC)
             target_compile_options(co_context
                 PUBLIC -fsanitize=undefined,address,leak
                 PUBLIC -fno-omit-frame-pointer)
+            target_link_options(co_context
+                PUBLIC -fsanitize=undefined,address,leak)
         else()
             message(WARNING "sanitizer is no supported with current tool-chains")
         endif()
