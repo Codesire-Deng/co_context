@@ -1,11 +1,13 @@
 #pragma once
 
+#include <uring/config.hpp>
+
 #ifndef LIBURINGCXX_KERNEL_VERSION_MAJOR
-#error Fail to detect kernel version. Please check cmake/Platform.cmake .
+#error Fail to detect kernel version. Please check cmake/configure.cmake .
 #endif
 
 #ifndef LIBURINGCXX_KERNEL_VERSION_MINOR
-#error Fail to detect kernel version. Please check cmake/Platform.cmake .
+#error Fail to detect kernel version. Please check cmake/configure.cmake .
 #endif
 
 namespace liburingcxx {

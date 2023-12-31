@@ -18,7 +18,7 @@
  */
 #pragma once
 
-#include <co_context/config.hpp>
+#include <co_context/config/io_context.hpp>
 #include <co_context/detail/attributes.hpp>
 #include <co_context/detail/io_context_meta.hpp>
 #include <co_context/detail/task_info.hpp>

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <co_context/config.hpp>
+#include <co_context/config/uring.hpp>
 
 #include <uring/io_uring.h>
 #include <uring/uring.hpp>

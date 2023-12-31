@@ -42,43 +42,31 @@ Makefile
 cmake_install.cmake
 install_manifest.txt
 compile_commands.json
-CMakeUserPresets.json
 CTestTestfile.cmake
 _deps
 
 # Visual Studio Code
 .vscode/
 
-# IntelliJ IDEA
-.idea/
-
 # Local History for Visual Studio Code
 .history/
 
 # clangd
 .cache/
-.clangd
-
-# clang-tidy
-.clang-tidy
 
 # Built Visual Studio Code Extensions
 *.vsix
 
 draft/
 
+perf.data*
+*.data
 
 # log for perf
-/log
-/tmp
+log
+tmp
 *.rdb
 *.svg
-/perf/
-/perf.*
-*.data
-*.perf
-*.folded
-palette.map
 
 # public/index.html for httpd
 public/

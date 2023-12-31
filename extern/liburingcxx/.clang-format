@@ -1,0 +1,99 @@
+---
+BasedOnStyle: LLVM
+IndentWidth: 4
+TabWidth: 4
+Language: Cpp
+AlignAfterOpenBracket: BlockIndent # BlockIndent
+AlignArrayOfStructures: Right
+AlignConsecutiveBitFields: "Consecutive"
+AlignConsecutiveMacros: "Consecutive"
+AlignEscapedNewlines: Left
+AlignOperands: "Align"
+AlignTrailingComments: true
+AllowAllArgumentsOnNextLine: true
+AllowAllConstructorInitializersOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: true
+AlignConsecutiveShortCaseStatements: # clang-format 17
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: true
+  AlignCaseColons: false
+AllowShortBlocksOnASingleLine: Empty
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortEnumsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: InlineOnly
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLambdasOnASingleLine: Inline
+AllowShortLoopsOnASingleLine: false
+AlwaysBreakBeforeMultilineStrings: false
+AlwaysBreakTemplateDeclarations: Yes
+BinPackArguments: true
+BinPackParameters: false
+BreakAfterAttributes: Leave # clang-format 16
+BreakBeforeBinaryOperators: NonAssignment
+BreakBeforeBraces: Attach
+BreakBeforeConceptDeclarations: true
+BreakBeforeTernaryOperators: true
+BreakConstructorInitializers: BeforeComma
+BreakInheritanceList: BeforeComma
+BreakStringLiterals: false
+ColumnLimit: 80
+CompactNamespaces: false
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+ConstructorInitializerIndentWidth: 4
+ContinuationIndentWidth: 4
+Cpp11BracedListStyle: true
+EmptyLineBeforeAccessModifier: Always
+FixNamespaceComments: true
+IndentCaseLabels: true
+IndentExternBlock: Indent
+IndentGotoLabels: true
+IndentPPDirectives: None
+IndentRequires: true # clang-format 14
+IndentWrappedFunctionNames: false
+InsertBraces: true # clang-format 15
+InsertNewlineAtEOF: true # clang-format 16
+IntegerLiteralSeparator: # clang-format 16
+  Binary: 8
+  Decimal: 0
+  Hex: 2
+  HexMinDigits: 8
+LambdaBodyIndentation: Signature
+LineEnding: LF # clang-format 16
+KeepEmptyLinesAtEOF: false # clang-format 17
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+NamespaceIndentation: Inner
+PackConstructorInitializers: CurrentLine # clang-format 14
+PointerAlignment: Right
+QualifierAlignment: Left
+ReflowComments: true
+RequiresClausePosition: OwnLine # clang-format 15
+RequiresExpressionIndentation: OuterScope # clang-format 16
+SeparateDefinitionBlocks: Always
+ShortNamespaceLines: 5
+SortIncludes: "CaseSensitive"
+SortUsingDeclarations: false
+SpaceAfterCStyleCast: false
+SpaceAfterLogicalNot: false
+SpaceAfterTemplateKeyword: false
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCpp11BracedList: false
+SpaceBeforeCtorInitializerColon: true
+SpaceBeforeInheritanceColon: true
+SpaceBeforeParens: ControlStatements
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceBeforeSquareBrackets: false
+SpaceInEmptyBlock: false
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: 1
+SpacesInAngles: "Never"
+SpacesInCStyleCastParentheses: false
+SpacesInConditionalStatement: false
+SpacesInContainerLiterals: true
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+Standard: Latest
+UseCRLF: false
+UseTab: Never
+...

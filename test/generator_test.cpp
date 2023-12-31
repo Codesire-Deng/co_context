@@ -1,4 +1,4 @@
-#ifndef CO_CONTEXT_NO_GENERATOR
+#if !CO_CONTEXT_NO_GENERATOR
 #include <co_context/generator.hpp>
 
 /////////////////////////////////////////////////////////////////////////////
@@ -318,12 +318,11 @@ int main() {
 
     stateful_alloc_example(std::allocator_arg, stateful_allocator<double>{42});
 
-    [[maybe_unused]]
-    member_coro m;
+    [[maybe_unused]] member_coro m;
     assert(*m.f().begin() == 42);
 }
 
-#else // ifndef CO_CONTEXT_NO_GENERATOR
+#else // if !CO_CONTEXT_NO_GENERATOR
 
 #include <iostream>
 

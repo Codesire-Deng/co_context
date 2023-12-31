@@ -10,6 +10,9 @@
 #include <fcntl.h>
 #include <span>
 #include <sys/socket.h>
+#if LIBURINGCXX_HAS_OPENAT2
+#include <linux/openat2.h>
+#endif
 
 struct __kernel_timespec;
 struct epoll_event;
@@ -35,8 +38,7 @@ class sq_entry final : private io_uring_sqe {
         return *this;
     }
 
-    [[nodiscard]]
-    inline uint64_t get_data() const noexcept {
+    [[nodiscard]] inline uint64_t get_data() const noexcept {
         return user_data;
     }
 
@@ -87,8 +89,7 @@ class sq_entry final : private io_uring_sqe {
         return *this;
     }
 
-    [[nodiscard]]
-    inline bool is_cqe_skip() const noexcept {
+    [[nodiscard]] inline bool is_cqe_skip() const noexcept {
         return (this->flags & IOSQE_CQE_SKIP_SUCCESS);
     }
 #endif

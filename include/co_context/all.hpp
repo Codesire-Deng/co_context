@@ -14,6 +14,6 @@
 #include <co_context/utility/defer.hpp>
 #include <co_context/utility/polymorphism.hpp>
 
-#ifndef CO_CONTEXT_NO_GENERATOR
+#if !CO_CONTEXT_NO_GENERATOR
 #include <co_context/generator.hpp>
 #endif

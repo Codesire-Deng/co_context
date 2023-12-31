@@ -1,9 +1,9 @@
 #pragma once
-#include <co_context/config.hpp>
 #include <co_context/detail/compat.hpp>
 #include <co_context/log/log.hpp>
 
 #include <coroutine>
+#include <cstdint>
 #include <memory>
 
 namespace co_context::detail {

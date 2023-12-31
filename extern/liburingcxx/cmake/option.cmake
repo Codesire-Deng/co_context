@@ -1,0 +1,15 @@
+if(CMAKE_VERSION VERSION_LESS 3.21)
+    get_property(not_top DIRECTORY PROPERTY PARENT_DIRECTORY)
+    if(NOT not_top)
+        set(PROJECT_IS_TOP_LEVEL true)
+    endif()
+    unset(not_top)
+endif()
+include(CMakeDependentOption)
+
+if(PROJECT_IS_TOP_LEVEL)
+    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+endif()
+
+cmake_dependent_option(LIBURINGCXX_BUILD_EXAMPLE "Build examples of liburingcxx" ON "PROJECT_IS_TOP_LEVEL" OFF)
+cmake_dependent_option(LIBURINGCXX_BUILD_TEST "Build tests of liburingcxx" ON "PROJECT_IS_TOP_LEVEL" OFF)

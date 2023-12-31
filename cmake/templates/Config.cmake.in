@@ -4,18 +4,6 @@ include(CMakeFindDependencyMacro)
 find_dependency(Threads REQUIRED)
 find_dependency(mimalloc QUIET)
 
-# Get the linux kernel version to liburingcxx
-message(STATUS "target_kernel_version = ${CMAKE_SYSTEM_VERSION}")
-set(kernel_version ${CMAKE_SYSTEM_VERSION})
-string(REGEX MATCH "^([0-9]+)\.([0-9]+)" kernel_version ${kernel_version})
-string(REGEX MATCH "^([0-9]+)" kernel_version_major ${kernel_version})
-string(REGEX REPLACE "^([0-9]+)\\." "" kernel_version_minor ${kernel_version})
-message(STATUS "kernel_version_major = ${kernel_version_major}")
-message(STATUS "kernel_version_minor = ${kernel_version_minor}")
-add_compile_definitions(LIBURINGCXX_KERNEL_VERSION_MAJOR=${kernel_version_major})
-add_compile_definitions(LIBURINGCXX_KERNEL_VERSION_MINOR=${kernel_version_minor})
-unset(kernel_version)
-
 include("${CMAKE_CURRENT_LIST_DIR}/co_context_targets.cmake")
 
 check_required_components(co_context)

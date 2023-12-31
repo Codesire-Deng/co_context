@@ -4,13 +4,13 @@
 // https://godbolt.org/z/5hcaPcfvP
 //
 #pragma once
-#ifdef CO_CONTEXT_STD_GENERATOR
+#ifdef CO_CONTEXT_HAS_STD_GENERATOR
 #include <generator>
 
 namespace co_context {
 using std::generator;
 }
-#elif !defined(CO_CONTEXT_NO_GENERATOR)
+#elif !CO_CONTEXT_NO_GENERATOR
 #pragma GCC system_header
 #include <algorithm>
 #include <cassert>

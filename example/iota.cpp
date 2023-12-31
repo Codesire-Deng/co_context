@@ -1,4 +1,4 @@
-#ifndef CO_CONTEXT_NO_GENERATOR
+#if !CO_CONTEXT_NO_GENERATOR
 
 #include <co_context/generator.hpp>
 
@@ -22,7 +22,7 @@ int main() {
     return 0;
 }
 
-#else // ifndef CO_CONTEXT_NO_GENERATOR
+#else // if !CO_CONTEXT_NO_GENERATOR
 
 #include <iostream>
 
