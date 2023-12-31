@@ -12,10 +12,6 @@ install(DIRECTORY "${co_context_SOURCE_DIR}/include/co_context"
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-install(DIRECTORY "${co_context_SOURCE_DIR}/include/uring"
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-)
-
 install(EXPORT co_context_targets
         FILE co_context_targets.cmake
         NAMESPACE co_context::

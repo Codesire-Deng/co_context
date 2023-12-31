@@ -393,8 +393,8 @@ namespace detail {
 } // namespace detail
 
 template<typename Awaiter>
-auto make_task(Awaiter awaiter) -> task<detail::remove_rvalue_reference_t<
-                                    detail::get_awaiter_result_t<Awaiter>>> {
+auto make_task(Awaiter awaiter) -> task<
+    detail::remove_rvalue_reference_t<detail::get_awaiter_result_t<Awaiter>>> {
     co_return co_await static_cast<Awaiter &&>(awaiter);
 }
 

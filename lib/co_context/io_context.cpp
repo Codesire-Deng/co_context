@@ -1,19 +1,22 @@
-#ifdef CO_CONTEXT_USE_MIMALLOC
+#include <co_context/config/config.hpp>
+#if CO_CONTEXT_USE_MIMALLOC
 #include <mimalloc-new-delete.h>
 #endif
+
 #include <co_context/co/semaphore.hpp>
-#include <co_context/config.hpp>
+#include <co_context/config/io_context.hpp>
 #include <co_context/detail/io_context_meta.hpp>
 #include <co_context/detail/thread_meta.hpp>
 #include <co_context/io_context.hpp>
 #include <co_context/log/log.hpp>
+
+#include <unistd.h>
 
 #include <cassert>
 #include <cstdint>
 #include <exception>
 #include <mutex>
 #include <thread>
-#include <unistd.h>
 
 namespace co_context {
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <co_context/config.hpp>
+#include <co_context/config/io_context.hpp>
 #include <co_context/detail/uring_type.hpp>
 
 namespace co_context {

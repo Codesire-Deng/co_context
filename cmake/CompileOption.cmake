@@ -36,11 +36,10 @@ else()
 endif()
 
 if (mi_version)
-    target_compile_definitions(co_context PRIVATE CO_CONTEXT_USE_MIMALLOC)
-    set(USE_MIMALLOC ON)
+    set(CO_CONTEXT_USE_MIMALLOC ON)
     message(NOTICE "mimalloc ${mi_version} enabled")
 else()
-    set(USE_MIMALLOC OFF)
+    set(CO_CONTEXT_USE_MIMALLOC OFF)
     message(WARNING "mimalloc disabled")
 endif()
 
@@ -48,14 +47,6 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 target_link_libraries(co_context PUBLIC Threads::Threads)
 
-if (USE_MIMALLOC)
+if (CO_CONTEXT_USE_MIMALLOC)
     target_link_libraries(co_context PUBLIC mimalloc)
-endif()
-
-if (co_context_no_generator) # set by check/check_compile.cmake
-    target_compile_definitions(co_context PUBLIC CO_CONTEXT_NO_GENERATOR)
-endif()
-
-if (NOT co_context_has_kernel_rwf_t) # set by check/check_compile.cmake
-    target_compile_definitions(co_context PUBLIC CO_CONTEXT_OFFER_KERNEL_RWF_T)
 endif()

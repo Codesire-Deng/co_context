@@ -1,0 +1,8 @@
+#pragma once
+#ifndef CO_CONTEXT_CONFIG_HPP
+#define CO_CONTEXT_CONFIG_HPP
+
+#cmakedefine01 CO_CONTEXT_NO_GENERATOR
+#cmakedefine01 CO_CONTEXT_USE_MIMALLOC
+
+#endif
