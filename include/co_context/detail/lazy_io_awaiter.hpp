@@ -50,7 +50,7 @@ class lazy_awaiter {
 
     /*NOLINT*/ int32_t await_resume() const noexcept { return result(); }
 
-    std::suspend_never detach() noexcept {
+    std::suspend_never detach() && noexcept {
 #if LIBURINGCXX_IS_KERNEL_REACH(5, 17)
         assert(!sqe->is_cqe_skip());
         sqe->set_cqe_skip();
@@ -462,8 +462,8 @@ struct lazy_link_timeout
     using lazy_link_io::await_suspend;
     using lazy_link_io::await_resume;
 
-    std::suspend_never detach() noexcept {
-        this->last_io->detach();
+    std::suspend_never detach() && noexcept {
+        std::move(*(this->last_io)).detach();
         return {};
     }
 
