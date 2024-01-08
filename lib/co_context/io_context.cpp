@@ -77,7 +77,7 @@ void io_context::do_worker_part() {
     log::v("worker[%u] will run %u times...\n", id, num);
     for (; num > 0; --num) {
         worker.work_once();
-        if constexpr (config::submission_threshold != -1) {
+        if constexpr (config::submission_threshold != -1U) {
             worker.check_submission_threshold();
         }
     }
