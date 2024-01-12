@@ -55,8 +55,8 @@ inline constexpr uint32_t default_io_uring_entries =
  * io_uring immediately. As a result, the actual batch size might be equal
  * to or slightly greater than the threshold.
  */
-inline constexpr uint32_t submission_threshold = 32;
-// inline constexpr uint32_t submission_threshold = -1U;
+// inline constexpr uint32_t submission_threshold = 32;
+inline constexpr uint32_t submission_threshold = -1U;
 // ========================================================================
 
 // =========================== co configuration ===========================
