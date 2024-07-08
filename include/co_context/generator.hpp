@@ -4,7 +4,7 @@
 // https://godbolt.org/z/5hcaPcfvP
 //
 #pragma once
-#ifdef CO_CONTEXT_HAS_STD_GENERATOR
+#if __has_include(<generator>) && defined (__cpp_lib_generator)
 #include <generator>
 
 namespace co_context {
