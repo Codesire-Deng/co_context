@@ -1,0 +1,3 @@
+[submodule "extern/liburingcxx"]
+	path = extern/liburingcxx
+	url = https://github.com/SeverinDenisenko/liburingcxx.git
